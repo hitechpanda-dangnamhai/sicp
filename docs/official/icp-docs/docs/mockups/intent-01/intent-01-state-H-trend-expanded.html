@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Intent 01 — State H — Market Trend Expanded</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+    background: #FDF2F4;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 14px;
+    color: #831447;
+  }
+  .phone-frame {
+    width: 100%;
+    max-width: 414px;
+    height: 844px;
+    max-height: calc(100vh - 48px);
+    background: linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%);
+    border-radius: 24px;
+    overflow: hidden;
+    border: 0.5px solid #F9D8E4;
+    box-shadow: 0 20px 60px rgba(233,30,99,0.18);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  @media (min-width: 1024px) {
+    body { padding: 32px; }
+    .phone-frame { box-shadow: 0 32px 80px rgba(233,30,99,0.24); max-height: calc(100vh - 64px); }
+  }
+  button { font-family: inherit; cursor: pointer; border: none; }
+  input, textarea { font-family: inherit; outline: none; }
+
+  @keyframes pop { 0%{transform:scale(0.96); opacity:0} 100%{transform:scale(1); opacity:1} }
+  @keyframes drift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+  @keyframes glow { 0%,100%{opacity:0.7; transform:scale(1)} 50%{opacity:1; transform:scale(1.05)} }
+  @keyframes pulseRing { 0%{transform:scale(1); opacity:0.5} 100%{transform:scale(1.6); opacity:0} }
+  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+  @keyframes elastic-pop { 0%{transform:scale(0); opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1); opacity:1} }
+  @keyframes slideUp { 0%{transform:translateY(20px); opacity:0} 100%{transform:translateY(0); opacity:1} }
+  .orb { animation: drift 4s ease-in-out infinite; }
+  .pulse-dot { animation: glow 1.6s ease-in-out infinite; }
+  .pulse-ring { animation: pulseRing 2.4s ease-out infinite; }
+  .spinner { animation: spin 1s linear infinite; }
+  .tile { animation: pop 0.5s ease-out backwards; }
+
+  .status-bar {
+    height: 44px;
+    padding: 0 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #831447;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+
+
+  .main-scroll { flex: 1; overflow-y: auto; padding: 8px 18px 150px; }
+
+  /* Hero: big delta number */
+  .trend-hero {
+    background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 50%, #10B981 100%);
+    border-radius: 20px;
+    padding: 22px 18px 18px;
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(16,185,129,0.22);
+  }
+  .trend-hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 140px; height: 140px;
+    background: radial-gradient(circle, rgba(255,255,255,0.45) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .th-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255,255,255,0.85);
+    color: #065F46;
+    padding: 4px 9px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    position: relative;
+    z-index: 1;
+  }
+  .th-delta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 56px;
+    font-weight: 700;
+    color: #065F46;
+    line-height: 1;
+    letter-spacing: -2px;
+    margin: 12px 0 6px;
+    text-shadow: 0 2px 0 rgba(255,255,255,0.4);
+    position: relative;
+    z-index: 1;
+  }
+  .th-headline {
+    font-size: 14px;
+    color: #065F46;
+    font-weight: 700;
+    margin-bottom: 14px;
+    position: relative;
+    z-index: 1;
+  }
+  .th-spark-box {
+    background: rgba(255,255,255,0.9);
+    border-radius: 14px;
+    padding: 12px 14px;
+    position: relative;
+    z-index: 1;
+  }
+  .th-spark-svg {
+    width: 100%;
+    height: 64px;
+    display: block;
+  }
+  .th-spark-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: #047857;
+    font-weight: 600;
+  }
+
+  /* 3 stat cells */
+  .stats-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .stat-cell {
+    background: #FFFFFF;
+    border: 0.5px solid #A7F3D0;
+    border-radius: 14px;
+    padding: 12px 8px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(16,185,129,0.08);
+  }
+  .stat-label {
+    font-size: 9px;
+    color: #047857;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: #065F46;
+  }
+  .stat-value.now {
+    background: linear-gradient(135deg, #10B981, #059669);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .stat-sub {
+    font-size: 9px;
+    color: #047857;
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  /* Section header reuse */
+  .section-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 12px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #065F46;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .section-hint {
+    font-size: 10px;
+    color: #047857;
+    font-weight: 500;
+  }
+
+  /* Related rising chips */
+  .chips-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 18px;
+  }
+  .chip-rising {
+    background: #FFFFFF;
+    border: 0.5px solid #A7F3D0;
+    color: #065F46;
+    padding: 7px 12px;
+    border-radius: 11px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    box-shadow: 0 2px 6px rgba(16,185,129,0.08);
+  }
+  .chip-arrow {
+    color: #10B981;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .chip-rising .chip-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #047857;
+    font-weight: 700;
+    background: rgba(16,185,129,0.12);
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+
+  /* AI reasoning strip */
+  .ai-reasoning {
+    background: linear-gradient(135deg, #FFFFFF 0%, #ECFDF5 100%);
+    border: 0.5px solid #A7F3D0;
+    border-left: 3px solid #10B981;
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 12px rgba(16,185,129,0.1);
+  }
+  .ai-reasoning-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .ai-reasoning-avatar {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10B981, #059669);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .ai-reasoning-tag {
+    font-size: 9px;
+    font-weight: 700;
+    color: #065F46;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+  }
+  .ai-reasoning-body {
+    font-size: 12px;
+    color: #065F46;
+    line-height: 1.55;
+    font-weight: 500;
+  }
+  .ai-reasoning-body strong { color: #047857; font-weight: 700; }
+
+  /* Bottom bar */
+  .bottom-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 10;
+    background: #FFF8F0;
+    box-shadow: 0 -8px 16px rgba(255,248,240,0.95), 0 -16px 24px rgba(255,248,240,0.6);
+    padding: 16px 18px 20px;
+  }
+  .btn-back-form {
+    width: 100%;
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    color: #fff;
+    border-radius: 14px;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    box-shadow: 0 10px 22px rgba(16,185,129,0.3);
+    height: 52px;
+    letter-spacing: -0.2px;
+  }
+
+  .meta-fresh {
+    text-align: center;
+    font-size: 10px;
+    color: #047857;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    margin-top: 10px;
+    margin-bottom: 6px;
+  }
+
+</style>
+</head>
+<body>
+<div class="phone-frame">
+
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="right">
+      <svg width="18" height="11" viewBox="0 0 18 11" fill="none">
+        <rect x="0" y="6" width="3" height="5" rx="1" fill="#831447"/>
+        <rect x="5" y="4" width="3" height="7" rx="1" fill="#831447"/>
+        <rect x="10" y="2" width="3" height="9" rx="1" fill="#831447"/>
+        <rect x="15" y="0" width="3" height="11" rx="1" fill="#831447"/>
+      </svg>
+      <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
+        <path d="M7.5 10.5C8.05 10.5 8.5 10.05 8.5 9.5C8.5 8.95 8.05 8.5 7.5 8.5C6.95 8.5 6.5 8.95 6.5 9.5C6.5 10.05 6.95 10.5 7.5 10.5ZM4 6.5L5 7.5C6.4 6.1 8.6 6.1 10 7.5L11 6.5C9 4.5 6 4.5 4 6.5ZM1 3.5L2 4.5C5.05 1.45 9.95 1.45 13 4.5L14 3.5C10.4 -0.1 4.6 -0.1 1 3.5Z" fill="#831447"/>
+      </svg>
+      <div style="width:24px; height:11px; border:1px solid #831447; border-radius:3px; padding:1px; position:relative;">
+        <div style="width:75%; height:100%; background:#831447; border-radius:1px;"></div>
+        <div style="position:absolute; right:-3px; top:3px; width:2px; height:5px; background:#831447; border-radius:0 1px 1px 0;"></div>
+      </div>
+    </div>
+  </div>
+
+
+    <div style="padding: 4px 18px 12px; flex-shrink: 0;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:0;">
+        <button style="width:36px; height:36px; background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(233,30,99,0.1);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+        <div style="flex:1;">
+          <div style="font-size:16px; font-weight:700; color:#831447; letter-spacing:-0.3px;">Nhu cầu thị trường</div>
+          <div style="font-size:11px; color:#BE185D; font-weight:500; margin-top:1px;">Google Trends · Maggi nước tương 200ml</div>
+        </div>
+        
+      </div>
+      
+    </div>
+    
+  <div class="main-scroll">
+
+    <!-- Hero: big delta -->
+    <div class="trend-hero">
+      <span class="th-tag">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+          <polyline points="17 6 23 6 23 12"/>
+        </svg>
+        Đang tăng mạnh
+      </span>
+      <div class="th-delta">↑34%</div>
+      <div class="th-headline">90 ngày qua, từ khóa "nước tương Maggi" tăng đều</div>
+
+      <div class="th-spark-box">
+        <svg class="th-spark-svg" viewBox="0 0 320 64" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="sparkBig" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#10B981" stop-opacity="0.4"/>
+              <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <!-- horizontal grid lines -->
+          <line x1="0" y1="16" x2="320" y2="16" stroke="#A7F3D0" stroke-width="0.5" stroke-dasharray="2,3"/>
+          <line x1="0" y1="32" x2="320" y2="32" stroke="#A7F3D0" stroke-width="0.5" stroke-dasharray="2,3"/>
+          <line x1="0" y1="48" x2="320" y2="48" stroke="#A7F3D0" stroke-width="0.5" stroke-dasharray="2,3"/>
+          <!-- area + line -->
+          <path d="M0,50 L20,48 L40,49 L60,46 L80,45 L100,43 L120,40 L140,38 L160,34 L180,30 L200,26 L220,22 L240,18 L260,14 L280,10 L300,8 L320,6 L320,64 L0,64 Z" fill="url(#sparkBig)"/>
+          <path d="M0,50 L20,48 L40,49 L60,46 L80,45 L100,43 L120,40 L140,38 L160,34 L180,30 L200,26 L220,22 L240,18 L260,14 L280,10 L300,8 L320,6" stroke="#10B981" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          <!-- last point -->
+          <circle cx="320" cy="6" r="3.5" fill="#fff" stroke="#10B981" stroke-width="2.2"/>
+        </svg>
+        <div class="th-spark-axis">
+          <span>3 tháng trước</span>
+          <span>2 tháng</span>
+          <span>1 tháng</span>
+          <span style="color:#10B981;">Hôm nay</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 stat cells -->
+    <div class="stats-row">
+      <div class="stat-cell">
+        <div class="stat-label">Hiện tại</div>
+        <div class="stat-value now">78</div>
+        <div class="stat-sub">/ 100</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Đỉnh 90d</div>
+        <div class="stat-value">95</div>
+        <div class="stat-sub">tuần trước</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Đáy 90d</div>
+        <div class="stat-value">42</div>
+        <div class="stat-sub">3 tháng trước</div>
+      </div>
+    </div>
+
+    <!-- Related rising chips -->
+    <div class="section-label">
+      <span class="section-title">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#065F46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+          <polyline points="17 6 23 6 23 12"/>
+        </svg>
+        Từ khoá đang lên
+      </span>
+      <span class="section-hint">Tap để thêm vào sản phẩm</span>
+    </div>
+
+    <div class="chips-grid">
+      <span class="chip-rising">
+        <span class="chip-arrow">↑</span>
+        không đường
+        <span class="chip-pct">+120%</span>
+      </span>
+      <span class="chip-rising">
+        <span class="chip-arrow">↑</span>
+        ít muối
+        <span class="chip-pct">+85%</span>
+      </span>
+      <span class="chip-rising">
+        <span class="chip-arrow">↑</span>
+        hữu cơ
+        <span class="chip-pct">+62%</span>
+      </span>
+      <span class="chip-rising">
+        <span class="chip-arrow">↑</span>
+        thuần chay
+        <span class="chip-pct">+48%</span>
+      </span>
+      <span class="chip-rising">
+        <span class="chip-arrow">↑</span>
+        Nhật Bản
+        <span class="chip-pct">+33%</span>
+      </span>
+    </div>
+
+    <!-- AI reasoning -->
+    <div class="ai-reasoning">
+      <div class="ai-reasoning-head">
+        <div class="ai-reasoning-avatar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L9.5 8.5 2 9 7 14 5.5 22 12 18 18.5 22 17 14 22 9 14.5 8.5z"/>
+          </svg>
+        </div>
+        <span class="ai-reasoning-tag">🤖 Aida nhận định</span>
+      </div>
+      <div class="ai-reasoning-body">
+        Trên thị trường Việt Nam, từ khóa <strong>"nước tương Maggi"</strong> tăng <strong>34% trong 90 ngày</strong>. Đặc biệt biến thể <strong>"không đường"</strong> và <strong>"ít muối"</strong> đang được tìm nhiều hơn 2x so với cùng kỳ. Đề xuất: tăng lượng nhập + thêm thuộc tính sức khoẻ vào mô tả sản phẩm để bắt sóng.
+      </div>
+    </div>
+
+    <div class="meta-fresh">Cập nhật 5 phút trước · Google Trends VN</div>
+  </div>
+
+  <div class="bottom-bar">
+    <button class="btn-back-form">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"/>
+        <polyline points="12 19 5 12 12 5"/>
+      </svg>
+      Quay lại form
+    </button>
+  </div>
+
+</div>
+</body>
+</html>

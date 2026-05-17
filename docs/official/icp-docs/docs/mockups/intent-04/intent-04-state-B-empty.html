@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ICP — Intent 04 · B · Empty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+    background: #FDF2F4;
+    min-height: 100vh;
+    color: #831447;
+    padding: 16px 14px 32px;
+  }
+
+  /* === STATE SWITCHER (sticky top) === */
+  .switcher-wrap {
+    max-width: 720px;
+    margin: 0 auto 18px;
+    background: #FFFFFF;
+    border: 0.5px solid #FBCFE8;
+    border-radius: 18px;
+    box-shadow: 0 8px 24px rgba(233,30,99,0.1);
+    padding: 12px 14px;
+    position: sticky;
+    top: 12px;
+    z-index: 50;
+  }
+  .switcher-title {
+    font-size: 11px; color: #BE185D; font-weight: 700; letter-spacing: 0.4px;
+    margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+  }
+  .switcher-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .switcher-btn {
+    flex: 1; min-width: 90px;
+    background: #FCE7F3; color: #9F1239;
+    font-size: 11px; font-weight: 600; letter-spacing: -0.1px;
+    border: none; border-radius: 10px;
+    padding: 8px 8px 9px; cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center; line-height: 1.3;
+  }
+  .switcher-btn:hover { background: #FBCFE8; }
+  .switcher-btn.active {
+    background: linear-gradient(135deg, #E91E63, #FB923C);
+    color: #FFFFFF; box-shadow: 0 4px 10px rgba(233,30,99,0.3);
+  }
+  .switcher-btn .letter {
+    display: inline-block; font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    margin-right: 4px; opacity: 0.85;
+  }
+  .state-meta {
+    font-size: 10px; color: #9F1239; padding-top: 8px; margin-top: 8px;
+    border-top: 0.5px dashed #FBCFE8;
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .state-meta strong { color: #831447; font-weight: 700; }
+
+  /* === PHONE FRAME (centered) === */
+  .frames-area {
+    display: flex; justify-content: center;
+  }
+  .phone-frame {
+    width: 100%;
+    max-width: 414px;
+    background: linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%);
+    border-radius: 24px;
+    overflow: hidden;
+    border: 0.5px solid #F9D8E4;
+    box-shadow: 0 20px 60px rgba(233,30,99,0.18);
+    display: flex;
+    flex-direction: column;
+    min-height: 900px;
+    position: relative;
+  }
+
+  /* States: only active is visible */
+  .state-view { display: flex; flex-direction: column; flex: 1; min-height: 900px; }
+  
+
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+
+  .icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .icon svg { width: 1em; height: 1em; display: block; }
+
+  @keyframes pop { 0%{transform:scale(0.96); opacity:0} 100%{transform:scale(1); opacity:1} }
+  @keyframes slide-in { 0%{transform:translateY(8px); opacity:0} 100%{transform:translateY(0); opacity:1} }
+  @keyframes drift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+  @keyframes glow { 0%,100%{opacity:0.7; transform:scale(1)} 50%{opacity:1; transform:scale(1.05)} }
+  @keyframes pulseRing { 0%{transform:scale(1); opacity:0.6} 100%{transform:scale(1.6); opacity:0} }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes barLoad { 0%{width:5%} 50%{width:60%} 100%{width:5%} }
+  @keyframes shimmer { 0%{background-position:-300px 0} 100%{background-position:300px 0} }
+  @keyframes bump { 0%,100%{transform:scale(1)} 30%{transform:scale(1.3)} 60%{transform:scale(0.95)} }
+  @keyframes toastIn { 0%{transform:translateY(120%); opacity:0} 60%{transform:translateY(-8px); opacity:1} 100%{transform:translateY(0); opacity:1} }
+  @keyframes phaseDone { 0%{transform:scale(0.5); opacity:0} 100%{transform:scale(1); opacity:1} }
+
+  .bubble-anim { animation: slide-in 0.4s ease-out backwards; }
+  .orb { animation: drift 4s ease-in-out infinite; }
+  .pulse-dot { animation: glow 1.6s ease-in-out infinite; }
+  .pulse-ring { animation: pulseRing 2.4s ease-out infinite; }
+  .spin { animation: spin 1s linear infinite; }
+  .bar-load::after {
+    content:''; position:absolute; inset:0; border-radius:inherit;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+    background-size: 300px 100%; animation: shimmer 1.4s linear infinite;
+  }
+  .cart-bump { animation: bump 0.6s cubic-bezier(0.34,1.56,0.64,1); }
+  .toast-anim { animation: toastIn 0.5s cubic-bezier(0.16,1,0.3,1) forwards; }
+
+  .scroll-x { overflow-x: auto; scrollbar-width: none; }
+  .scroll-x::-webkit-scrollbar { display: none; }
+
+  .grad-text-pink-orange {
+    background: linear-gradient(135deg, #E91E63, #FB923C);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .chat-area {
+    flex: 1; overflow-y: auto;
+    padding: 8px 14px 12px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+
+  /* Skeleton block for loading state */
+  .sk {
+    background: linear-gradient(90deg, #FCE7F3 0%, #FBCFE8 50%, #FCE7F3 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M5 12l6 6M5 12l6-6"/></symbol>
+    <symbol id="i-arrow-narrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M15 16l4-4M15 8l4 4"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 18a2 2 0 0 1 2 2 2 2 0 0 1 2 -2 2 2 0 0 1 -2 -2 2 2 0 0 1 -2 2zM16 6a2 2 0 0 1 2 2 2 2 0 0 1 2 -2 2 2 0 0 1 -2 -2 2 2 0 0 1 -2 2zM9 18a6 6 0 0 1 6 -6 6 6 0 0 1 -6 -6 6 6 0 0 1 -6 6 6 6 0 0 1 6 6z"/></symbol>
+    <symbol id="i-dots" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></symbol>
+    <symbol id="i-photo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 8h.01"/><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5"/><path d="M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7h2a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1a2 2 0 0 0 2 2h2a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2"/><circle cx="12" cy="13" r="3"/></symbol>
+    <symbol id="i-microphone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2m0 3a3 3 0 0 1 3 -3h0a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3h0a3 3 0 0 1 -3 -3z"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M8 21l8 0"/><path d="M12 17l0 4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M22 12c-2.667 4.667 -6 7 -10 7s-7.333 -2.333 -10 -7c2.667 -4.667 6 -7 10 -7s7.333 2.333 10 7"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2 -2.96 0 -7 -1 -8c0 3.038 -1.773 4.741 -3 6c-1.226 1.26 -2 3.24 -2 5a6 6 0 1 0 12 0c0 -1.532 -1.056 -3.94 -2 -5c-1.786 3 -2.791 3 -4 2"/></symbol>
+    <symbol id="i-world" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18"/></symbol>
+    <symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5"/><path d="M12 12l8 -4.5"/><path d="M12 12l0 9"/><path d="M12 12l-8 -4.5"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="1"/><path d="M4 7v3.859c0 .537 .213 1.052 .593 1.432l8.116 8.116a2.025 2.025 0 0 0 2.864 0l4.834 -4.834a2.025 2.025 0 0 0 0 -2.864l-8.117 -8.116a2.025 2.025 0 0 0 -1.431 -.593h-3.859a3 3 0 0 0 -3 3z"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/></symbol>
+    <symbol id="i-trending-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6 -6l4 4l8 -8"/><path d="M14 7l7 0l0 7"/></symbol>
+    <symbol id="i-soup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 8.5c0 -.828 -.672 -1.5 -1.5 -1.5s-1.5 .672 -1.5 1.5"/><path d="M15 8.5c0 -.828 -.672 -1.5 -1.5 -1.5s-1.5 .672 -1.5 1.5"/><path d="M11 8.5c0 -.828 -.672 -1.5 -1.5 -1.5s-1.5 .672 -1.5 1.5"/><path d="M3 11h18a8 8 0 0 1 -3.2 6.4l.2 1.6a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1l.2 -1.6a8 8 0 0 1 -3.2 -6.4z"/></symbol>
+    <symbol id="i-glass-full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21l8 0"/><path d="M12 15l0 6"/><path d="M17 3l1 7c0 3.012 -2.686 5 -6 5s-6 -1.988 -6 -5l1 -7h10z"/><path d="M6 10a5 5 0 0 1 6 0a5 5 0 0 0 6 0"/></symbol>
+    <symbol id="i-egg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-3.5 0 -6.5 4.5 -6.5 9s2.5 8 6.5 8s6.5 -3.5 6.5 -8s-3 -9 -6.5 -9z"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l-2 0l9 -9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"/></symbol>
+    <symbol id="i-message-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20l1.3 -3.9a9 8 0 1 1 3.4 2.9l-4.7 1"/><path d="M12 12l0 .01"/><path d="M8 12l0 .01"/><path d="M16 12l0 .01"/></symbol>
+    <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 13h3l3 3h4l3 -3h3"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7" r="4"/><path d="M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+    <symbol id="i-loader" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6l0 -3"/><path d="M16.25 7.75l2.15 -2.15"/><path d="M18 12l3 0"/><path d="M16.25 16.25l2.15 2.15"/><path d="M12 18l0 3"/><path d="M7.75 16.25l-2.15 2.15"/><path d="M6 12l-3 0"/><path d="M7.75 7.75l-2.15 -2.15"/></symbol>
+    <symbol id="i-alert-triangle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path d="M12 16h.01"/></symbol>
+    <symbol id="i-mood-empty" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 10l.01 0"/><path d="M15 10l.01 0"/><path d="M9 15l6 0"/></symbol>
+    <symbol id="i-keyboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10l0 .01"/><path d="M10 10l0 .01"/><path d="M14 10l0 .01"/><path d="M18 10l0 .01"/><path d="M6 14l0 .01"/><path d="M18 14l0 .01"/><path d="M10 14l4 0"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></symbol>
+    <symbol id="i-shopping-cart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><path d="M17 17h-11v-14h-2"/><path d="M6 5l14 1l-1 7h-13"/></symbol>
+    <symbol id="i-circle-check-filled" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M17 3.34a10 10 0 1 1 -14.995 8.984l-.005 -.324l.005 -.324a10 10 0 0 1 14.995 -8.336zm-1.293 5.953a1 1 0 0 0 -1.32 -.083l-.094 .083l-3.293 3.292l-1.293 -1.292l-.094 -.083a1 1 0 0 0 -1.403 1.403l.083 .094l2 2l.094 .083a1 1 0 0 0 1.226 0l.094 -.083l4 -4l.083 -.094a1 1 0 0 0 -.083 -1.32z"/></symbol>
+  </defs>
+</svg>
+
+
+<div style="max-width:720px; margin:0 auto 18px; background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:18px; box-shadow:0 8px 24px rgba(233,30,99,0.1); padding:12px 14px; font-family:'Be Vietnam Pro',-apple-system,sans-serif;">
+  <div style="font-size:11px; color:#BE185D; font-weight:700; letter-spacing:0.4px; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
+    <span class="icon" style="font-size:14px; color:#E91E63;"><svg><use href="#i-sparkles"/></svg></span>
+    INTENT 04 · RECOMMEND BY IMAGE
+  </div>
+  <div style="font-size:14px; color:#831447; font-weight:700; margin-bottom:4px;">B · Empty</div>
+  <div style="font-size:11px; color:#9F1239;">Vespa returns 0 results + 3 fallback CTAs</div>
+  <div style="font-size:10px; color:#10B981; font-weight:600; padding-top:7px; margin-top:7px; border-top:0.5px dashed #FBCFE8;">● BE empty_reason enum · 0 migration</div>
+</div>
+
+<div style="display:flex; justify-content:center;">
+<div class="phone-frame">
+<div class="state-view" data-state="empty">
+
+  <div style="padding:12px 14px 10px; display:flex; align-items:center; gap:10px; background:#FFFFFF; border-bottom:0.5px solid #FCE7F3;">
+    <button style="background:#FCE7F3; border:none; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;"><span class="icon" style="font-size:18px; color:#BE185D;"><svg><use href="#i-arrow-left"/></svg></span></button>
+    <div style="position:relative; width:36px; height:36px;">
+      <div style="width:36px; height:36px; background:radial-gradient(circle at 30% 30%, #FFF 0%, #FFE4E6 35%, #FB923C 100%); border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 14px rgba(190,24,93,0.3);"><span class="icon" style="font-size:18px; color:#BE185D;"><svg><use href="#i-sparkles"/></svg></span></div>
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:14px; color:#831447; font-weight:700; display:flex; align-items:center; gap:6px;">Gợi ý sản phẩm <span style="font-size:9px; background:linear-gradient(135deg, #E91E63, #FB923C); color:#fff; padding:2px 7px; border-radius:6px; font-weight:700;">AI</span></div>
+      <div style="font-size:10px; color:#9F1239; font-weight:500;">Không tìm thấy kết quả</div>
+    </div>
+  </div>
+
+  <div class="chat-area">
+    <!-- USER bubble -->
+    <div style="display:flex; justify-content:flex-end;">
+      <div style="max-width:78%; display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+        <div style="position:relative; width:148px; height:148px; border-radius:18px; overflow:hidden; box-shadow:0 8px 20px rgba(233,30,99,0.25); border:2px solid #FFFFFF;">
+          <div style="position:absolute; inset:0; background:linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%); display:flex; align-items:center; justify-content:center;">
+            <span class="icon" style="font-size:64px; color:rgba(255,255,255,0.7);"><svg><use href="#i-package"/></svg></span>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg, #E91E63, #EC4899); color:#FFFFFF; padding:9px 14px; border-radius:18px 18px 4px 18px; font-size:13px; font-weight:500;">Tìm sản phẩm giống cái này</div>
+      </div>
+    </div>
+
+    <!-- AI bubble: analyzed (still works) -->
+    <div style="display:flex; gap:8px; align-items:flex-start;">
+      <div style="width:30px; height:30px; flex-shrink:0; background:radial-gradient(circle at 30% 30%, #FFF 0%, #FFE4E6 40%, #FB923C 100%); border-radius:50%; display:flex; align-items:center; justify-content:center;"><span class="icon" style="font-size:14px; color:#BE185D;"><svg><use href="#i-sparkles"/></svg></span></div>
+      <div style="flex:1; max-width:calc(100% - 38px);">
+        <div style="background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:4px 18px 18px 18px; padding:12px 14px;">
+          <div style="font-size:13px; color:#831447; font-weight:600; margin-bottom:8px;">Tôi nhận diện được:</div>
+          <div style="display:flex; flex-wrap:wrap; gap:6px;">
+            <span style="display:inline-flex; align-items:center; gap:5px; background:#FCE7F3; color:#831447; font-size:11px; font-weight:600; padding:5px 9px; border-radius:8px;"><span class="icon" style="font-size:11px; color:#BE185D;"><svg><use href="#i-tag"/></svg></span>Đồ điện tử</span>
+            <span style="display:inline-flex; align-items:center; gap:5px; background:#FEF3C7; color:#78350F; font-size:11px; font-weight:600; padding:5px 9px; border-radius:8px;"><span class="icon" style="font-size:11px; color:#92400E;"><svg><use href="#i-package"/></svg></span>Phụ kiện</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI bubble: empty result with friendly tone + CTAs -->
+    <div style="display:flex; gap:8px; align-items:flex-start;">
+      <div style="width:30px; height:30px; flex-shrink:0; background:radial-gradient(circle at 30% 30%, #FFF 0%, #FFE4E6 40%, #FB923C 100%); border-radius:50%; display:flex; align-items:center; justify-content:center;"><span class="icon" style="font-size:14px; color:#BE185D;"><svg><use href="#i-sparkles"/></svg></span></div>
+      <div style="flex:1; max-width:calc(100% - 38px);">
+        <div style="position:relative; background:linear-gradient(135deg, #FFFFFF 0%, #FEF3F8 100%); border:0.5px solid #FBCFE8; border-radius:4px 18px 18px 18px; padding:16px 14px 14px; box-shadow:0 6px 16px rgba(233,30,99,0.08); overflow:hidden;">
+          <div style="position:absolute; top:-20px; right:-20px; width:80px; height:80px; background:radial-gradient(circle, rgba(156,163,175,0.15), transparent 70%); border-radius:50%;"></div>
+          
+          <div style="position:relative; display:flex; gap:10px; margin-bottom:10px;">
+            <div style="width:42px; height:42px; flex-shrink:0; background:linear-gradient(135deg, #FCE7F3, #FBCFE8); border-radius:12px; display:flex; align-items:center; justify-content:center;">
+              <span class="icon" style="font-size:22px; color:#BE185D;"><svg><use href="#i-mood-empty"/></svg></span>
+            </div>
+            <div>
+              <div style="font-size:13px; color:#831447; font-weight:700; line-height:1.3; margin-bottom:3px;">Tiếc quá, shop chưa có loại này</div>
+              <div style="font-size:11px; color:#9F1239; line-height:1.4;">50 sản phẩm hiện tại của anh đều là <strong style="color:#831447;">đồ ăn / gia vị</strong>, chưa có đồ điện tử.</div>
+            </div>
+          </div>
+
+          <!-- 3 fallback CTAs -->
+          <div style="display:flex; flex-direction:column; gap:6px; margin-top:14px; padding-top:12px; border-top:0.5px dashed #FBCFE8;">
+            <div style="font-size:10px; color:#9F1239; font-weight:600; letter-spacing:0.3px; margin-bottom:2px;">CÓ THỂ ANH MUỐN:</div>
+            <button style="display:flex; align-items:center; gap:10px; background:linear-gradient(135deg, #E91E63, #FB923C); border:none; color:#FFFFFF; padding:10px 12px; border-radius:12px; font-size:12px; font-weight:700; text-align:left; box-shadow:0 4px 10px rgba(233,30,99,0.25);">
+              <span class="icon" style="font-size:16px;"><svg><use href="#i-camera"/></svg></span>
+              <div style="flex:1;">Chụp ảnh khác<div style="font-size:10px; font-weight:500; opacity:0.85; margin-top:1px;">Thử sản phẩm shop có bán</div></div>
+              <span class="icon" style="font-size:16px;"><svg><use href="#i-arrow-narrow-right"/></svg></span>
+            </button>
+            <button style="display:flex; align-items:center; gap:10px; background:#FFFFFF; border:0.5px solid #FBCFE8; color:#831447; padding:10px 12px; border-radius:12px; font-size:12px; font-weight:600; text-align:left;">
+              <span class="icon" style="font-size:16px; color:#BE185D;"><svg><use href="#i-keyboard"/></svg></span>
+              <div style="flex:1;">Mô tả bằng chữ thay vì ảnh<div style="font-size:10px; font-weight:500; color:#9F1239; margin-top:1px;">Vd: "tai nghe bluetooth"</div></div>
+              <span class="icon" style="font-size:16px; color:#BE185D;"><svg><use href="#i-arrow-narrow-right"/></svg></span>
+            </button>
+            <button style="display:flex; align-items:center; gap:10px; background:#FFFFFF; border:0.5px solid #FBCFE8; color:#831447; padding:10px 12px; border-radius:12px; font-size:12px; font-weight:600; text-align:left;">
+              <span class="icon" style="font-size:16px; color:#C2410C;"><svg><use href="#i-package"/></svg></span>
+              <div style="flex:1;">Nhập hàng mới<div style="font-size:10px; font-weight:500; color:#9F1239; margin-top:1px;">Mở rộng danh mục shop</div></div>
+              <span class="icon" style="font-size:16px; color:#BE185D;"><svg><use href="#i-arrow-narrow-right"/></svg></span>
+            </button>
+          </div>
+        </div>
+        <div style="font-size:9px; color:#9F1239; padding:3px 6px 0;">empty_reason: category_not_in_inventory</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:10px 14px 12px;">
+    <div style="display:flex; gap:8px; align-items:center; background:linear-gradient(135deg, #FFFFFF, #FEF3F8); border:0.5px solid #FBCFE8; border-radius:30px; padding:6px 6px 6px 18px; box-shadow:0 10px 26px rgba(233,30,99,0.15);">
+      <span class="icon" style="font-size:18px; color:#E91E63;"><svg><use href="#i-sparkles"/></svg></span>
+      <input style="flex:1; background:transparent; border:none; font-size:13px; outline:none; color:#831447;" placeholder="Mô tả sản phẩm bằng chữ..." />
+      <button style="background:#FCE7F3; border:none; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;"><span class="icon" style="font-size:18px; color:#BE185D;"><svg><use href="#i-camera"/></svg></span></button>
+      <button style="background:linear-gradient(135deg, #E91E63, #F43F5E 50%, #FB923C); border:none; width:42px; height:42px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 10px 22px rgba(233,30,99,0.5);"><span class="icon" style="font-size:20px; color:#fff;"><svg><use href="#i-microphone"/></svg></span></button>
+    </div>
+  </div>
+
+</div>
+</div>
+</div>
+
+</body>
+</html>

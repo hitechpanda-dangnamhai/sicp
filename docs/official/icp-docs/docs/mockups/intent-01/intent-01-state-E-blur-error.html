@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Intent 01 — State E — Blur Error</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+    background: #FDF2F4;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 14px;
+    color: #831447;
+  }
+  .phone-frame {
+    width: 100%;
+    max-width: 414px;
+    height: 844px;
+    max-height: calc(100vh - 48px);
+    background: linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%);
+    border-radius: 24px;
+    overflow: hidden;
+    border: 0.5px solid #F9D8E4;
+    box-shadow: 0 20px 60px rgba(233,30,99,0.18);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  @media (min-width: 1024px) {
+    body { padding: 32px; }
+    .phone-frame { box-shadow: 0 32px 80px rgba(233,30,99,0.24); max-height: calc(100vh - 64px); }
+  }
+  button { font-family: inherit; cursor: pointer; border: none; }
+  input, textarea { font-family: inherit; outline: none; }
+
+  @keyframes pop { 0%{transform:scale(0.96); opacity:0} 100%{transform:scale(1); opacity:1} }
+  @keyframes drift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+  @keyframes glow { 0%,100%{opacity:0.7; transform:scale(1)} 50%{opacity:1; transform:scale(1.05)} }
+  @keyframes pulseRing { 0%{transform:scale(1); opacity:0.5} 100%{transform:scale(1.6); opacity:0} }
+  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+  @keyframes elastic-pop { 0%{transform:scale(0); opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1); opacity:1} }
+  @keyframes slideUp { 0%{transform:translateY(20px); opacity:0} 100%{transform:translateY(0); opacity:1} }
+  .orb { animation: drift 4s ease-in-out infinite; }
+  .pulse-dot { animation: glow 1.6s ease-in-out infinite; }
+  .pulse-ring { animation: pulseRing 2.4s ease-out infinite; }
+  .spinner { animation: spin 1s linear infinite; }
+  .tile { animation: pop 0.5s ease-out backwards; }
+
+  .status-bar {
+    height: 44px;
+    padding: 0 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #831447;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+
+
+  .err-content {
+    flex: 1;
+    padding: 20px 22px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-y: auto;
+  }
+  .blurry-preview {
+    width: 220px;
+    height: 220px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, #FCE7F3 0%, #FECDD3 50%, #FED7AA 100%);
+    margin-top: 12px;
+    position: relative;
+    overflow: hidden;
+    border: 3px solid #fff;
+    box-shadow: 0 12px 28px rgba(233,30,99,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: blur(2px);
+  }
+  .blurry-content {
+    text-align: center;
+    color: rgba(190,24,93,0.5);
+  }
+  .err-overlay {
+    position: absolute;
+    inset: -3px;
+    border-radius: 24px;
+    border: 3px dashed rgba(220,38,38,0.6);
+    pointer-events: none;
+  }
+  .err-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: linear-gradient(135deg, #DC2626, #991B1B);
+    color: #fff;
+    padding: 5px 11px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    box-shadow: 0 4px 10px rgba(220,38,38,0.4);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .err-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(220,38,38,0.1);
+    color: #DC2626;
+    padding: 6px 13px;
+    border-radius: 20px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-top: 22px;
+    text-transform: uppercase;
+    border: 0.5px solid rgba(220,38,38,0.3);
+  }
+  .err-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: #831447;
+    text-align: center;
+    margin-top: 14px;
+    letter-spacing: -0.5px;
+    line-height: 1.25;
+  }
+  .err-sub {
+    font-size: 13px;
+    color: #BE185D;
+    text-align: center;
+    margin-top: 8px;
+    font-weight: 500;
+    line-height: 1.5;
+    max-width: 300px;
+  }
+  .err-reasons {
+    width: 100%;
+    margin-top: 24px;
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 16px;
+    border: 0.5px solid #FBCFE8;
+    box-shadow: 0 4px 12px rgba(233,30,99,0.08);
+  }
+  .err-reasons-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #BE185D;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .reason-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 8px 0;
+  }
+  .reason-row + .reason-row {
+    border-top: 0.5px solid #FCE7F3;
+  }
+  .reason-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, #FEF3C7, #FCD34D);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .reason-text {
+    font-size: 12px;
+    color: #831447;
+    line-height: 1.5;
+    font-weight: 500;
+    flex: 1;
+  }
+  .reason-text strong { color: #BE185D; font-weight: 700; }
+  .err-ctas {
+    width: 100%;
+    margin-top: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .btn-primary {
+    width: 100%;
+    background: linear-gradient(135deg, #E91E63 0%, #F43F5E 50%, #FB923C 100%);
+    color: #fff;
+    padding: 16px 20px;
+    border-radius: 16px;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 10px 22px rgba(233,30,99,0.35);
+    letter-spacing: -0.2px;
+  }
+  .btn-secondary {
+    width: 100%;
+    background: #FFFFFF;
+    color: #BE185D;
+    padding: 14px 20px;
+    border-radius: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    border: 0.5px solid #FBCFE8;
+  }
+  .err-code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #9F1239;
+    background: rgba(220,38,38,0.08);
+    padding: 6px 10px;
+    border-radius: 8px;
+    margin-top: 14px;
+    border: 0.5px solid rgba(220,38,38,0.2);
+  }
+
+</style>
+</head>
+<body>
+<div class="phone-frame">
+
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="right">
+      <svg width="18" height="11" viewBox="0 0 18 11" fill="none">
+        <rect x="0" y="6" width="3" height="5" rx="1" fill="#831447"/>
+        <rect x="5" y="4" width="3" height="7" rx="1" fill="#831447"/>
+        <rect x="10" y="2" width="3" height="9" rx="1" fill="#831447"/>
+        <rect x="15" y="0" width="3" height="11" rx="1" fill="#831447"/>
+      </svg>
+      <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
+        <path d="M7.5 10.5C8.05 10.5 8.5 10.05 8.5 9.5C8.5 8.95 8.05 8.5 7.5 8.5C6.95 8.5 6.5 8.95 6.5 9.5C6.5 10.05 6.95 10.5 7.5 10.5ZM4 6.5L5 7.5C6.4 6.1 8.6 6.1 10 7.5L11 6.5C9 4.5 6 4.5 4 6.5ZM1 3.5L2 4.5C5.05 1.45 9.95 1.45 13 4.5L14 3.5C10.4 -0.1 4.6 -0.1 1 3.5Z" fill="#831447"/>
+      </svg>
+      <div style="width:24px; height:11px; border:1px solid #831447; border-radius:3px; padding:1px; position:relative;">
+        <div style="width:75%; height:100%; background:#831447; border-radius:1px;"></div>
+        <div style="position:absolute; right:-3px; top:3px; width:2px; height:5px; background:#831447; border-radius:0 1px 1px 0;"></div>
+      </div>
+    </div>
+  </div>
+
+
+    <div style="padding: 4px 18px 12px; flex-shrink: 0;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:0;">
+        <button style="width:36px; height:36px; background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(233,30,99,0.1);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+        <div style="flex:1;">
+          <div style="font-size:16px; font-weight:700; color:#831447; letter-spacing:-0.3px;">Không nhận diện được</div>
+          <div style="font-size:11px; color:#BE185D; font-weight:500; margin-top:1px;">Aida cần ảnh rõ hơn</div>
+        </div>
+        
+      </div>
+      
+    </div>
+    
+  <div class="err-content">
+
+    <div class="blurry-preview">
+      <div class="err-badge">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        Ảnh mờ
+      </div>
+      <div class="err-overlay"></div>
+      <div class="blurry-content">
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2v6.343c0 .53.21 1.04.586 1.414L18.414 13.586c.375.375.586.884.586 1.414V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5c0-.53.21-1.04.586-1.414L9.414 9.757A2 2 0 0 0 10 8.343V2"/>
+          <line x1="9" y1="2" x2="15" y2="2"/>
+        </svg>
+        <div style="font-size:11px; margin-top:8px; font-weight:600;">IMG_20260517_094555.jpg</div>
+      </div>
+    </div>
+
+    <div class="err-label">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+      </svg>
+      Vision Quality Low
+    </div>
+
+    <h1 class="err-title">Aida chưa đọc<br>được nhãn sản phẩm</h1>
+    <p class="err-sub">
+      Ảnh hơi mờ hoặc thiếu ánh sáng. Hãy chụp lại theo gợi ý dưới đây.
+    </p>
+
+    <div class="err-reasons">
+      <div class="err-reasons-title">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18h6"/>
+          <path d="M10 22h4"/>
+          <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>
+        </svg>
+        Mẹo chụp lại
+      </div>
+
+      <div class="reason-row">
+        <div class="reason-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          </svg>
+        </div>
+        <div class="reason-text">
+          Chụp ở chỗ <strong>sáng hơn</strong> — gần cửa sổ hoặc bật đèn trần
+        </div>
+      </div>
+
+      <div class="reason-row">
+        <div class="reason-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18h6"/>
+            <path d="M11 21h2"/>
+            <circle cx="12" cy="9" r="6"/>
+          </svg>
+        </div>
+        <div class="reason-text">
+          Giữ điện thoại <strong>cách 20-30cm</strong>, đợi tự động lấy nét rồi mới chụp
+        </div>
+      </div>
+
+      <div class="reason-row">
+        <div class="reason-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+          </svg>
+        </div>
+        <div class="reason-text">
+          Đặt sản phẩm <strong>thẳng đứng</strong>, nhãn quay thẳng về camera
+        </div>
+      </div>
+    </div>
+
+    <div class="err-ctas">
+      <button class="btn-primary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+          <path d="M21 3v5h-5"/>
+        </svg>
+        Chụp lại ngay
+      </button>
+      <button class="btn-secondary">
+        Nhập thông tin thủ công
+      </button>
+    </div>
+
+    <div class="err-code">
+      E_VISION_BLUR · trace: a3f2c89...d4e1
+    </div>
+
+  </div>
+
+</div>
+</body>
+</html>

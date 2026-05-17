@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Intent 05 — Promo Applied</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+    background: #FDF2F4;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 14px;
+    color: #831447;
+  }
+  .phone-frame {
+    width: 100%;
+    max-width: 414px;
+    background: linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%);
+    border-radius: 24px;
+    overflow: hidden;
+    border: 0.5px solid #F9D8E4;
+    box-shadow: 0 20px 60px rgba(233,30,99,0.18);
+    display: flex;
+    flex-direction: column;
+    min-height: 844px;
+    position: relative;
+  }
+  @media (min-width: 1024px) {
+    body { padding: 32px; }
+    .phone-frame { box-shadow: 0 32px 80px rgba(233,30,99,0.24); }
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+
+  @keyframes pop { 0%{transform:scale(0.95); opacity:0} 100%{transform:scale(1); opacity:1} }
+  @keyframes slideUp { 0%{transform:translateY(10px); opacity:0} 100%{transform:translateY(0); opacity:1} }
+  @keyframes slideLeft { 0%{transform:translateX(0)} 100%{transform:translateX(-72px)} }
+  @keyframes brainGlow { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+  @keyframes nodePulse { 0%,100%{transform:scale(1); opacity:0.7} 50%{transform:scale(1.4); opacity:1} }
+  @keyframes drift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+  @keyframes shimmer { 0%{background-position:-200px 0} 100%{background-position:200px 0} }
+  @keyframes spin { 100%{transform:rotate(360deg)} }
+  @keyframes bump { 0%,100%{transform:scale(1)} 30%{transform:scale(1.15)} }
+  @keyframes pulseRing { 0%{transform:scale(1); opacity:0.5} 100%{transform:scale(1.6); opacity:0} }
+  @keyframes confettiFall { 0%{transform:translateY(-10px) rotate(0); opacity:0} 30%{opacity:1} 100%{transform:translateY(40px) rotate(360deg); opacity:0} }
+  @keyframes checkPop { 0%{transform:scale(0)} 60%{transform:scale(1.2)} 100%{transform:scale(1)} }
+
+  .pop { animation: pop 0.5s ease-out backwards; }
+  .slide-up { animation: slideUp 0.4s ease-out backwards; }
+  .drift { animation: drift 4s ease-in-out infinite; }
+  .shimmer { background: linear-gradient(90deg, #FCE7F3 0%, #FFF1F5 50%, #FCE7F3 100%); background-size: 400px 100%; animation: shimmer 1.6s linear infinite; }
+  .spin { animation: spin 1s linear infinite; }
+  .bump { animation: bump 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .pulse-ring { animation: pulseRing 2s ease-out infinite; }
+  .check-pop { animation: checkPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+  .ico { width: 1em; height: 1em; display: inline-block; vertical-align: -0.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 18l6-6-6-6"/></symbol>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></symbol>
+    <symbol id="i-bottle" viewBox="0 0 24 24"><path d="M10 2h4M10 2v3l-2 2v13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7l-2-2V2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5.5 3.5 10.7 8 12 4.5-1.3 8-6.5 8-12V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M16 18a2 2 0 0 1 2 2 2 2 0 0 1 2-2 2 2 0 0 1-2-2 2 2 0 0 1-2 2zM16 4a2 2 0 0 1 2 2 2 2 0 0 1 2-2 2 2 0 0 1-2-2 2 2 0 0 1-2 2zM9 18a4 4 0 0 1 4 4 4 4 0 0 1 4-4 4 4 0 0 1-4-4 4 4 0 0 1-4 4z"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 17h13V5H3zM16 9h4l3 4v4h-7"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+    <symbol id="i-cart" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="17" cy="19" r="2"/><path d="M17 17H6V3H4M6 5l14 1-1 7H6"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.24 3.96 2.5 17a2 2 0 0 0 1.71 3h15.58a2 2 0 0 0 1.71-3L13.76 3.96a2 2 0 0 0-3.52 0z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="7"/><path d="m21 21-6-6"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M5 7h2a2 2 0 0 0 2-2 1 1 0 0 1 1-1h4a1 1 0 0 1 1 1 2 2 0 0 0 2 2h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2"/><circle cx="12" cy="13" r="3"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4M4 13a8.1 8.1 0 0 0 15.5 2M20 19v-4h-4"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-package" viewBox="0 0 24 24"><path d="m12 3 9 5v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v10"/></symbol>
+    <symbol id="i-gift" viewBox="0 0 24 24"><path d="M20 12v10H4V12M2 7h20v5H2zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></symbol>
+  </defs>
+</svg>
+
+<div class="phone-frame">
+
+  <!-- STATUS BAR -->
+  <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 22px 0; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700; color:#831447; flex-shrink:0;">
+    <span>9:41</span>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
+        <rect x="0" y="6" width="2" height="4" rx="0.5" fill="#831447"/>
+        <rect x="4" y="4" width="2" height="6" rx="0.5" fill="#831447"/>
+        <rect x="8" y="2" width="2" height="8" rx="0.5" fill="#831447"/>
+        <rect x="12" y="0" width="2" height="10" rx="0.5" fill="#831447"/>
+      </svg>
+      <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
+        <path d="M7 9.5 L1 4 a8 8 0 0 1 12 0z" stroke="#831447" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+      </svg>
+      <div style="width:22px; height:11px; border:1px solid #831447; border-radius:3px; padding:1px; position:relative;">
+        <div style="width:80%; height:100%; background:#831447; border-radius:1px;"></div>
+        <div style="position:absolute; right:-3px; top:3px; width:2px; height:5px; background:#831447; border-radius:0 1px 1px 0;"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <div style="padding:14px 18px 14px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button aria-label="Quay lại" style="background:#FFFFFF; border:0.5px solid #FBCFE8; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#BE185D; box-shadow:0 2px 8px rgba(233,30,99,0.1);">
+        <svg class="ico" style="font-size:17px"><use href="#i-arrow-left"/></svg>
+      </button>
+      <div>
+        <div style="font-size:16px; color:#831447; font-weight:700; letter-spacing:-0.3px;">Giỏ hàng</div>
+        <div style="font-size:10px; color:#BE185D; font-weight:500; display:flex; align-items:center; gap:4px;">
+          <span style="width:5px; height:5px; background:#10B981; border-radius:50%;"></span>
+          4 sản phẩm • Đã áp mã SALE15
+        </div>
+      </div>
+    </div>
+    
+    <button style="background:#FFFFFF; border:0.5px solid #FBCFE8; padding:7px 12px; border-radius:14px; color:#BE185D; font-size:11px; font-weight:600; display:flex; align-items:center; gap:5px; box-shadow:0 2px 8px rgba(233,30,99,0.1);">
+      <svg class="ico" style="font-size:13px"><use href="#i-trash"/></svg>
+      Xoá hết
+    </button>
+  </div>
+  <div class="pop" style="padding:0 16px 12px; flex-shrink:0;">
+    <div style="background:linear-gradient(135deg, #FFFFFF, #FCE7F3); border:0.5px solid #FBCFE8; border-radius:16px; padding:12px 14px; box-shadow:0 8px 20px rgba(233,30,99,0.12); position:relative; overflow:hidden;">
+      <div style="position:absolute; top:-8px; left:20%;">
+        <div style="width:6px; height:8px; background:#E91E63; transform:rotate(20deg); animation:confettiFall 1.5s ease-out 0.2s backwards;"></div>
+      </div>
+      <div style="position:absolute; top:-8px; left:50%;">
+        <div style="width:6px; height:8px; background:#FB923C; transform:rotate(-30deg); animation:confettiFall 1.8s ease-out 0.4s backwards;"></div>
+      </div>
+      <div style="position:absolute; top:-8px; left:75%;">
+        <div style="width:6px; height:8px; background:#10B981; transform:rotate(45deg); animation:confettiFall 1.6s ease-out 0.6s backwards;"></div>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div class="check-pop" style="width:42px; height:42px; background:linear-gradient(135deg, #10B981, #059669); border-radius:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 6px 14px rgba(16,185,129,0.4);">
+          <svg class="ico" style="font-size:22px; color:#fff; stroke-width:3"><use href="#i-check"/></svg>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+            <span style="font-size:9px; color:#10B981; font-weight:700; letter-spacing:1px; text-transform:uppercase;">Áp mã thành công</span>
+          </div>
+          <div style="font-size:14px; color:#831447; font-weight:700; letter-spacing:-0.2px; margin-bottom:2px;">
+            Tiết kiệm <span style="background:linear-gradient(135deg, #E91E63, #FB923C); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; font-family:'JetBrains Mono', monospace;">21.750₫</span>
+          </div>
+          <div style="font-size:10px; color:#9F1239;">Mã <span style="font-family:'JetBrains Mono', monospace; font-weight:700; color:#BE185D;">SALE15</span> giảm 15% toàn giỏ</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex:1; overflow-y:auto; padding:0 16px 240px;">
+
+    <div class="slide-up" style="animation-delay:0.05s; background:#FFFFFF; border:0.5px solid #FBCFE8;  border-radius:16px; padding:12px; margin-bottom:10px; box-shadow:0 4px 12px rgba(233,30,99,0.06); position:relative;">
+      <div style="display:flex; gap:12px;">
+        <div style="width:64px; height:64px; background:linear-gradient(135deg, #FEF3C7, #FCD34D); border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;">
+          <svg class="ico" style="font-size:30px; color:#92400E; opacity:0.7"><use href="#i-bottle"/></svg>
+          <span style="position:absolute; top:-4px; right:-4px; background:linear-gradient(135deg, #F59E0B, #D97706); color:#fff; font-size:9px; font-weight:700; padding:2px 5px; border-radius:6px;">-15%</span>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:9px; color:#9F1239; font-weight:600; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:2px;">MAGGI</div>
+          <div style="font-size:13px; color:#831447; font-weight:600; line-height:1.3; letter-spacing:-0.1px; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Nước tương Maggi đậm đặc 700ml</div>
+          <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:8px;">
+            <span style="font-size:14px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace; letter-spacing:-0.3px;">25.500₫</span>
+            <span style="font-size:11px; color:#9CA3AF; text-decoration:line-through; font-family:'JetBrains Mono', monospace;">30.000₫</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button aria-label="Giảm" style="width:26px; height:26px; background:#FCE7F3; border:0.5px solid #FBCFE8; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#BE185D;">
+                <svg class="ico" style="font-size:14px"><use href="#i-minus"/></svg>
+              </button>
+              <div style="font-size:14px; color:#831447; font-weight:700; min-width:24px; text-align:center; font-family:'JetBrains Mono', monospace;">2</div>
+              <button aria-label="Tăng" style="width:26px; height:26px; background:linear-gradient(135deg, #E91E63, #F43F5E); border:none; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; box-shadow:0 3px 8px rgba(233,30,99,0.32);">
+                <svg class="ico" style="font-size:14px"><use href="#i-plus"/></svg>
+              </button>
+            </div>
+            <div style="font-size:14px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace;">51.000₫</div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+    <div class="slide-up" style="animation-delay:0.1s; background:#FFFFFF; border:0.5px solid #FBCFE8;  border-radius:16px; padding:12px; margin-bottom:10px; box-shadow:0 4px 12px rgba(233,30,99,0.06); position:relative;">
+      <div style="display:flex; gap:12px;">
+        <div style="width:64px; height:64px; background:linear-gradient(135deg, #FEE2E2, #FCA5A5); border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;">
+          <svg class="ico" style="font-size:30px; color:#991B1B; opacity:0.7"><use href="#i-bottle"/></svg>
+          
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:9px; color:#9F1239; font-weight:600; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:2px;">CHIN-SU</div>
+          <div style="font-size:13px; color:#831447; font-weight:600; line-height:1.3; letter-spacing:-0.1px; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Tương ớt Chin-su 250g</div>
+          <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:8px;">
+            <span style="font-size:14px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace; letter-spacing:-0.3px;">17.000₫</span>
+            
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button aria-label="Giảm" style="width:26px; height:26px; background:#FCE7F3; border:0.5px solid #FBCFE8; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#BE185D;">
+                <svg class="ico" style="font-size:14px"><use href="#i-minus"/></svg>
+              </button>
+              <div style="font-size:14px; color:#831447; font-weight:700; min-width:24px; text-align:center; font-family:'JetBrains Mono', monospace;">1</div>
+              <button aria-label="Tăng" style="width:26px; height:26px; background:linear-gradient(135deg, #E91E63, #F43F5E); border:none; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; box-shadow:0 3px 8px rgba(233,30,99,0.32);">
+                <svg class="ico" style="font-size:14px"><use href="#i-plus"/></svg>
+              </button>
+            </div>
+            <div style="font-size:14px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace;">17.000₫</div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+    <div class="slide-up" style="animation-delay:0.15s; background:#FFFFFF; border:0.5px solid #FBCFE8;  border-radius:16px; padding:12px; margin-bottom:10px; box-shadow:0 4px 12px rgba(233,30,99,0.06); position:relative;">
+      <div style="display:flex; gap:12px;">
+        <div style="width:64px; height:64px; background:linear-gradient(135deg, #DBEAFE, #93C5FD); border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;">
+          <svg class="ico" style="font-size:30px; color:#1E40AF; opacity:0.7"><use href="#i-bottle"/></svg>
+          <span style="position:absolute; top:-4px; right:-4px; background:linear-gradient(135deg, #10B981, #059669); color:#fff; font-size:9px; font-weight:700; padding:2px 5px; border-radius:6px;">MỚI</span>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:9px; color:#9F1239; font-weight:600; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:2px;">MAGGI</div>
+          <div style="font-size:13px; color:#831447; font-weight:600; line-height:1.3; letter-spacing:-0.1px; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Hạt nêm Maggi vị thịt heo 400g</div>
+          <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:8px;">
+            <span style="font-size:14px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace; letter-spacing:-0.3px;">35.000₫</span>
+            
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button aria-label="Giảm" style="width:26px; height:26px; background:#FCE7F3; border:0.5px solid #FBCFE8; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#BE185D;">
+                <svg class="ico" style="font-size:14px"><use href="#i-minus"/></svg>
+              </button>
+              <div style="font-size:14px; color:#831447; font-weight:700; min-width:24px; text-align:center; font-family:'JetBrains Mono', monospace;">1</div>
+              <button aria-label="Tăng" style="width:26px; height:26px; background:linear-gradient(135deg, #E91E63, #F43F5E); border:none; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; box-shadow:0 3px 8px rgba(233,30,99,0.32);">
+                <svg class="ico" style="font-size:14px"><use href="#i-plus"/></svg>
+              </button>
+            </div>
+            <div style="font-size:14px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace;">35.000₫</div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+    <div class="slide-up" style="animation-delay:0.2s; background:#FFFFFF; border:0.5px solid #FBCFE8;  border-radius:16px; padding:12px; margin-bottom:10px; box-shadow:0 4px 12px rgba(233,30,99,0.06); position:relative;">
+      <div style="display:flex; gap:12px;">
+        <div style="width:64px; height:64px; background:linear-gradient(135deg, #FED7AA, #FB923C); border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;">
+          <svg class="ico" style="font-size:30px; color:#9A3412; opacity:0.7"><use href="#i-bottle"/></svg>
+          
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:9px; color:#9F1239; font-weight:600; letter-spacing:0.3px; text-transform:uppercase; margin-bottom:2px;">MAGGI</div>
+          <div style="font-size:13px; color:#831447; font-weight:600; line-height:1.3; letter-spacing:-0.1px; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Nước tương Maggi cao cấp 500ml</div>
+          <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:8px;">
+            <span style="font-size:14px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace; letter-spacing:-0.3px;">42.000₫</span>
+            
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button aria-label="Giảm" style="width:26px; height:26px; background:#FCE7F3; border:0.5px solid #FBCFE8; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#BE185D;">
+                <svg class="ico" style="font-size:14px"><use href="#i-minus"/></svg>
+              </button>
+              <div style="font-size:14px; color:#831447; font-weight:700; min-width:24px; text-align:center; font-family:'JetBrains Mono', monospace;">1</div>
+              <button aria-label="Tăng" style="width:26px; height:26px; background:linear-gradient(135deg, #E91E63, #F43F5E); border:none; border-radius:8px; display:flex; align-items:center; justify-content:center; color:#fff; box-shadow:0 3px 8px rgba(233,30,99,0.32);">
+                <svg class="ico" style="font-size:14px"><use href="#i-plus"/></svg>
+              </button>
+            </div>
+            <div style="font-size:14px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace;">42.000₫</div>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+    <div class="slide-up" style="animation-delay:0.3s; background:linear-gradient(135deg, #FFFFFF, #FEF3F8); border:0.5px dashed #FBCFE8; border-radius:14px; padding:12px 14px; margin-bottom:14px;">
+      <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px;">
+        <svg class="ico" style="font-size:14px; color:#BE185D"><use href="#i-gift"/></svg>
+        <span style="font-size:10px; color:#BE185D; font-weight:700; letter-spacing:1px; text-transform:uppercase;">Quà tặng kèm</span>
+      </div>
+      <div style="font-size:12px; color:#831447; line-height:1.5; font-weight:500;">
+        Mua thêm <b style="color:#BE185D; font-family:'JetBrains Mono', monospace;">52.500₫</b> nữa, em tặng anh <b style="color:#BE185D;">1 chai dầu ăn Tường An 250ml</b> miễn phí.
+      </div>
+    </div>
+  </div>
+
+  <div style="position:absolute; bottom:0; left:0; right:0; background:#FFFFFF; border-top:0.5px solid #FCE7F3; padding:14px 18px 20px; box-shadow:0 -8px 24px rgba(233,30,99,0.08); border-radius:18px 18px 24px 24px;">
+    
+    <div style="background:linear-gradient(135deg, #ECFDF5, #D1FAE5); border:0.5px solid #BBF7D0; border-radius:11px; padding:7px 10px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+      <svg class="ico" style="font-size:15px; color:#059669; flex-shrink:0"><use href="#i-truck"/></svg>
+      <div style="flex:1; font-size:11px; color:#065F46; font-weight:500;">Anh đã được <b>miễn phí vận chuyển</b> (đơn từ 100.000₫)</div>
+    </div>
+    
+    <div class="pop" style="background:linear-gradient(135deg, #FCE7F3, #FBCFE8); border:0.5px solid #FBCFE8; border-radius:11px; padding:7px 10px; margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+      <svg class="ico" style="font-size:15px; color:#BE185D; flex-shrink:0"><use href="#i-tag"/></svg>
+      <div style="flex:1; font-size:11px; color:#831447; font-weight:600;">Mã <b style="font-family:'JetBrains Mono', monospace; color:#BE185D;">SALE15</b> đã áp dụng</div>
+      <button style="background:#fff; border:0.5px solid #FBCFE8; color:#BE185D; padding:3px 8px; border-radius:7px; font-size:10px; font-weight:700;">Bỏ</button>
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+        <span style="font-size:12px; color:#9F1239;">Tạm tính (4 món)</span>
+        <span style="font-size:13px; color:#831447; font-weight:600; font-family:'JetBrains Mono', monospace;">145.000₫</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+        <span style="font-size:12px; color:#9F1239;">Giảm giá</span>
+        <span style="font-size:13px; color:#10B981; font-weight:600; font-family:'JetBrains Mono', monospace;">−21.750₫</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:12px; color:#9F1239;">Vận chuyển</span>
+        <span style="font-size:13px; color:#10B981; font-weight:600; font-family:'JetBrains Mono', monospace;">Miễn phí</span>
+      </div>
+    </div>
+
+    <div style="height:0.5px; background:#FCE7F3; margin:0 -2px 12px;"></div>
+
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px;">
+      <div>
+        <div style="font-size:11px; color:#9F1239; font-weight:500; margin-bottom:2px;">Tổng thanh toán</div>
+        <div style="font-size:9px; color:#9F1239; opacity:0.7;">Đã bao gồm VAT</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:22px; font-weight:700; background:linear-gradient(135deg, #E91E63, #FB923C); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; font-family:'JetBrains Mono', monospace; letter-spacing:-0.5px; line-height:1;">123.250₫</div>
+      </div>
+    </div>
+
+    <button style="width:100%; background:linear-gradient(135deg, #E91E63, #F43F5E 50%, #FB923C); border:none; color:#fff; padding:14px; border-radius:16px; font-size:15px; font-weight:700; box-shadow:0 12px 28px rgba(233,30,99,0.42); display:flex; align-items:center; justify-content:center; gap:8px; letter-spacing:0.2px; opacity:1; cursor:pointer;">
+      Thanh toán
+      <svg class="ico" style="font-size:18px"><use href="#i-arrow-right"/></svg>
+    </button>
+
+    <div style="display:flex; align-items:center; justify-content:center; gap:5px; margin-top:10px;">
+      <svg class="ico" style="font-size:12px; color:#10B981"><use href="#i-shield"/></svg>
+      <span style="font-size:10px; color:#9F1239; font-weight:500;">Thanh toán bảo mật • Hoàn tiền nếu lỗi</span>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
