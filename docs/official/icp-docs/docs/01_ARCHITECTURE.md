@@ -202,8 +202,28 @@ vespa.search_trend(category, window_days) -> {score, top_attrs}
 vespa.index(product) -> ok
 vespa.compare_similar(product) -> {avg_price, similar_count, ...}
 
-# Shopee mock
-shopee.price_range(category, attrs) -> {min, max, avg, count}
+# Shopee mock (per ADR-032 — supersedes ADR-008 JSON file approach)
+# Queries Postgres table shopee_prices_mock seeded by shopee-mock-seed-worker at startup.
+# Real Shopee crawler is OUT OF SCOPE for ICP — implemented in a separate project.
+shopee.price_range(category, attrs) -> {
+  found: bool,
+  min: int,        # min_price VND
+  avg: int,        # avg_price VND
+  max: int,        # max_price VND
+  count: int,      # sample_count
+  review_count: int,
+  samples: [       # 3-5 sample products for Intent 01 state D expanded panel
+    {
+      title: str,
+      store: str,
+      price: int,
+      rating: float | null,
+      sold_count: int
+    },
+    ...
+  ],
+  updated_at: ISO8601 str
+}
 
 # Multimodal
 vision.analyze(image_b64) -> {category, attributes, ocr_text}

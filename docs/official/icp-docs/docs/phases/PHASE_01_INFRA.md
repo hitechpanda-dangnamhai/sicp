@@ -176,13 +176,55 @@ icp/
 - [ ] HTTP server mode (JSON-RPC over POST /rpc)
 - [ ] Dockerfile
 
-### Day 6 — Web skeleton (Next.js)
+### Day 6 — Web skeleton (Next.js) — frontend tech stack LOCKED per ADR-033/034/035
+
+**Tech stack đã chốt:**
+- **Framework:** Next.js 14 App Router (per `00_CONTEXT.md` §2)
+- **Styling:** Tailwind CSS v3 (per ADR-033)
+- **Component library:** shadcn/ui copy-paste pattern (per ADR-033)
+- **Animation:** CSS keyframes chủ đạo + Framer Motion `framer-motion/m` (lazy-load) + canvas-confetti (per ADR-034)
+- **State management:** Zustand v5 (per ADR-035)
+- **Server data:** TanStack Query (LOCKED at this phase)
+- **Form state:** react-hook-form (LOCKED at this phase)
+
+**Tasks:**
 - [ ] `apps/web` Next.js 14 App Router init
-- [ ] TailwindCSS + shadcn/ui setup
-- [ ] `app/layout.tsx`, `app/page.tsx` → "ICP loaded"
-- [ ] `lib/api-client.ts` skeleton (gọi gateway)
-- [ ] `lib/sse-client.ts` skeleton (EventSource wrapper)
-- [ ] env variable `NEXT_PUBLIC_API_URL`
+- [ ] **Tailwind CSS v3 setup** với content paths cover all `apps/web/components/**`
+- [ ] **shadcn/ui CLI setup** (`npx shadcn-ui@latest init`) với MoMo Premium tokens import vào `globals.css`
+- [ ] **Framer Motion** install với entry point `framer-motion/m` for lazy-load
+- [ ] **canvas-confetti** install
+- [ ] **Zustand v5** install
+- [ ] **TanStack Query** install + Provider wrap app
+- [ ] **react-hook-form** install
+- [ ] **MSW setup** — `apps/web/src/mocks/handlers.ts` skeleton cho dev và Storybook
+- [ ] Component directory structure (per ADR-033):
+  ```
+  apps/web/components/
+    ├── ui/          ← shadcn copy-paste (Button, Dialog, Toast, Sheet)
+    ├── icp/         ← ICP-specific (BrainIcon, OrbPulse, MicButton, PhoneFrame, BottomBar)
+    ├── layout/      ← Composition layouts
+    ├── cards/       ← ActionCard, ProductCard, AIBubble, UserBubble
+    └── chat/        ← ChatThreadLayout
+  apps/web/stores/   ← Zustand stores (per ADR-035, populated in S-02+)
+  ```
+- [ ] `app/layout.tsx` — wrap với TanStack Query Provider + AuthContext + Toaster
+- [ ] `app/page.tsx` → render `<PhoneFrame>` minimal "ICP loaded" placeholder
+- [ ] `lib/api-client.ts` — import generated client từ `@icp/shared-types/api`, set `OpenAPI.BASE` + `OpenAPI.TOKEN`
+- [ ] `lib/sse-client.ts` — typed wrapper từ `08_FE_BE_CONTRACT.md` section 6
+- [ ] **`lib/tracker.ts`** — behavior event tracker từ `07_BEHAVIOR_LOGS.md` section 7
+- [ ] **NestJS Swagger module** setup ở gateway, script `pnpm openapi:sync` chạy được
+- [ ] **CI step**: `contract-check` workflow verify generated files committed
+- [ ] env vars: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_VERSION`
+- [ ] `globals.css` setup CSS variables MoMo Premium từ `PHASE_00_DESIGN_SYSTEM.md` Section 1
+- [ ] `@media (prefers-reduced-motion)` guard utility classes (per Rule 20 đề xuất)
+- [ ] Dockerfile
+
+**Reference:**
+- ADR-033 component framework
+- ADR-034 animation
+- ADR-035 state management
+- `PHASE_00_DESIGN_SYSTEM.md` Section 1 (color tokens)
+- Slice owner: S-01 UI Foundation (populate components), S-02 Runtime Foundation (Zustand stores + OpenAPI codegen)
 
 ### Day 7 — Glue + CI
 - [ ] `Makefile` hoặc `package.json` root scripts: `make up`, `make seed`, `make logs`, `make down`

@@ -80,9 +80,13 @@
 | **Organisms** | `<ChatThreadLayout>`, `<AnalyticsChartCard>`, `<LineChart>/<BarChart>/<DonutChart>`, `<CartItemRow>`, `<PaymentMethodPicker>`, `<OrderSummary>`, `<EmptyState>` | Intent 02/03/04/07 reuse chat layout; Intent 07 3 chart types confirmed |
 
 **Risks (Rule 7 surface):**
-- Component library framework chưa quyết (shadcn vs Mantine vs Tailwind thuần) — `PHASE_00_HANDOFF.md` open question → human cần chốt trước S-01 brief
-- Animation library chưa quyết (Framer Motion vs CSS-only vs Motion One) → human chốt ở S-01 brief
-- 75 HTML mockup có inline CSS thuần — extract thành React + design tokens là effort lớn → cần budget 5-7 days đủ
+- ✅ Component library framework — RESOLVED via **ADR-033** (shadcn/ui + Tailwind v3)
+- ✅ Animation library — RESOLVED via **ADR-034** (Hybrid CSS-only + Framer Motion + canvas-confetti)
+- ✅ State management — RESOLVED via **ADR-035** (Zustand for cross-component shared)
+- 75 HTML mockup có inline CSS thuần — extract thành React + design tokens là effort lớn → budget 5-7 days cần monitor scope creep
+- Brain icon size strategy < 40px chưa quyết (handoff debt) → resolve ở S-01 brief
+- Cross-intent navigation pattern (router.push vs in-page state) chưa lock → resolve ở S-01 brief
+- i18n strategy (hardcode VN vs i18next) — defer hoặc resolve ở S-01 brief
 
 ---
 
@@ -286,7 +290,7 @@
 | **Type** | V-SLICE |
 | **Method** | **VSP (full)** |
 | **Primary phase spec** | `PHASE_03_IMPORT.md` (full) |
-| **Conflict resolution notes** | (a) Google Trends (ADR-031) chưa trong spec; ADR wins per priority 2. (b) **Shopee price source: human decision 2026-05-18 = Postgres table + local seed worker, NOT JSON file (ADR-008). Propose ADR-032 override.** |
+| **Conflict resolution notes** | (a) Google Trends (ADR-031) chưa trong spec; ADR wins per priority 2 — expand spec at S-07 brief. (b) **Shopee price source: ✅ RESOLVED — ADR-032 ACCEPTED 2026-05-18 overriding ADR-008. Postgres table `shopee_prices_mock` (V008 migration applied) + worker seed. Real crawler OUT OF SCOPE.** |
 | **Depends on** | S-02 (MCP framework, LangGraph interrupt pattern), S-01 (5 action card variants component), S-04 (Vespa indexing pipeline) |
 | **Blocks** | S-11 (flagship demo) |
 | **Output expected** | `apps/ai/src/graphs/intents/importing_by_images.py`, `apps/mcp/src/tools/{vision,gtrends,shopee_mock}.py`, `apps/workers/src/shopee-mock-seed-worker.ts`, **new migration V008__shopee_prices_mock.sql** (subject to ADR-032 approval), Policy DSL evaluator, 5 policies + 2 new |
@@ -313,15 +317,18 @@
 - 4 phase analyzing loading checklist (gom Shopee + Google Trends thành 1 phase "Phân tích thị trường")
 
 **Risks (Rule 7 surface):**
-- **CONFLICT #1 surfaced:** ADR-031 (Google Trends) + mockup `gtrends.interest_over_time` MCP tool vs `PHASE_03_IMPORT.md` Section A chỉ list 4 tools cũ (vision, search_trend, price_range, text.embed) → **ADR + mockup win priorities 1+2**, expand phase spec at S-07 brief
-- **CONFLICT #2 surfaced (NEW from human decision 2026-05-18):** ADR-008 "Mock Shopee crawler — File JSON `infra/seed/shopee-mock.json`" vs **human decision = local Postgres table + worker seed data (real crawler là project khác, OUT OF SCOPE)** → **Propose ADR-032 override ADR-008** at S-07 brief
-  - Action: Add migration V008 schema `shopee_prices_mock` table với fields `category`, `attributes JSONB`, `min_price`, `avg_price`, `max_price`, `sample_count`, `updated_at`
-  - Action: Build `apps/workers/src/shopee-mock-seed-worker.ts` chạy lúc startup seed ~200 fake rows từ pattern data
-  - Action: MCP `shopee.price_range` query Postgres table thay vì JSON file
-  - Action: Document trong `DECISIONS.md` ADR-032 status Proposed → Accepted khi human OK
+- **CONFLICT #1 pending:** ADR-031 (Google Trends) + mockup `gtrends.interest_over_time` MCP tool vs `PHASE_03_IMPORT.md` Section A chỉ list 4 tools cũ (vision, search_trend, price_range, text.embed). → **ADR + mockup win priorities 1+2**. Action: expand phase spec at S-07 brief (Step 4) — add Section A.5 for `gtrends.interest_over_time` tool spec.
+- **CONFLICT #2 ✅ RESOLVED (2026-05-18):** ADR-032 Accepted, supersedes ADR-008.
+  - ✅ Migration V008 created (`infra/migrations/V008__shopee_prices_mock.sql`) — schema `shopee_prices_mock` table với aggregates + samples JSONB (Option 2 design)
+  - ✅ Schema doc updated `02_DATA_MODEL.md`
+  - ✅ MCP tool spec updated `01_ARCHITECTURE.md` Section 6
+  - ✅ Migration roadmap updated `PHASE_00_HANDOFF.md`
+  - ⏳ Implementation pending S-07: build `apps/workers/src/shopee-mock-seed-worker.ts` (Step 5/7 task pack)
+  - ⏳ Implementation pending S-07: MCP `shopee.price_range` query Postgres table (Step 5/7 task pack)
 - Gemini API rate limit cho vision.analyze — pre-warm cache embedding (Redis SHA256 input)
 - Policy DSL evaluator JSONPath subset implementation — 10 unit tests bắt buộc
 - Idempotent commit: re-click "Nhập hàng" không tạo duplicate (`IMP-04` test scenario)
+- Shopee samples JSONB schema — validate ở seed worker code (TypeScript Zod) since không có DB CHECK; document Zod schema trong `packages/shared-types/src/shopee.ts`
 
 ---
 
@@ -542,18 +549,26 @@ S-00 (Q-GATE audit)
 
 ## Known Conflicts Flagged (per Rule 7)
 
-| # | Conflict | Slice surfaces it | Sources | Resolution | Action needed |
+**Status legend:**
+- 🔴 **Pending** — Chưa resolve, sẽ surface ở Slice Brief khi tới slice tương ứng
+- 🟢 **Resolved** — Decision đã chốt, docs đã sync
+
+| # | Conflict | Status | Slice owner | Resolution | Reference |
 |---|---|---|---|---|---|
-| 1 | Cart UI layout | S-05 | Mockup Intent 05 full-screen vs PHASE_04 spec sidebar | Mockup wins (priority 1) | Already documented ADR-05-01 |
-| 2 | Google Trends in PHASE_03 | S-07 | ADR-031 + mockup Intent 01 State B vs PHASE_03_IMPORT spec silent | ADR + mockup win (priorities 1+2) | Expand PHASE_03 spec at S-07 brief |
-| 3 | OTP 3DS state G | S-06 | Mockup Intent 06 State G vs PHASE_04 spec silent | Mockup wins (priority 1) | Design OTP handler at S-06 brief; expand PHASE_04 spec |
-| 4 | Intent 07 3 chart types | S-10 | Mockup 3 charts (line/bar/donut) vs PHASE_05 generic "recharts" | Mockup wins → verify chart_spec schema | Verify chart_spec JSON schema at S-10 brief |
-| 5 | **Shopee price source** | **S-07** | **Human decision 2026-05-18 = Postgres table + local seed worker vs ADR-008 JSON file** | **Human decision wins → propose ADR-032 override ADR-008** | **Add ADR-032 + V008 migration + shopee-mock-seed-worker at S-07 brief; document scope: real crawler là project khác, OUT OF SCOPE ICP** |
-| 6 | Variant B co-purchase data | S-04 | Mockup co-purchase hint requires V006 mat view vs V006 only at S-10 | Use fixture in S-04, real V006 at S-10 | Define fixture format at S-04 brief |
-| 7 | V006 timing | S-09 vs S-10 | S-09 needs co_purchase_matrix, S-10 needs full V006 | Partial apply V006 at S-09, full at S-10 | Plan migration ordering at S-09 brief |
-| 8 | Component framework choice | S-01 | Open question PHASE_00_HANDOFF (shadcn vs Mantine vs Tailwind) | Human decides | Resolve before S-01 brief |
-| 9 | Animation library choice | S-01 | Open question PHASE_00_HANDOFF (Framer Motion vs CSS-only vs Motion One) | Human decides | Resolve before S-01 brief |
-| 10 | State management library | S-01, S-02 | Open question PHASE_00_HANDOFF (Zustand vs Redux vs Context) | Human decides | Resolve before S-02 brief |
+| 1 | Cart UI layout (mockup full-screen vs spec sidebar) | 🟢 Resolved | S-05 | Mockup wins (priority 1) — ADR-05-01 already documented | `DECISIONS.md` ADR-05-01 |
+| 2 | Google Trends in PHASE_03 spec | 🔴 Pending | S-07 | ADR-031 + mockup win (priorities 1+2) — expand PHASE_03 spec at S-07 brief | ADR-031, `PHASE_03_IMPORT.md` (expand) |
+| 3 | OTP 3DS state G handler | 🔴 Pending | S-06 | Mockup wins (priority 1) — design OTP handler at S-06 brief; expand PHASE_04 spec | Mockup `intent-06-state-G-otp.html`, `PHASE_04` (expand) |
+| 4 | Intent 07 3 chart types schema | 🔴 Pending | S-10 | Mockup wins — verify chart_spec JSON schema at S-10 brief | Mockup `intent-07-state-C/D/E`, `03_API_CONTRACTS.md` (expand) |
+| 5 | Shopee price source (Postgres vs JSON) | 🟢 **Resolved 2026-05-18** | S-07 | **ADR-032 Accepted** — Postgres table + seed worker; ADR-008 superseded | ADR-032, V008 migration, `02_DATA_MODEL.md`, `01_ARCHITECTURE.md` |
+| 6 | Variant B co-purchase data fixture | 🔴 Pending | S-04 | Use fixture in S-04, real V006 at S-10 — define fixture format at S-04 brief | `slices/S-04_BRIEF.md` (future) |
+| 7 | V006 timing (S-09 partial vs S-10 full) | 🔴 Pending | S-09 + S-10 | Partial apply V006 (co_purchase_matrix only) at S-09, full at S-10 — plan migration ordering at S-09 brief | `slices/S-09_BRIEF.md` (future) |
+| 8 | Component framework choice | 🟢 **Resolved 2026-05-18** | S-01 | **ADR-033 Accepted** — shadcn/ui + Tailwind v3 | ADR-033, `PHASE_01_INFRA.md` Day 6 (updated) |
+| 9 | Animation library choice | 🟢 **Resolved 2026-05-18** | S-01 | **ADR-034 Accepted** — Hybrid CSS-only + Framer Motion + canvas-confetti | ADR-034 |
+| 10 | State management library | 🟢 **Resolved 2026-05-18** | S-01, S-02 | **ADR-035 Accepted** — Zustand + TanStack Query + react-hook-form + Context + useState (phân chia rõ) | ADR-035 |
+
+**Summary:**
+- ✅ **5 resolved** (#1, #5, #8, #9, #10)
+- 🔴 **5 pending** (#2, #3, #4, #6, #7) — sẽ resolve ở Step 4 Slice Brief của slice tương ứng (per Rule 2 — no full backlog upfront)
 
 ---
 

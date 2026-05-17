@@ -232,6 +232,7 @@ icp.analytics.events      → InsightGenerated, InsightDismissed, InsightActionA
 | **V003 — insights** | Intent 07 + Hero card | P0 | P02 | Persist AI insights cho dashboard |
 | **V005 — payment metadata** | Intent 06 | P1 | P04 | ALTER transactions ADD payment_method, failure_reason, metadata JSONB |
 | **V006 — analytics aggregations** | Intent 07 + Intent 04 co-purchase | P0 | P05 | `analytics_daily` + `analytics_daily_category` materialized views, refresh hourly |
+| **V008 — shopee_prices_mock** ⭐ NEW | Intent 01 | P1 | P03 | Mock Shopee price reference table + seed worker (per ADR-032, supersedes ADR-008 JSON file) |
 
 **Optional (skip-able cho hackathon):**
 
@@ -240,7 +241,9 @@ icp.analytics.events      → InsightGenerated, InsightDismissed, InsightActionA
 | V004 — promotions | Intent 05 free-gift | Skip — hardcode trong response JSON |
 | V007 — media_uploads | Intent 01 | Skip — dùng base64 inline `products.image_data` (ADR-01-01) |
 
-**Total bắt buộc:** 5 migrations (V001+V002+V003+V005+V006). Quản lý được trong hackathon timeline.
+**Total bắt buộc:** 6 migrations (V001+V002+V003+V005+V006+V008). Quản lý được trong hackathon timeline.
+
+**Numbering note:** V004 và V007 skipped, V008 là next available slot. Không có V009 yet.
 
 ### Seed data planned
 
@@ -423,15 +426,20 @@ Phase 00 đã đề xuất 2 rules mới (15, 16, 17, 18 ở handoff Intent 01 v
 
 ## Câu hỏi mở (cần human quyết định trước Phase 01)
 
-- [ ] **Component library framework:** shadcn/ui (Radix + Tailwind, copy-paste) vs Mantine (full library) vs build từ đầu với Tailwind thuần? Mockup hiện dùng CSS thuần — Phase 01 PHẢI quyết định trước khi build atoms.
-- [ ] **Animation library:** Framer Motion (heavy ~30kb) vs CSS-only keyframes (đủ cho 80% mockup hiện tại) vs Motion One (lighter ~5kb)?
-- [ ] **State management:** Zustand vs Redux Toolkit vs React Context? Có 8 intents, mỗi intent có state machine 7-11 states → cần solution scale tốt.
-- [ ] **SSE client implementation:** native EventSource vs `@microsoft/fetch-event-source` (hỗ trợ POST body)? Nhiều endpoint cần POST + SSE (vision upload, voice audio chunks).
-- [ ] **Brain icon size strategy:** simplified version cho < 40px (đã note ở debt) — Phase 02 cần quyết định nay hay later.
-- [ ] **Mock data refresh strategy:** seed file Postgres + manual reset, hay auto-regenerate mỗi N giờ via worker?
-- [ ] **Demo presenter mode:** có cần page `/demo-presenter` với keyboard shortcuts navigate giữa 75 mockup states không? Useful cho hackathon judging.
-- [ ] **Cross-intent navigation:** lúc nào dùng `router.push` vs in-page state change? Mockup hiện chỉ là tĩnh — Phase 01+ cần lock navigation pattern (vd Intent 05 → 06 = full route, Intent 03 → cart = pill overlay).
-- [ ] **i18n strategy:** Hardcode VN copy bây giờ + extract sau, hay setup i18next ngay từ Phase 01? Mockup hiện đều tiếng Việt cứng.
+### ✅ Resolved (2026-05-18 — Step 0-1-2 setup)
+
+- [x] **Component library framework** → **shadcn/ui** (Radix + Tailwind). Decision documented in **ADR-033**.
+- [x] **Animation library** → **Hybrid CSS-only + Framer Motion + canvas-confetti**. Decision documented in **ADR-034**.
+- [x] **State management** → **Zustand** for cross-component, TanStack Query for server, react-hook-form for forms, Context for low-frequency auth, useState for local. Decision documented in **ADR-035**.
+
+### ⏳ Still pending (will resolve at slice-level Step 4)
+
+- [ ] **SSE client implementation:** native EventSource vs `@microsoft/fetch-event-source` (hỗ trợ POST body)? Nhiều endpoint cần POST + SSE (vision upload, voice audio chunks). → Resolve ở **S-02 Runtime Foundation** brief.
+- [ ] **Brain icon size strategy:** simplified version cho < 40px (đã note ở debt) — Phase 02 cần quyết định nay hay later. → Resolve ở **S-01 UI Foundation** brief.
+- [ ] **Mock data refresh strategy:** seed file Postgres + manual reset, hay auto-regenerate mỗi N giờ via worker? → Resolve ở **S-00 Repo Reality Check** audit hoặc **S-02 Runtime Foundation**.
+- [ ] **Demo presenter mode:** có cần page `/demo-presenter` với keyboard shortcuts navigate giữa 75 mockup states không? Useful cho hackathon judging. → Resolve ở **S-11 Demo Hardening**.
+- [ ] **Cross-intent navigation:** lúc nào dùng `router.push` vs in-page state change? Mockup hiện chỉ là tĩnh — Phase 01+ cần lock navigation pattern (vd Intent 05 → 06 = full route, Intent 03 → cart = pill overlay). → Resolve ở **S-01 UI Foundation** brief.
+- [ ] **i18n strategy:** Hardcode VN copy bây giờ + extract sau, hay setup i18next ngay từ Phase 01? Mockup hiện đều tiếng Việt cứng. → Resolve ở **S-01 UI Foundation** brief hoặc defer to S-11 polish.
 
 ---
 

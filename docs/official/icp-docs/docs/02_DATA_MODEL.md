@@ -427,6 +427,122 @@ Mọi service publish/consume PHẢI dùng types từ `packages/shared-types`.
 
 Hackathon scope: **không có soft delete**. Status fields đủ (`status='archived'`). Đơn giản hoá queries.
 
+## X. Mock External Reference Data — Shopee Prices
+
+> **Migration:** V008
+> **ADR reference:** ADR-032 (supersedes ADR-008 JSON file approach)
+> **Date added:** 2026-05-18
+> **Seeded by:** `apps/workers/src/shopee-mock-seed-worker.ts` (idempotent startup worker)
+> **Real crawler:** OUT OF SCOPE for ICP project — handled by a separate project
+
+### Purpose
+
+Cung cấp data reference cho **Intent 01 (Import by Image)** UI:
+- **State B (compact card):** aggregate price range (min/avg/max) cho category + attributes match
+- **State D (expanded panel):** 5 sample products với store name, rating, sold count
+
+### DDL
+
+```sql
+CREATE TABLE shopee_prices_mock (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  -- Categorization (query key)
+  category      VARCHAR(100) NOT NULL,
+  attributes    JSONB NOT NULL DEFAULT '{}',
+    -- {brand?: string, size?: string, variant?: string}
+
+  -- Aggregates (state B)
+  min_price     BIGINT NOT NULL CHECK (min_price >= 0),
+  avg_price     BIGINT NOT NULL CHECK (avg_price >= min_price),
+  max_price     BIGINT NOT NULL CHECK (max_price >= avg_price),
+  sample_count  INT    NOT NULL CHECK (sample_count > 0),
+  review_count  INT    NOT NULL DEFAULT 0,
+
+  -- Samples for state D expanded panel (display-only JSONB)
+  samples       JSONB NOT NULL DEFAULT '[]',
+    -- [
+    --   {
+    --     "title": string,
+    --     "store": string,
+    --     "price": int,
+    --     "rating": float | null,
+    --     "sold_count": int
+    --   }, ...
+    -- ]
+
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  UNIQUE (category, attributes)
+);
+
+CREATE INDEX idx_shopee_category ON shopee_prices_mock(category);
+CREATE INDEX idx_shopee_attrs ON shopee_prices_mock USING GIN (attributes);
+```
+
+### Query patterns
+
+**Pattern 1 — Match by category + brand attribute (MCP `shopee.price_range` hot path):**
+
+```sql
+SELECT min_price, avg_price, max_price, sample_count, review_count, samples, updated_at
+FROM shopee_prices_mock
+WHERE category = $1 AND attributes @> $2::jsonb
+ORDER BY updated_at DESC
+LIMIT 1;
+```
+
+Args: `$1 = 'nuoc_tuong'`, `$2 = '{"brand":"Maggi","size":"200ml"}'`
+
+**Pattern 2 — Fallback by category only (when no attribute match):**
+
+```sql
+SELECT min_price, avg_price, max_price, sample_count, review_count, samples, updated_at
+FROM shopee_prices_mock
+WHERE category = $1
+ORDER BY updated_at DESC
+LIMIT 1;
+```
+
+### Seed worker behavior
+
+`apps/workers/src/shopee-mock-seed-worker.ts` (implement ở slice S-07):
+
+1. Run once at startup
+2. Check `SELECT COUNT(*) FROM shopee_prices_mock` → nếu > 0, skip seed
+3. Insert ~200 rows covering 10 categories × ~20 attribute combos
+4. Use `ON CONFLICT (category, attributes) DO NOTHING` for idempotency
+5. Log `shopee.mock.seeded` với rows_inserted
+
+### Sample data shape (1 row example)
+
+```json
+{
+  "category": "nuoc_tuong",
+  "attributes": {"brand": "Maggi", "size": "200ml"},
+  "min_price": 22000,
+  "avg_price": 24500,
+  "max_price": 28000,
+  "sample_count": 5,
+  "review_count": 1247,
+  "samples": [
+    {"title": "Nước tương Maggi đậu nành nguyên chất 200ml", "store": "Maggi Official", "price": 22000, "rating": 4.9, "sold_count": 8500},
+    {"title": "Maggi nước tương đậu nành chai 200ml", "store": "SiêuThị Online", "price": 24000, "rating": 4.7, "sold_count": 3200},
+    {"title": "Nước tương Maggi cao cấp 200ml + tặng kèm", "store": "Premium Store", "price": 26000, "rating": 4.8, "sold_count": 1500},
+    {"title": "Maggi nước tương đậu nành 200ml combo 3 chai", "store": "Vinmart+", "price": 28000, "rating": 5.0, "sold_count": 920}
+  ]
+}
+```
+
+### Cross-references
+
+- MCP tool spec: `01_ARCHITECTURE.md` Section 6 `shopee.price_range`
+- Mockup: `mockups/intent-01/intent-01-state-B-prefilled.html` + `intent-01-state-D-shopee-expanded.html`
+- Decision: `DECISIONS.md` ADR-032 (supersedes ADR-008)
+- Migration: `infra/migrations/V008__shopee_prices_mock.sql`
+- Seed worker: `apps/workers/src/shopee-mock-seed-worker.ts` (slice S-07)
+- TypeScript Zod schema: `packages/shared-types/src/shopee.ts` (slice S-07)
+
 ---
 
 **END OF DATA MODEL DOC.**

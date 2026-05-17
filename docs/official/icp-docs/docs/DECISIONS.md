@@ -52,11 +52,12 @@
 - **Decision:** 1 Flask app, 8 subgraphs trong cùng process. LangGraph router dispatch.
 - **Rationale:** Hackathon scope, deployment đơn giản, share state easier.
 
-## ADR-008 — Mock Shopee crawler
-- **Status:** Accepted
+## ADR-008 — Mock Shopee crawler ⚠️ SUPERSEDED by ADR-032
+- **Status:** Superseded (2026-05-18) — see ADR-032 below
 - **Context:** Crawl Shopee thật tốn effort + có risk legal.
-- **Decision:** File JSON `infra/seed/shopee-mock.json` với ~200 products fake, MCP tool `shopee.price_range` query file này.
-- **Trade-offs:** Không realistic; demo OK.
+- **Decision (original):** File JSON `infra/seed/shopee-mock.json` với ~200 products fake, MCP tool `shopee.price_range` query file này.
+- **Why superseded:** Decision của human 2026-05-18 — JSON file thiếu data structure cho state D expanded panel (5 sample products với title/store/rating/sold_count). Chuyển sang Postgres table cho phép store sample data structured + worker seed idempotent. Xem ADR-032.
+- **Trade-offs (original):** Không realistic; demo OK.
 
 ## ADR-009 — Next.js single screen architecture
 - **Status:** Accepted
@@ -277,3 +278,192 @@
   - Shopee search volume — không có public API, chỉ có giá
 - **Trade-off:** Thêm 1 external dependency. Hackathon dùng fixture 
   (~30 keywords pre-baked), prod thay bằng pytrends hoặc SerpAPI.
+
+
+## ADR-032 — Shopee price source: Postgres table + local seed worker
+
+- **Status:** Accepted
+- **Date:** 2026-05-18
+- **Supersedes:** ADR-008
+- **Context:**
+  - Mockup Intent 01 state B (compact card) + state D (expanded panel) yêu cầu hiển thị:
+    - Aggregate price data (min/avg/max/sample_count/review_count)
+    - 5 sample products với title, store name, rating, sold_count
+  - Original ADR-008 đề xuất JSON file `infra/seed/shopee-mock.json` — phù hợp aggregates nhưng không lưu sample products structured → state D phải sinh fake at runtime → demo không deterministic.
+  - Human decision (2026-05-18): "Sẽ làm thêm 1 worker tạo 1 bảng giá ảo của Shopee, và so sánh lấy từ bảng giá thôi, và seed data dữ liệu mẫu vào bảng giá đó để lấy lên so sánh."
+- **Decision:**
+  1. Tạo table Postgres `shopee_prices_mock` (V008 migration) với schema:
+     - Aggregates: `min_price`, `avg_price`, `max_price`, `sample_count`, `review_count`
+     - Samples: `samples JSONB` (array of {title, store, price, rating, sold_count})
+     - Match key: `(category, attributes JSONB)` UNIQUE
+  2. Worker `apps/workers/src/shopee-mock-seed-worker.ts` chạy 1 lần lúc startup, idempotent qua `ON CONFLICT DO NOTHING`. Seed ~200 rows covering 10 categories × ~20 attribute combos.
+  3. MCP tool `shopee.price_range(category, attrs)` query Postgres table thay vì JSON file. Trả về aggregates + samples trong 1 SELECT.
+- **Out of scope for ICP project:**
+  - Real Shopee crawler — sẽ implement ở **project khác** (không phải ICP). Khi project đó ship, có thể disable seed worker và point MCP tool sang real data source.
+- **Rationale:**
+  - Mockup state D yêu cầu structured sample data → JSON file không scale
+  - Demo determinism: seed 1 lần → mọi lần demo show same data
+  - Table query với GIN index trên attributes JSONB nhanh + flexible
+  - Worker pattern align với choreography philosophy (ADR-002)
+  - Bảng `shopee_prices_mock` có schema chuẩn → audit trail tốt hơn JSON
+- **Trade-offs:**
+  - Cần 1 migration mới (V008) thay vì chỉ seed JSON
+  - Worker startup logic thêm 1 dependency (chỉ chạy nếu table empty)
+- **Reference:**
+  - Migration: `infra/migrations/V008__shopee_prices_mock.sql`
+  - Worker: `apps/workers/src/shopee-mock-seed-worker.ts` (sẽ implement ở slice S-07)
+  - MCP tool spec update: `docs/01_ARCHITECTURE.md` Section 6
+  - Schema doc: `docs/02_DATA_MODEL.md` Section "Mock external price reference"
+
+---
+
+## ADR-033 — Component library: shadcn/ui + Tailwind CSS
+
+- **Status:** Accepted
+- **Date:** 2026-05-18
+- **Resolves:** Open question in `PHASE_00_HANDOFF.md` Section "Câu hỏi mở"
+- **Context:**
+  - Phase 00 đã LOCK 75 HTML mockup với CSS thuần (50+ CSS variables custom MoMo Premium pink+orange)
+  - S-01 (UI Foundation) cần build React component library từ mockup
+  - 3 options đã xem xét: shadcn/ui, Mantine, Tailwind thuần + Radix
+  - Mockup analysis: cần custom heavy MoMo Premium tokens → ownership styling cao
+  - Constraint: Bundle target < 500KB (PHASE_06_POLISH performance audit), mobile-first 390-414px viewport
+- **Decision:** Sử dụng **shadcn/ui** (Radix UI primitives + Tailwind CSS, copy-paste pattern).
+- **Library versions:**
+  - **Next.js 14** App Router (LOCKED ở `00_CONTEXT.md` §2)
+  - **Tailwind CSS v3** — start với v3 cho stable (shadcn fully supported); upgrade v4 sau hackathon nếu cần
+  - **shadcn/ui** latest 2026-05
+  - **Radix UI primitives** dependencies tự động cài qua shadcn CLI
+- **Rationale:**
+  - Mockup MoMo Premium custom rất nặng → cần ownership code styling 100% → shadcn copy-paste pattern phù hợp nhất
+  - Bundle size hoàn hảo (tree-shake, chỉ ship component đã dùng)
+  - Tiết kiệm 2-3 ngày S-01 vs Tailwind thuần (Dialog/Toast/Dropdown/Sheet/Accordion đã có sẵn từ shadcn)
+  - Accessibility miễn phí (Radix handle ARIA, focus trap, keyboard nav)
+  - Ecosystem chuẩn 2025-2026 cho Next.js 14 App Router — docs + community dồi dào
+  - Mantine bị loại do bundle 80-150KB + theme system fight mockup custom
+- **Component organization (LOCKED):**
+  ```
+  apps/web/components/
+    ├── ui/          ← shadcn copy-paste (Button, Dialog, Toast, Sheet, Tabs, ...)
+    ├── icp/         ← ICP-specific (BrainIcon, OrbPulse, MicButton, PhoneFrame, BottomBar)
+    ├── layout/      ← Composition layouts (ChatThreadLayout, MainScroll)
+    ├── cards/       ← ActionCard, ProductCard, AIBubble, UserBubble
+    └── chat/        ← ChatThreadLayout
+  ```
+- **Trade-offs:**
+  - shadcn không "install package" — phải `npx shadcn-ui@latest add <name>` để copy file. Lần đầu confuse, sau quen OK.
+  - Component ICP-specific (BrainIcon, OrbPulse...) vẫn phải tự build — đây là constraint chung mọi option, không phải nhược điểm shadcn.
+- **Reference:**
+  - Setup: `apps/web/components/` + `apps/web/styles/tokens.css`
+  - Phase 01 task: `PHASE_01_INFRA.md` Day 6 (update reference)
+  - Slice owner: S-01 UI Foundation
+
+---
+
+## ADR-034 — Animation: Hybrid CSS-only + Framer Motion + canvas-confetti
+
+- **Status:** Accepted
+- **Date:** 2026-05-18
+- **Resolves:** Open question in `PHASE_00_HANDOFF.md` Section "Câu hỏi mở"
+- **Context:**
+  - Phase 00 mockup phân tích frequency animation:
+    - `pulse-ring` 7/8 intents, `slide-up` 139 lần, `pop` 101 lần, `shimmer` 69 lần, `pulse-dot` 42 lần (CSS keyframes — đơn giản)
+    - Intent 05 swipe-to-delete + undo (cần gesture + spring physics — không thể CSS thuần)
+    - Intent 05/06 confetti (cần particle system — specialized lib)
+    - SPA state transitions (Intent 01/02/04/07) cần coordinate enter/exit React → cần lib
+  - Constraint: Bundle < 500KB, `prefers-reduced-motion` guard mọi animation (Rule 20 đề xuất `PHASE_00_HANDOFF.md`)
+- **Decision:** Hybrid approach — CSS-only chủ đạo, Framer Motion cho 4 use cases đặc biệt, canvas-confetti cho 2 states confetti.
+- **Sử dụng theo use case (LOCKED):**
+
+  | Animation use case | Tool |
+  |---|---|
+  | pulse-ring, shimmer, slide-up, pop, pulse-dot, spin, orb-pulse, brain-shake, typing-cursor, bubble-anim (~80% mockup) | **CSS keyframes** trong `globals.css` |
+  | Intent 05 swipe-to-delete + undo | **Framer Motion** `useDrag` + `AnimatePresence` |
+  | Intent 05/06 confetti success | **canvas-confetti** (~5KB lib) |
+  | Enter/exit transitions giữa states React | **Framer Motion** `<AnimatePresence>` |
+  | Layout animations (cart add/remove) | **Framer Motion** `<motion.div layout>` |
+- **Library versions:**
+  - **Framer Motion** v11+ (recommend dùng `framer-motion/m` lazy-load entry point → ~5KB initial)
+  - **canvas-confetti** latest
+- **prefers-reduced-motion guard (BẮT BUỘC mọi animation per Rule 20):**
+  - CSS: `@media (prefers-reduced-motion: reduce) { .anim { animation: none; } }`
+  - Framer: `useReducedMotion()` hook + conditional `animate` prop
+  - Components MUST default disable: orb breathe, brain shake, confetti, pulse rings, ring expand
+- **Rationale:**
+  - Mockup hiện đã 100% CSS keyframes → tận dụng, không convert lãng phí
+  - Framer chỉ load khi cần gesture/exit/layout → ~10-35KB bundle tuỳ lazy
+  - canvas-confetti specialized lib tốt hơn tự code particle CSS
+  - Motion One bị loại do React integration yếu + community nhỏ
+- **Trade-offs:**
+  - 2 mental models (CSS vs Framer) — dev phải biết khi nào dùng cái nào → document rõ trong `05_CODING_CONVENTIONS.md`
+  - Bundle ~10-35KB Framer + ~5KB confetti = max ~40KB → vẫn dưới target
+- **Migration mockup → React rule (LOCKED):**
+  - Copy `@keyframes` definitions từ mockup vào `apps/web/styles/globals.css`
+  - KHÔNG "improve" CSS animation sang Framer Motion (vi phạm Rule 6 MOCKUP IS LAW)
+- **Reference:**
+  - Setup: `apps/web/styles/globals.css` + `apps/web/lib/animations.ts`
+  - Phase 01 task: animation utilities setup (S-01)
+  - Slice owner: S-01 UI Foundation + later S-05/S-06 (confetti + swipe)
+
+---
+
+## ADR-035 — State management: Zustand for cross-component, TanStack Query for server, react-hook-form for forms, Context for low-frequency, useState for local
+
+- **Status:** Accepted
+- **Date:** 2026-05-18
+- **Resolves:** Open question in `PHASE_00_HANDOFF.md` Section "Câu hỏi mở"
+- **Context:**
+  - ICP có 8 intents, 7-11 states mỗi intent → cần phân chia state rõ ràng
+  - 5 loại state đã identify:
+    1. Server data (TanStack Query đã LOCK `PHASE_01_INFRA.md`)
+    2. Form state (react-hook-form đã LOCK `PHASE_03_IMPORT.md` §E)
+    3. URL state (Next.js App Router built-in)
+    4. Local component state (React useState)
+    5. **Cross-component shared state** ← ADR này resolve
+  - Cross-component cần ~3-4 stores: intent SSE session, voice recording, session memory ("cái thứ 2"), UI (toast queue + swipe undo)
+  - Constraint: High-frequency state (SSE 20 events/s, voice partial transcript 5/s) → React Context loại do re-render storm
+- **Decision:** Sử dụng **Zustand** cho cross-component shared state high-frequency.
+- **Phân chia rõ ràng (LOCKED — sẽ document trong `05_CODING_CONVENTIONS.md`):**
+
+  | Loại state | Tool | Lý do |
+  |---|---|---|
+  | Server data (products, cart, orders, user profile) | **TanStack Query** | Cache + refetch + invalidate + optimistic |
+  | Form state (login, prefilled, address) | **react-hook-form** | Local form, validation, submit |
+  | Auth status | **React Context** | Low-frequency change |
+  | URL state (current intent, modal open) | **Next.js App Router** | Sharable, back button |
+  | Local component state (toggle, hover) | **React useState** | Built-in, đơn giản |
+  | **Cross-component shared high-frequency** | **Zustand** | Selector pattern, persist, ~1KB |
+- **Stores đề xuất cho ICP (LOCKED initial scope, có thể thêm khi tới slice):**
+  ```
+  apps/web/stores/
+    ├── intent-session.ts       ← Intent SSE streaming (requestId, phase, events)
+    ├── voice-recording.ts      ← Intent 02 + 07 share (status, transcript, audioChunks)
+    ├── session-memory.ts       ← "cái thứ 2" resolve (lastSearchProductIds) + persist sessionStorage
+    └── ui.ts                   ← Toast queue, swipe-to-delete pending undo
+  ```
+- **Library versions:**
+  - **Zustand** v5 latest (breaking change từ v4)
+  - **Zustand middleware:** `persist` (cho session-memory), `devtools` (debug)
+- **Anti-patterns (CẤM trong code review per Rule 5):**
+  - ❌ KHÔNG để Zustand cache server data — đó là việc của TanStack Query
+  - ❌ KHÔNG để Zustand quản lý form input — đó là việc của react-hook-form
+  - ❌ KHÔNG để Zustand thay React.useState cho local toggle — overkill
+  - ❌ KHÔNG dùng React Context cho high-frequency state (SSE, voice) — re-render storm
+- **Next.js 14 App Router pattern (LOCKED):**
+  - Store khai báo trong `stores/*.ts` (server component compatible)
+  - Component dùng store PHẢI có `'use client'` directive
+- **Rationale:**
+  - Zustand API đơn giản nhất, learning curve thấp nhất → hackathon timeline OK
+  - High-frequency state handle tốt qua selector (chỉ component đọc `s.field` re-render khi field thay đổi)
+  - Bundle 1KB là lựa chọn non-zero rẻ nhất
+  - Persist middleware built-in cho session memory
+  - Redux Toolkit bị loại do boilerplate nặng + bundle 13KB
+  - Context bị loại do re-render storm với high-frequency
+  - Jotai loại do community nhỏ hơn + mental model atom khác Zustand
+- **Trade-offs:**
+  - Cần document rõ "khi nào dùng tool nào" để dev không abuse Zustand → `05_CODING_CONVENTIONS.md`
+  - 5 tools state management song song (Zustand + TanStack Query + react-hook-form + Context + useState) — phân chia rõ là CRITICAL
+- **Reference:**
+  - Setup: `apps/web/stores/*.ts`
+  - Phase 01 task: state management scaffolding (S-02)
+  - Slice owner: S-02 Runtime Foundation (initial stores), S-08 + S-10 (voice store), S-05 (UI store)
