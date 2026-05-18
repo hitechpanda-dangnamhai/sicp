@@ -5,7 +5,7 @@
 >
 > **Status:** ACTIVE
 > **Created:** 2026-05-18 Phiên 3
-> **Last updated:** 2026-05-18 Phiên 3 (initial)
+> **Last updated:** 2026-05-18 Phiên 7 (C13 amendment appended)
 
 ---
 
@@ -150,4 +150,68 @@ Phiên 4 T01 kickoff.
 ## Amendments (append below — đó là nơi phiên T01-T08 sẽ thêm decisions 
 phát sinh ack'd bởi human mid-execution)
 
-(empty — no amendments yet)
+---
+
+### C13 (Amendment Phiên 7) — transactions table base DDL bổ sung 2 columns
+
+- **Status:** AMENDMENT approved 2026-05-18 Phiên 7 by human (Option C-clean)
+- **Decision:** `02_DATA_MODEL.md` Section 1 transactions DDL (lines 119-128 
+  pre-patch) bổ sung 2 columns vào base table:
+  - `user_id     UUID NOT NULL REFERENCES users(id)` — denorm cho per-user 
+    failed-transaction lookup hot path
+  - `updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()` — mutable entity 
+    lifecycle/audit pattern parity với orders + products
+- **Rationale:**
+  - V005 (`infra/migrations/V005__payment_metadata.sql`) đã reference 2 
+    columns này:
+    - Line 14-16: `CREATE INDEX idx_transactions_user_failed ON 
+      transactions(user_id, created_at DESC) WHERE status = 'failed';` 
+      — index expect `user_id` column local.
+    - Line 31-34: `UPDATE transactions SET payment_method = 'mock', 
+      completed_at = updated_at WHERE ...;` — backfill expect `updated_at` 
+      column tồn tại.
+  - Thiếu 2 columns này trong V001 base → migration chain V001→V005 
+    sẽ FAIL: ERROR `column "user_id" does not exist` + ERROR `column 
+    "updated_at" does not exist`.
+  - V005 author intent rõ ràng đã expect denorm pattern (index hợp lý 
+    chỉ nếu `user_id` local). Chỉ thiếu update 02_DATA_MODEL.md gốc.
+  - `transactions` là mutable entity (status pending→success/failed; V005 
+    thêm `completed_at`); thiếu `updated_at` thực sự là bug schema cũ.
+- **FK semantics:** `REFERENCES users(id)` KHÔNG có `ON DELETE CASCADE` 
+  (match pattern `orders.user_id` line 98 — giữ transactions cho audit 
+  trail nếu user bị xóa). Nullable: NOT NULL (mỗi transaction phải tied 
+  to a user).
+- **Áp dụng:**
+  - T04 V001 (this session) include 2 columns trong transactions DDL.
+  - T05 seed.ts (Phiên 8) insert transactions phải set `user_id` (lookup 
+    qua order's user_id) + `updated_at` (default NOW()).
+  - 02_DATA_MODEL.md docs file: synced trong same session (Phiên 7) — 
+    output `outputs/code/docs/02_DATA_MODEL.md` lines 119-136 patched 
+    inline với C13 amendment comment block.
+- **Conflict source:** Phiên 7 T04 pre-flight verification phát hiện 
+  V005 references columns không có trong base 02_DATA_MODEL Section 1. 
+  Human chốt Option C-clean (patch base, không silent fix, không defer).
+- **Trade-off considered:**
+  - Option A (preferred Rule 7 surface): V001 strict mirror, V005 fail, 
+    defer docs patch — verdict slice DoD-2 PARTIAL. → REJECTED bởi human.
+  - Option B (silent fix): AI tự add columns không ack — Rule 7 violation. 
+    → KHÔNG đề xuất.
+  - Option C-clean (chosen): patch base với human ack + decisions-log 
+    amendment — Rule 7 compliant (human approved, AI propose), DoD-2 
+    clean PASS expected, schema cohesion ↑.
+- **Cross-impact verified (grep `docs/` + `infra/migrations/`):**
+  - 03_API_CONTRACTS.md line 111 reference `OrderDetail.transactions` 
+    là nested response DTO; KHÔNG spec column shape → no impact.
+  - INTENT_AUDIT_REPORT.md line 199, 201 reference table existence + 
+    metadata column → no impact (V005 thêm metadata vẫn OK).
+  - PHASE_00_HANDOFF.md line 230, 233 reference table existence + V005 
+    intent → no impact.
+  - Không có SELECT/JOIN query nào trong docs reference 
+    `transactions.user_id` cụ thể trước C13 (V005 là first introducer); 
+    C13 ratifies V005 intent.
+- **Pending docs maintainer sync (NON-BLOCKING):**
+  - `s00b-base/docs/02_DATA_MODEL.md` (read-only baseline in bundle) 
+    chưa được edit — chỉ output `outputs/code/docs/02_DATA_MODEL.md` 
+    holds patched version. Docs maintainer batch sync với C8/C9/C10/C11 
+    sau S-00b done bằng cách overwrite từ output patched file (1-line 
+    diff verified).

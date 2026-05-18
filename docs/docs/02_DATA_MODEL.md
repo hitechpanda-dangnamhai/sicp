@@ -117,14 +117,22 @@ CREATE INDEX idx_order_items_order ON order_items(order_id);
 CREATE INDEX idx_order_items_product ON order_items(product_id);
 
 -- TRANSACTIONS (payment)
+-- C13 Amendment (2026-05-18 Phiên 7): user_id + updated_at thêm vào base DDL.
+-- Rationale: V005 index `idx_transactions_user_failed` (user_id) + backfill
+-- `completed_at = updated_at` require 2 columns này tồn tại từ V001.
+-- Denorm user_id (vs JOIN qua orders.user_id) hợp lý cho per-user failed-tx
+-- query hot path. updated_at align với pattern mutable entity (orders/products).
+-- See decisions-log.md C13 amendment.
 CREATE TABLE transactions (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   order_id    UUID NOT NULL REFERENCES orders(id),
+  user_id     UUID NOT NULL REFERENCES users(id),
   amount      BIGINT NOT NULL,
   status      VARCHAR(20) NOT NULL CHECK (status IN ('pending', 'success', 'failed')),
   provider    VARCHAR(40) DEFAULT 'mock',
   external_id VARCHAR(100),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- BEHAVIOR_EVENTS (user behavior cho recommendation/analytics)
