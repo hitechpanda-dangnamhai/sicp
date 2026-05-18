@@ -19,6 +19,17 @@
 -- này; thiếu trong V001 → chain V001→V005 fail. V005 author intent expect
 -- denorm pattern. See decisions-log.md C13 amendment.
 --
+-- Decision C16 (Phiên 8 AMENDMENT 2026-05-18 Path α): behavior_events table
+-- PRIMARY KEY changed từ single-column (event_id) → composite
+-- (event_id, occurred_at). Rationale: Postgres requires unique constraints
+-- on partitioned tables include all partition key columns. Spec gốc
+-- 02_DATA_MODEL.md line 141 + 07_BEHAVIOR_LOGS.md line 149 đều spec single
+-- PK → Postgres 16 reject ERROR "unique constraint on partitioned table
+-- must include all partitioning columns". V001 EXACT mirror nên cũng fail.
+-- Fix in-session với human ack Path α (Phiên 8 smoke test phát hiện).
+-- 2 upstream docs (02_DATA_MODEL.md + 07_BEHAVIOR_LOGS.md) patched cùng
+-- session. See decisions-log.md C16 amendment.
+--
 -- Migration chain: V001 (this) → V002 → V003 → V005 → V006 → V008.
 -- V004 (promotions) + V007 (media_uploads) intentionally skipped per
 -- docs/09_FIELD_AUDIT.md lines 312, 315 (promotions cut hackathon scope;
@@ -249,7 +260,11 @@ CREATE TABLE transactions (
 -- hoặc cron task.
 
 CREATE TABLE behavior_events (
-  event_id     UUID PRIMARY KEY,
+  -- C16 Amendment (Phiên 8): PRIMARY KEY composite (event_id, occurred_at).
+  -- Postgres requires PK on partitioned table include partition key columns.
+  -- Single-column PK on event_id (per upstream spec) → reject.
+  -- See decisions-log.md C16.
+  event_id     UUID NOT NULL,
   event_type   VARCHAR(80) NOT NULL,
   occurred_at  TIMESTAMPTZ NOT NULL,
   received_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -262,7 +277,8 @@ CREATE TABLE behavior_events (
   subject_type VARCHAR(40),
   subject_id   VARCHAR(64),
   properties   JSONB NOT NULL DEFAULT '{}',
-  app_version  VARCHAR(20)
+  app_version  VARCHAR(20),
+  PRIMARY KEY (event_id, occurred_at)
 ) PARTITION BY RANGE (occurred_at);
 
 -- Monthly partitions, Phase 01 tạo trước 3 tháng:
