@@ -102,12 +102,17 @@ icp/
     │   ├── users.json
     │   ├── products.json
     │   ├── policies.json
-    │   ├── shopee-mock.json
     │   └── seed.ts (or .py)
     └── vespa/
         ├── services.xml
         └── schemas/product.sd
 ```
+
+> **Note (C1 patch, S-00 audit):** Trước đây có `infra/seed/shopee-mock.json` 
+> theo ADR-008. ADR-032 (LOCKED 2026-05-18) đã supersede approach này: 
+> mock data giờ ở Postgres table `shopee_prices_mock`, seeded bởi 
+> `apps/workers/src/shopee-mock-seed-worker.ts` lúc startup. 
+> Xem `infra/migrations/V008__shopee_prices_mock.sql`.
 
 ## Tasks ordering (theo dependency)
 
@@ -158,22 +163,8 @@ icp/
   - `auth.verify_jwt` (log `auth.token_verified` / `token_invalid`)
   - `events.append` (log `event.appended`)
   - `products.get`
+- [ ] **Endpoint `GET /health`** (HTTP, riêng biệt với JSON-RPC `/rpc`) — cho DoD-3 readiness probe (patch C4 per S-00 audit)
 - [ ] HTTP server mode (JSON-RPC over POST /rpc), trace context extract from request headers
-- [ ] Dockerfile
-
-### Day 6 — Web skeleton (Next.js) + tracker SDK + OpenAPI codegen
-- [ ] `apps/web` Next.js 14 App Router init (BÁM theo `PHASE_00_DESIGN_SYSTEM.md` đã chốt)
-- [ ] **Component library từ Phase 00 sẵn sàng** — KHÔNG tạo lại
-- [ ] `app/layout.tsx`, `app/page.tsx` → import từ `@/components/ui/*`
-- [ ] `lib/api-client.ts` — import generated client từ `@icp/shared-types/api`, set `OpenAPI.BASE` + `OpenAPI.TOKEN`
-- [ ] `lib/sse-client.ts` — typed wrapper từ `08_FE_BE_CONTRACT.md` section 6
-- [ ] **`lib/tracker.ts`** — behavior event tracker từ `07_BEHAVIOR_LOGS.md` section 7
-- [ ] **NestJS Swagger module** setup ở gateway, script `pnpm openapi:sync` chạy được
-- [ ] **CI step**: `contract-check` workflow verify generated files committed
-- [ ] **MSW setup** — `apps/web/src/mocks/handlers.ts` skeleton cho dev và Storybook
-- [ ] **TanStack Query** Provider wrap app
-- [ ] env vars: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_APP_VERSION`
-- [ ] HTTP server mode (JSON-RPC over POST /rpc)
 - [ ] Dockerfile
 
 ### Day 6 — Web skeleton (Next.js) — frontend tech stack LOCKED per ADR-033/034/035
@@ -269,9 +260,12 @@ icp/
 
 ## Câu hỏi cho human trước khi start
 
-- [ ] Dùng pnpm hay yarn hay npm? (đề xuất pnpm)
-- [ ] Có sẵn API key Gemini và OpenAI chưa?
-- [ ] Test trên local Docker hay máy chủ riêng?
+- [x] ~~Dùng pnpm hay yarn hay npm?~~ → **pnpm** (locked per `MASTER_ROADMAP.md` line 42, patch C5 per S-00 audit)
+- [x] ~~Có sẵn API key Gemini và OpenAI chưa?~~ → **Trạng thái 2026-05-18:** Chưa có. Plan:
+  - **Gemini API key (free tier):** đăng ký tại https://aistudio.google.com/apikey trước khi S-00b kickoff (10 phút, không cần thẻ). Đủ cho dev/test (15 req/min, 1500 req/day).
+  - **OpenAI API key (paid, ~$5 nạp tối thiểu):** chỉ cần trước khi demo hackathon, dùng làm fallback nếu Gemini bị rate limit. Đăng ký tại https://platform.openai.com → Settings → Billing → Add payment → Settings → API keys → Create.
+  - Keys ĐỪNG commit vào git. Setup pattern: `.env.example` (commit, không có giá trị) + `.env` (KHÔNG commit, có giá trị thật, nằm trong `.gitignore`).
+- [x] ~~Test trên local Docker hay máy chủ riêng?~~ → **Local Docker Desktop** (laptop dev). Máy chủ riêng để sau khi tới Phase 06 polish + demo prep.
 
 ---
 
