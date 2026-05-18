@@ -1,0 +1,21 @@
+# =============================================================================
+# apps/ai/pyproject.toml — ICP AI Orchestration service stub (T03)
+# =============================================================================
+# T03 stub manifest. Real dependencies (Flask, LangGraph, langchain-google-genai,
+# langchain-openai, structlog, pydantic, opentelemetry-distro,
+# opentelemetry-instrumentation-flask, opentelemetry-exporter-otlp, etc.)
+# defer S-02 Day 4 per docs/phases/PHASE_01_INFRA.md line 149.
+#
+# Reference: PEP 621 (project metadata in pyproject.toml).
+# =============================================================================
+
+[project]
+name = "icp-ai"
+version = "0.0.1"
+description = "ICP AI orchestration service stub (T03). Real Flask + LangGraph implementation defers to S-02 Day 4."
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

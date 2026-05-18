@@ -1,0 +1,20 @@
+# =============================================================================
+# apps/mcp/pyproject.toml — ICP MCP Tool Server service stub (T03)
+# =============================================================================
+# T03 stub manifest. Real dependencies (pydantic, psycopg, redis, requests,
+# opentelemetry stack, MCP tool registry deps) defer S-02 Day 5 per
+# docs/phases/PHASE_01_INFRA.md line 159.
+#
+# Reference: PEP 621 (project metadata in pyproject.toml).
+# =============================================================================
+
+[project]
+name = "icp-mcp"
+version = "0.0.1"
+description = "ICP MCP Tool Server service stub (T03). Real JSON-RPC tool registry + /health controller defers to S-02 Day 5."
+requires-python = ">=3.11"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

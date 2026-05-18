@@ -1,0 +1,13 @@
+{
+  "name": "@icp/gateway",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ICP API Gateway service stub (T03). Real NestJS implementation defers to S-02 Day 3.",
+  "scripts": {
+    "dev": "echo 'gateway stub — NestJS init in S-02 Day 3'",
+    "build": "echo 'gateway stub — no build at T03'",
+    "lint": "echo 'gateway stub — no lint at T03'",
+    "test": "echo 'gateway stub — no test at T03'",
+    "typecheck": "echo 'gateway stub — no typecheck at T03'"
+  }
+}

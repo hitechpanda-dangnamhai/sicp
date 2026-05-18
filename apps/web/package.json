@@ -1,0 +1,13 @@
+{
+  "name": "@icp/web",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ICP Web (Next.js) service stub (T03 PLACEHOLDER). T08 sẽ overwrite hoàn toàn với Next.js 14.2 + Tailwind 3.4 + shadcn stack (per ADR-033/034/035 + D-03).",
+  "scripts": {
+    "dev": "echo 'web stub — T08 Next.js init replaces this'",
+    "build": "echo 'web stub — T08 overwrite'",
+    "lint": "echo 'web stub — T08 overwrite'",
+    "test": "echo 'web stub — T08 overwrite'",
+    "typecheck": "echo 'web stub — T08 overwrite'"
+  }
+}
