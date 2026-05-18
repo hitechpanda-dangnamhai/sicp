@@ -1,0 +1,10 @@
+# pnpm workspaces declaration
+# Patterns critical:
+#   - `packages/*` (plural) — T02 sẽ init `packages/shared-types`, resolve qua
+#     `@icp/shared-types`. Singular `package/*` typo sẽ break workspace resolution.
+#   - `apps/*` — T02 init `apps/workers`, T03 stub `apps/{gateway,ai,mcp,web}`.
+# Source: docs/00_CONTEXT.md Section 1 repo layout.
+
+packages:
+  - "apps/*"
+  - "packages/*"

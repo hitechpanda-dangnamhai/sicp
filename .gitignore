@@ -1,2 +1,77 @@
+# =============================================================================
+# ICP monorepo .gitignore
+# =============================================================================
 
+# --- Node.js / pnpm ----------------------------------------------------------
+node_modules/
+*.tsbuildinfo
+dist/
+build/
+.turbo/
+
+# --- Next.js -----------------------------------------------------------------
+.next/
+next-env.d.ts
+out/
+
+# --- Python (apps/ai, apps/mcp) ---------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- Env files ---------------------------------------------------------------
+# IMPORTANT: .env.example MUST be committed (template for new contributors).
+# Real secrets go in .env (ignored).
 .env
+.env.local
+.env.*.local
+.env.development
+.env.production
+!.env.example
+
+# --- Logs --------------------------------------------------------------------
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Coverage / test artifacts ----------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+
+# --- IDE / editor ------------------------------------------------------------
+# Default: ignore root .vscode/ for hackathon scope. If team wants shared
+# editor config, un-ignore selectively via `!.vscode/extensions.json` etc.
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ----------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Docker ------------------------------------------------------------------
+# Compose override files for local hacking — keep base committed.
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# --- Misc temp ---------------------------------------------------------------
+*.tmp
+*.bak
+.cache/

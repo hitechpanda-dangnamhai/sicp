@@ -1,0 +1,39 @@
+# EditorConfig is awesome: https://editorconfig.org
+# Top-most EditorConfig file
+root = true
+
+# --- Default cho tất cả file -------------------------------------------------
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# --- TypeScript / JavaScript / JSON / YAML / CSS / HTML ----------------------
+[*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc,yml,yaml,css,scss,html,vue}]
+indent_style = space
+indent_size = 2
+
+# --- Python (apps/ai, apps/mcp) ---------------------------------------------
+# PEP 8: 4 spaces, no tabs.
+[*.{py,pyi}]
+indent_style = space
+indent_size = 4
+
+# --- Markdown ---------------------------------------------------------------
+# IMPORTANT: KHÔNG trim trailing whitespace cho .md vì 2 spaces cuối dòng = 
+# Markdown hard line break.
+[*.md]
+trim_trailing_whitespace = false
+
+# --- Makefile ----------------------------------------------------------------
+# Make REQUIRES tab indentation cho recipe lines. Convert sang space sẽ break.
+[Makefile]
+indent_style = tab
+
+# --- Shell scripts ----------------------------------------------------------
+[*.{sh,bash}]
+indent_style = space
+indent_size = 2

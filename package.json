@@ -1,0 +1,26 @@
+{
+  "name": "icp",
+  "version": "0.0.1",
+  "private": true,
+  "description": "ICP — Intelligent Commerce Platform (Hackathon 2026 monorepo root)",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --stream run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test",
+    "typecheck": "pnpm -r run typecheck",
+    "format": "pnpm -r --parallel run format",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist apps/*/.next",
+    "obs:up": "docker compose -f infra/docker-compose.observability.yml up -d",
+    "obs:down": "docker compose -f infra/docker-compose.observability.yml down"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
