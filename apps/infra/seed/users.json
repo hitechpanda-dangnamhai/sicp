@@ -1,0 +1,32 @@
+[
+  {
+    "email": "merchant1@demo.icp",
+    "password": "demo1234",
+    "role": "merchant",
+    "display_name": "Anh Nam"
+  },
+  {
+    "email": "merchant2@demo.icp",
+    "password": "demo1234",
+    "role": "merchant",
+    "display_name": "Chị Lan"
+  },
+  {
+    "email": "customer1@demo.icp",
+    "password": "demo1234",
+    "role": "customer",
+    "display_name": "Khách 1"
+  },
+  {
+    "email": "customer2@demo.icp",
+    "password": "demo1234",
+    "role": "customer",
+    "display_name": "Khách 2"
+  },
+  {
+    "email": "admin@demo.icp",
+    "password": "demo1234",
+    "role": "admin",
+    "display_name": "Admin"
+  }
+]

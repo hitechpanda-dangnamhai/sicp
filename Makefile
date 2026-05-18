@@ -51,8 +51,17 @@ migrate:
 	bash infra/migrations/apply.sh
 
 # `seed.ts` được T05 tạo. Depends on migrate xong trước.
+# C14 Amendment (Phiên 8 2026-05-18 Path B): replaced `node infra/seed/seed.ts`
+# với `pnpm --filter @icp/seed run seed` vì:
+#   1. seed.ts là TypeScript — `node` không parse TS syntax → SyntaxError runtime.
+#   2. `infra/seed` đã được add vào pnpm-workspace.yaml packages glob (cùng C14),
+#      package `@icp/seed` resolve được qua workspace; deps (pg/bcryptjs/dotenv/tsx)
+#      install tự động khi root `pnpm install`.
+#   3. Script `seed` trong infra/seed/package.json invokes `tsx seed.ts` (D-05
+#      ESM + tsx runner per execution guide §4.5 line 1274).
+# See decisions-log.md C14 amendment.
 seed: migrate
-	node infra/seed/seed.ts
+	pnpm --filter @icp/seed run seed
 
 # --- Vespa ------------------------------------------------------------------
 # `deploy.sh` được T06 tạo. Zip schemas/services.xml + POST tới Vespa config server.

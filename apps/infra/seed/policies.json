@@ -1,0 +1,41 @@
+[
+  {
+    "code": "PRICE_TOO_HIGH_v1",
+    "description": "Cảnh báo khi merchant submit product draft với giá cao hơn 20% so với median market price.",
+    "rule_dsl": {
+      "trigger": "ProductDraftSubmitted",
+      "condition": {
+        "field": "price_vs_median_pct",
+        "op": ">",
+        "value": 20
+      },
+      "action": {
+        "type": "SUGGEST_PRICE",
+        "template": "price_outlier_warn"
+      }
+    },
+    "priority": 100,
+    "enabled": true
+  },
+  {
+    "code": "LOW_STOCK_HOT_v1",
+    "description": "Cảnh báo khi stock của product hot (trend cao) xuống thấp — gợi ý vay credit để bổ sung hàng.",
+    "rule_dsl": {
+      "trigger": "StockChanged",
+      "condition": {
+        "field": "stock_and_trend",
+        "op": "lt_with_hot",
+        "value": {
+          "stock_max": 10,
+          "trend_min": 0.7
+        }
+      },
+      "action": {
+        "type": "SUGGEST_CREDIT_LOAN",
+        "template": "low_stock_hot_warn"
+      }
+    },
+    "priority": 90,
+    "enabled": true
+  }
+]
