@@ -35,6 +35,7 @@ env/
 .env
 .env.local
 .env.*.local
+.env.key
 .env.development
 .env.production
 !.env.example

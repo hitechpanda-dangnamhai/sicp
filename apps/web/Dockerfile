@@ -1,33 +1,74 @@
 # =============================================================================
-# apps/web/Dockerfile — ICP Web (Next.js) — T03 PLACEHOLDER
+# apps/web/Dockerfile — ICP Web (Next.js 14 standalone) production build
 # =============================================================================
-# Stage:    T03 stub (S-00b Foundation Scaffold, Phiên 6)
-# Purpose:  Minimal HTTP server respond GET /health → 200 {status:ok,stub:true}.
-#           T03 mục tiêu chỉ là cho compose build context resolve được tại T08.
+# Slice:    S-00b Foundation Scaffold (T08)
+# Status:   OVERWRITES T03 stub. T03 file declared this overwrite sanctioned
+#           ("T08 SẼ OVERWRITE FILE NÀY HOÀN TOÀN" — T03 Dockerfile line 8).
 #
-# *** T08 SẼ OVERWRITE FILE NÀY HOÀN TOÀN ***
-# T08 sẽ thay bằng Next.js 14 multi-stage build (builder + runner stages, per
-# ADR-033/034/035 + decisions-log.md D-03 — Next.js 14.2.x + Tailwind 3.4.x +
-# shadcn). Lý do sequencing: T08 cần web source code (app/, components/,
-# globals.css, next.config.js) trước khi viết production Dockerfile.
+# Build context per Q-3 A LOCKED:
+#   compose `web.build.context: ..` = monorepo root.
+#   compose `web.build.dockerfile: apps/web/Dockerfile`.
+# This is asymmetric vs gateway/ai/mcp (which use `context: ../apps/<svc>`)
+# because Next.js multi-stage build needs to COPY pnpm-workspace.yaml + root
+# package.json + packages/shared-types/package.json for workspace resolution.
+# See `.dockerignore` at repo root (Q-7 A) to keep build context lean
+# (excludes node_modules/.next/.git/docs/s00b-outputs).
 #
-# Port:     3000 (per docs/phases/PHASE_01_INFRA.md line 31)
-# Base:     node:20-alpine (per decisions-log.md D-03 — Node 20 LTS)
+# Source skeleton: slices/S-00b_EXECUTION_GUIDE.md Section 4.8 lines 2486-2525.
+#
+# Stage layout:
+#   1. deps    — Resolve pnpm workspace deps for web + transitive shared-types.
+#   2. builder — Build @icp/shared-types then @icp/web (Next.js standalone).
+#   3. runner  — Minimal production image with server.js + static + public.
+#
+# Healthcheck targets `/api/health` per Q-1 A LOCKED (see
+# app/api/health/route.ts).
 # =============================================================================
 
-FROM node:20-alpine
-
+# --- Stage 1: deps ----------------------------------------------------------
+FROM node:20-alpine AS deps
+RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json ./
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/shared-types/package.json ./packages/shared-types/
+
+RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN pnpm install --frozen-lockfile
+
+# --- Stage 2: builder -------------------------------------------------------
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY . .
+
+RUN corepack enable && corepack prepare pnpm@9 --activate
+RUN pnpm --filter @icp/shared-types build
+RUN pnpm --filter @icp/web build
+
+# --- Stage 3: runner --------------------------------------------------------
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Next.js standalone output produces:
+#   .next/standalone/  → self-contained server.js + minimal node_modules
+#   .next/static/      → static assets (chunked JS/CSS, optimized images)
+#   public/            → user-provided static files (favicon, robots.txt, etc)
+COPY --from=builder /app/apps/web/.next/standalone ./
+COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/public ./apps/web/public
 
 EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-# Stub HTTP server inline — same pattern apps/gateway/Dockerfile (per Q-4 ack
-# Option A: web cũng expose /health stub để DoD-3 literal được thỏa mãn ngay
-# T03). CommonJS `require` per Q-1 ack. CMD array form cho PID 1 signaling.
-CMD ["node", "-e", "require('http').createServer((req,res)=>{if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({status:'ok',stub:true}));}else{res.writeHead(404);res.end();}}).listen(3000,()=>console.log('web stub listening on 3000 — T08 will replace with Next.js'))"]
+# Healthcheck per D-02 (stateless tier) + Q-1 A (route `/api/health`).
+# start-period=30s matches compose web service (Next.js cold-start buffer).
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=30s \
+  CMD wget -q -O- http://127.0.0.1:3000/api/health || exit 1
 
-# Healthcheck per decisions-log.md D-02 (stateless defaults).
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-  CMD wget -q -O- http://localhost:3000/health || exit 1
+CMD ["node", "apps/web/server.js"]

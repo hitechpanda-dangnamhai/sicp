@@ -7,6 +7,16 @@
 #   make up && make seed
 #
 # Source: docs/phases/PHASE_01_INFRA.md Day 7 + slices/S-00b_EXECUTION_GUIDE.md §4.1
+#
+# C22.b Amendment (Phiên 10 2026-05-18 Path Q-3 B-controlled): targets `up` và
+# `obs-up` được thêm idempotent network bootstrap line `docker network inspect
+# icp >/dev/null 2>&1 || docker network create icp` BEFORE compose up command.
+# Lý do: `docker-compose.observability.yml` (T07) declare network `icp` là
+# `external: true` — compose KHÔNG tự tạo external network, user trước đó phải
+# chạy `docker network create icp` thủ công. C22.b wire bootstrap vào Makefile
+# để user không cần một-time setup step. `obs-down` / `down` không cần patch
+# (network persistent across down cycles; only create/idempotent on up).
+# See decisions-log.md C22.b amendment.
 # =============================================================================
 
 .DEFAULT_GOAL := help
@@ -39,6 +49,7 @@ help:
 # Note: 2 compose files chưa tồn tại tại T01 — T07 (obs) + T08 (app) sẽ tạo.
 # Makefile reference path để Day 7 wiring có sẵn template.
 up:
+	@docker network inspect icp >/dev/null 2>&1 || docker network create icp
 	docker compose -f infra/docker-compose.yml -f infra/docker-compose.observability.yml up -d
 
 down:
@@ -70,6 +81,7 @@ vespa-deploy:
 
 # --- Observability escape hatch ---------------------------------------------
 obs-up:
+	@docker network inspect icp >/dev/null 2>&1 || docker network create icp
 	docker compose -f infra/docker-compose.observability.yml up -d
 
 obs-down:

@@ -1,0 +1,126 @@
+# =============================================================================
+# ICP — .dockerignore (repo root)
+# =============================================================================
+# Slice:    S-00b Foundation Scaffold (T08, Q-7 A LOCKED).
+#
+# Purpose:  Keep Docker build context lean when the web service builds with
+#           `context: ..` (monorepo root) per Q-3 A. Without this file Docker
+#           would scan the entire repo (node_modules at root + per-app +
+#           per-package, .git history, .next caches, Python venvs, docs,
+#           s00b-outputs) — slow uploads to the build daemon AND risk of
+#           leaking artifacts into the final image if a `COPY . .` step
+#           appears in any Dockerfile.
+#
+# Scope:    This file affects ALL Dockerfile builds whose context is the
+#           monorepo root. Currently only `web` service uses that context
+#           (Q-3 A); gateway/ai/mcp use service-local contexts (T03 stubs)
+#           and have no need for these exclusions, but the file is harmless
+#           there too (their contexts already exclude what is listed).
+#
+# Pattern:  Mirrors common patterns from `.gitignore` (T01 emit) plus a few
+#           Docker-specific extras (Dockerfile itself NOT excluded — needed by
+#           the build daemon). Layout grouped by ecosystem.
+#
+# Source:   docs/00_CONTEXT.md repo layout + .gitignore (T01).
+# =============================================================================
+
+# --- Version control --------------------------------------------------------
+.git
+.gitignore
+.gitattributes
+
+# --- Node / pnpm ------------------------------------------------------------
+node_modules
+**/node_modules
+*.tsbuildinfo
+**/*.tsbuildinfo
+dist
+**/dist
+build
+**/build
+.turbo
+**/.turbo
+.pnpm-store
+**/.pnpm-store
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Next.js ----------------------------------------------------------------
+.next
+**/.next
+next-env.d.ts
+out
+**/out
+
+# --- Python (apps/ai, apps/mcp — not in web build but harmless) ------------
+__pycache__
+**/__pycache__
+*.py[cod]
+**/*.py[cod]
+.venv
+**/.venv
+venv
+**/venv
+*.egg-info
+**/*.egg-info
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# --- Env files (NEVER ship .env to image — runtime mount only) -------------
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+# Keep .env.example available in case build process references for defaults.
+!.env.example
+
+# --- IDE / editor -----------------------------------------------------------
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# --- OS ---------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Docker -----------------------------------------------------------------
+docker-compose.override.yml
+docker-compose.override.yaml
+# Note: do NOT exclude `Dockerfile` — build daemon needs it.
+# Note: do NOT exclude `infra/docker-compose*.yml` — they live outside the
+#       web service's COPY targets so they're cost-neutral, but leaving them
+#       in keeps the context predictable if a future stage adds debug COPYs.
+
+# --- Test / coverage --------------------------------------------------------
+coverage
+**/coverage
+.nyc_output
+*.lcov
+
+# --- Logs / temp ------------------------------------------------------------
+*.log
+*.tmp
+*.bak
+.cache
+**/.cache
+
+# --- Docs / planning artefacts (not needed in any image) -------------------
+docs
+s00-outputs
+s00b-outputs
+s00b-base
+ai-delivery
+README.md
+*.md
+
+# --- Misc -------------------------------------------------------------------
+.editorconfig
+.eslintcache

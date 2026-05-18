@@ -2,12 +2,39 @@
   "name": "@icp/web",
   "version": "0.0.1",
   "private": true,
-  "description": "ICP Web (Next.js) service stub (T03 PLACEHOLDER). T08 sẽ overwrite hoàn toàn với Next.js 14.2 + Tailwind 3.4 + shadcn stack (per ADR-033/034/035 + D-03).",
   "scripts": {
-    "dev": "echo 'web stub — T08 Next.js init replaces this'",
-    "build": "echo 'web stub — T08 overwrite'",
-    "lint": "echo 'web stub — T08 overwrite'",
-    "test": "echo 'web stub — T08 overwrite'",
-    "typecheck": "echo 'web stub — T08 overwrite'"
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "14.2.18",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "framer-motion": "^11.11.0",
+    "canvas-confetti": "^1.9.3",
+    "zustand": "^5.0.0",
+    "@tanstack/react-query": "^5.59.0",
+    "react-hook-form": "^7.53.0",
+    "@icp/shared-types": "workspace:*",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.5.0",
+    "class-variance-authority": "^0.7.0",
+    "lucide-react": "^0.453.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.16.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/canvas-confetti": "^1.6.4",
+    "typescript": "^5.4.0",
+    "tailwindcss": "^3.4.13",
+    "postcss": "^8.4.47",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.18",
+    "msw": "^2.4.0"
   }
 }

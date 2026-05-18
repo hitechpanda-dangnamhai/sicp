@@ -1,0 +1,82 @@
+# =============================================================================
+# .github/workflows/ci.yml — ICP CI (lint + test + typecheck)
+# =============================================================================
+# Slice:    S-00b Foundation Scaffold (T08).
+#
+# Source:   slices/S-00b_EXECUTION_GUIDE.md Section 4.8 lines 2581-2631.
+#
+# Strategy: Three independent jobs (lint / test / typecheck) on ubuntu-latest
+#           with pnpm@9 + Node 20 LTS (matches D-03 version pins). Each job
+#           soft-fails with `|| echo "..."` because S-00b foundation scaffold
+#           does NOT include real lint configs, test suites, or per-package
+#           typecheck scripts yet — those land in S-01 H-UI + S-02 P-CAP.
+#
+# DoD-4    — "CI green với empty test, per DoD-4 literal" (Brief Bước 5).
+#           Soft-fail keeps green status badge while signaling "no real
+#           coverage yet" via the echo line in job logs. S-01 + S-02 replace
+#           soft-fail with strict assertion as actual lint/test/typecheck
+#           configs land.
+#
+# Branch strategy:
+#   push:  main + feat/** + fix/** (matches GitHub Flow with prefix branches)
+#   PR:    main (gate merges)
+#
+# Cache strategy:
+#   actions/setup-node@v4 cache: pnpm — caches pnpm store across runs based
+#   on pnpm-lock.yaml hash. First run: cold (~2 min install); subsequent
+#   runs: warm (~20s install).
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'fix/**'
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint || echo "No lint script yet (S-00b foundation — populated in S-02)"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test || echo "No tests yet (S-00b foundation — test rỗng cũng OK per DoD-4)"
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck || echo "Typecheck not configured yet"

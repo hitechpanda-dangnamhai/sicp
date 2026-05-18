@@ -1,0 +1,83 @@
+/* =============================================================================
+ * apps/web/app/globals.css — Tailwind base + MoMo Premium Design Tokens
+ * =============================================================================
+ * Slice:    S-00b Foundation Scaffold (T08)
+ *
+ * Source:   docs/phases/PHASE_00_DESIGN_SYSTEM.md Section 1 (color tokens) +
+ *           slices/S-00b_EXECUTION_GUIDE.md Section 4.8 lines 2354-2411.
+ *
+ * Coverage T08 (scaffold tier):
+ * - Section 1.1 Surface tokens (bg, border) — full set.
+ * - Section 1.2 Text tokens — full set (no black per MoMo guideline).
+ * - Section 1.3 Pink ramp (PRIMARY 70%) — full 10-stop set.
+ * - prefers-reduced-motion media query — accessibility baseline.
+ * - body background + color defaults.
+ *
+ * Deferred to S-01 H-UI (when first shadcn components added):
+ * - Section 1.4-1.6 Rose / Orange / Amber / Sky / Mint / Lilac ramps —
+ *   added as components consume them.
+ * - shadcn-required HSL tokens (--background, --foreground, --primary, etc.)
+ *   if/when shadcn components installed via `npx shadcn@latest add <name>`.
+ * - Be Vietnam Pro font-face declaration (next/font/google loader in layout).
+ * - Component-scoped CSS (animation keyframes, transition utilities).
+ * =============================================================================
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* === Section 1.1 Surface ================================================ */
+  --bg-page-from: #FCE7F0;
+  --bg-page-mid:  #FEEEE0;
+  --bg-page-to:   #FFF8F0;
+  --bg-page: linear-gradient(180deg, var(--bg-page-from) 0%, var(--bg-page-mid) 40%, var(--bg-page-to) 100%);
+  --bg-page-frame: #FDF2F4;
+  --bg-surface: #FFFFFF;
+  --bg-tinted: #FEF3F8;
+
+  --border-subtle:  #F9D8E4;
+  --border-pink:    #FBCFE8;
+  --border-orange:  #FED7AA;
+  --border-divider: #FCE7F3;
+
+  /* === Section 1.2 Text (KHÔNG dùng đen — MoMo guideline) ================= */
+  --text-primary:   #831447;
+  --text-secondary: #9F1239;
+  --text-tertiary:  #BE185D;
+  --text-muted:     #7C7591;
+  --text-on-color:  #FFFFFF;
+  --text-on-light:  #1F1147;
+
+  /* === Section 1.3 Pink Ramp (PRIMARY 70% of UI) ========================== */
+  --pink-50:  #FFF1F5;
+  --pink-100: #FCE7F3;
+  --pink-200: #FBCFE8;
+  --pink-300: #F9A8D4;
+  --pink-400: #F472B6;
+  --pink-500: #EC4899;
+  --pink-600: #E91E63;  /* MOMO SIGNATURE */
+  --pink-700: #BE185D;
+  --pink-800: #831447;
+  --pink-900: #500724;
+
+  /* === Section 1.4-1.6 Rose / Orange / Amber / Sky / Mint / Lilac =========
+   * Deferred to S-01 H-UI extension. Pattern shown by pink ramp above;
+   * S-01 adds remaining ramps using same `--<name>-<step>: #HEX;` convention.
+   */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-be-vietnam, system-ui), sans-serif;
+}

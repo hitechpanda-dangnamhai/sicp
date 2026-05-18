@@ -1,0 +1,143 @@
+version: '3.9'
+
+# ICP observability stack — LGTM (Loki + Grafana + Tempo + Prometheus) + OTel Collector.
+#
+# Locked decisions per S-00b decisions-log:
+# - C11 LOCKED      — Grafana host port 3002 per PHASE_01_INFRA.md DoD-6 (NOT 3001).
+# - D-02 LOCKED     — healthcheck: stateless services `start_period=10s` (otel-collector);
+#                     stateful `start_period=30s` (loki/tempo/prometheus/grafana).
+# - C22.a (Phiên 10) — otel-collector logs exporter strategy = `otlphttp/loki`
+#                     (Q-2 B-controlled). See `otel/collector-config.yaml`.
+# - C22.b (Phiên 10) — Makefile `up`/`obs-up` now idempotently bootstrap the
+#                     external `icp` network (Q-3 B-controlled). See T01 Makefile.
+# - C22.c (Phiên 10) — long-form `depends_on` with `condition: service_healthy`
+#                     for the otel-collector → loki/tempo/prometheus and
+#                     grafana → loki/tempo/prometheus edges (Q-5 B-controlled).
+#                     All 5 services have verified healthcheck endpoints.
+# - Q-4 A LOCKED    — collector config mounted at `/etc/otelcol/config.yaml`
+#                     with explicit `--config=` command flag.
+#
+# Network `icp` is declared `external: true` so the app compose file (T08) can
+# join the same network when both files are orchestrated together via
+# `make up` (docker compose -f infra/docker-compose.yml -f infra/docker-compose.observability.yml ...).
+# The network is auto-created by `make up` / `make obs-up` per C22.b.
+
+services:
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    container_name: icp-otel-collector
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel/collector-config.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+      - "8888:8888"     # Self-metrics for Prometheus scrape
+    networks: [icp]
+    depends_on:
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/otelcol-contrib", "components"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: icp-loki
+    command: ["-config.file=/etc/loki/config.yml"]
+    volumes:
+      - ./otel/loki-config.yaml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+    ports: ["3100:3100"]
+    networks: [icp]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: icp-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./otel/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"     # HTTP query API
+      - "9095:9095"     # gRPC
+      - "4327:4317"     # Internal OTLP receiver (mapped to host 4327 to avoid clash with collector 4317)
+    networks: [icp]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3200/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  prometheus:
+    image: prom/prometheus:v2.50.0
+    container_name: icp-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-remote-write-receiver"
+    volumes:
+      - ./otel/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports: ["9090:9090"]
+    networks: [icp]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:9090/-/ready || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: icp-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: light
+    volumes:
+      - ./otel/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./otel/grafana-dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports: ["3002:3000"]   # C11: 3002 NOT 3001 per PHASE_01 + DoD-6
+    networks: [icp]
+    depends_on:
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  icp:
+    external: true
+    name: icp
+
+volumes:
+  loki_data:
+  tempo_data:
+  prometheus_data:
+  grafana_data:
