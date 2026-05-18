@@ -320,32 +320,35 @@ Slice-specific cho S-00 (9):
   - 01_ARCHITECTURE.md
   - 02_DATA_MODEL.md
   - infra/migrations/V002_*.sql, V003_*.sql, V005_*.sql, V006_*.sql
+  - Và một số file đã chỉnh sửa
+```
+
+# Tạo zip từ repo của bạn (sau khi đã apply 7 patches)
+```
+zip s00-context.zip \
+  docs/workflow/ICP_WORKFLOW_FINAL.md \
+  .ai-delivery/TASK_OPERATING_SYSTEM.md \
+  MASTER_ROADMAP.md \
+  MASTER_SLICE_BACKLOG.md \
+  docs/phases/PHASE_01_INFRA.md \
+  docs/00_CONTEXT.md \
+  docs/01_ARCHITECTURE.md \
+  docs/02_DATA_MODEL.md \
+  docs/05_CODING_CONVENTIONS.md \
+  docs/06_OBSERVABILITY.md \
+  docs/07_BEHAVIOR_LOGS.md \
+  docs/DECISIONS.md \
+  docs/handoff/PHASE_00_HANDOFF.md \
+  infra/migrations/V002__product_enrichment.sql \
+  infra/migrations/V003__insights.sql \
+  infra/migrations/V005__payment_metadata.sql \
+  infra/migrations/V006__analytics_aggregations.sql \
+  infra/migrations/V008__shopee_prices_mock.sql
 ```
 
 **Prompt:**
 ```
-ICP Workflow — Phiên 2: Slice S-00 Repo Reality Check
-
-Context: Phiên 1 đã setup workflow + roadmap + backlog.
-Hôm nay execute toàn bộ Slice S-00 (Q-GATE — audit, không code feature).
-
-Apply Steps 3-10 cho S-00:
-- Step 3: Confirm S-00 (đầu backlog)
-- Step 4: Tạo slices/S-00_BRIEF.md
-- Step 5: Tạo slices/S-00_TASKLIST.md (~3-5 audit tasks)
-- Step 6-7: Pick task + tạo task pack
-- Step 8: Execute audit với bash/view tools
-- Step 9: Review per 9 Gates
-- Step 10: Update tasklist + tạo S-00_REPORT.md
-
-Goal: Compare repo state vs PHASE_01_INFRA DoD checklist.
-Output cuối: reports/S00-REPORT.md với findings.
-
-Constraints:
-- KHÔNG code feature mới, chỉ audit
-- Follow 7 Rules
-- 9 Gates check
-- Surface conflicts per Rule 7
+ Copy tu File PHIEN_2_PROMPT_FINAL_V3.md lam Prompt
 ```
 
 **Output:**
@@ -364,23 +367,31 @@ Constraints:
 
 ---
 
-### Phiên 3 — Slice S-01 Planning (H-UI, EBT v2)
+### Phiên 3 — Slice S-01 Planning (H-UI, EBT v2) => Qua Moi Phien => Dung Prompt Hoi Input => S-00,S-01 =DONE, cac S con lai thi chua co
 
 **Mục đích:** Phân tích mockup để output detailed component tasklist.
 
 **Files upload (~13 files + zip):**
 ```
 Common (4):
-  - workflow, TOS, ROADMAP, BACKLOG
+  ✅ docs/workflow/ICP_WORKFLOW_FINAL.md
+  ✅ .ai-delivery/TASK_OPERATING_SYSTEM.md
+  ✅ MASTER_ROADMAP.md
+  ✅ MASTER_SLICE_BACKLOG.md (updated từ phiên 1)
 
-Slice-specific cho S-01 (8 + zip):
-  - phases/PHASE_00_DESIGN_SYSTEM.md (primary — token values)
-  - handoff/PHASE_00_HANDOFF.md
-  - handoff/PHASE_00_CROSS_INTENT_PATTERNS.md
-  - handoff/PHASE_00_INTENT_01_HANDOFF_DELTA.md
-  - mockups.zip ⭐ (75 HTML + 8 builders)
-  - 05_CODING_CONVENTIONS.md
-  - reports/S00-REPORT.md (từ Phiên 2 — biết apps/web đã có gì)
+Slice-specific cho S-01 H-UI (10 + zip):
+  ✅ docs/phases/PHASE_00_DESIGN_SYSTEM.md          ← Primary, token values
+  ✅ docs/handoff/PHASE_00_HANDOFF.md (updated)     ← Component summary + decisions
+  ✅ docs/handoff/PHASE_00_CROSS_INTENT_PATTERNS.md ← 12 patterns LOCKED
+  ✅ docs/handoff/PHASE_00_INTENT_01_HANDOFF_DELTA.md ← 2 bugs visual fix
+  ⭐ docs/handoff/PHASE_03_FRONTEND_KICKOFF.md       ← THÊM MỚI — REQUIRED READ
+  ✅ docs/05_CODING_CONVENTIONS.md
+  ⭐ docs/DECISIONS.md (updated)                     ← THÊM MỚI — ADR-033/034/035
+  ✅ reports/S00-REPORT.md                          ← Audit findings from phiên 2
+  ✅ mockups.zip ⭐ (75 HTML + 8 builders)
+
+  Optional (skip để giảm context):
+  ⏭️ docs/handoff/CROSS_INTENT_BUG_IMPACT_ANALYSIS.md (overlap với INTENT_01_DELTA)
 ```
 
 **Prompt:**
@@ -591,7 +602,7 @@ Common (4) + Task-specific (9):
 
 ---
 
-### Phiên 8 — S-02 Planning (P-CAP, CDP)
+### Phiên 8 — S-02 Planning (P-CAP, CDP) 
 
 **Mục đích:** Plan Runtime Foundation với CDP method.
 
