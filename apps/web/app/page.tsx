@@ -1,25 +1,29 @@
 /**
- * apps/web/app/page.tsx — Home Page
+ * apps/web/app/page.tsx — Root page placeholder
  *
- * Slice:    S-00b Foundation Scaffold (T08)
- * Source:   slices/S-00b_EXECUTION_GUIDE.md Section 4.8 lines 2447-2461.
+ * Slice:    S-00b T08 (initial) + S-01 T03 PATCH Phiên 15 (per C-20)
  *
- * Renders the placeholder "ICP loaded" headline inside a `<PhoneFrame>`
- * wrapper. Verifies DoD-5 acceptance:
- *   `curl http://localhost:3000` → HTML containing "ICP loaded".
+ * Status:   Placeholder. Renders <PhoneFrame> wrapper around "ICP loaded"
+ *           heading for landing route `/`.
  *
- * S-01 H-UI replaces this scaffold with the actual intent-routing landing
- * surface (brand orb + 8 intent entries + mic button per docs/04_INTENT_SPECS.md).
+ * Decisions:
+ * - C-20 (T03 Phiên 15) — `<PhoneFrame mode>` required prop per C-01 RESOLVED
+ *   forced consumer migration. This consumer was emitted S-00b T08 before
+ *   C-01 decided 2 modes. Patch: add `mode="chat"` (conservative default —
+ *   Family A pattern, internal scroll). Future page.tsx redesign may switch
+ *   to `mode="app"` per actual UX.
+ *
+ * Notes:
+ * - This is a placeholder route. Real intent pages will be emitted in
+ *   S-03+ V-SLICE work consuming layout primitives via @/components/icp/layout.
  */
 import { PhoneFrame } from '@/components/icp/PhoneFrame';
 
 export default function HomePage() {
   return (
-    <PhoneFrame>
-      <main className="p-8 flex items-center justify-center min-h-[640px]">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
-          ICP loaded
-        </h1>
+    <PhoneFrame mode="chat">
+      <main className="flex h-full w-full items-center justify-center">
+        <h1 className="text-xl font-bold text-icp-pink-800">ICP loaded</h1>
       </main>
     </PhoneFrame>
   );

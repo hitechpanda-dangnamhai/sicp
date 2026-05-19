@@ -4,6 +4,7 @@
  * Slice:    S-01 UI Foundation
  * Task:     T01 Tokens + Utility Foundation
  *           T02 PATCH — append trend-green ramp (C-11) + shadcn HSL mapping (C-12)
+ *           T03 PATCH — comment line 37 closure per C-18 (CSS strategy 4-tier lock)
  *
  * Source:   docs/phases/PHASE_00_DESIGN_SYSTEM.md Sections 1.1-1.9, 2, 3.3-3.5, 5
  *           reports/S-01_SEMANTIC_COMPONENTS.md Section 1.1 (16 keyframes + 11 utility classes)
@@ -28,13 +29,21 @@
  *          (single source of truth — sửa --pink-600 ở MoMo, shadcn --primary cũng đổi).
  *          HSL 3-value format (no hsl(), no commas) required by Tailwind opacity
  *          modifier syntax (bg-primary/90 etc).
+ * - C-18 — CSS strategy 4-tier LOCK toàn slice S-01 (T03 amendment Phiên 15).
+ *          Closes T01 deferred decision below ("@layer components styles").
+ *          Resolution: components T03-T07 dùng Tailwind utility inline + CVA
+ *          (Tier 4 strategy). NO @layer components classes added throughout S-01.
+ *          See slices/S-01_decisions-log.md C-18 for 4-tier rationale.
  *
  * Supersedes:
  * - S-00b T08 partial globals.css (pink ramp only) — extended to full tokens.
  *
  * Out of scope (deferred):
  * - Be Vietnam Pro @font-face — T02 emits via next/font/google in layout.tsx.
- * - @layer components styles — defer per-component task (T02-T06).
+ * - @layer components styles — RESOLVED per C-18 (T03 Phiên 15): components
+ *   dùng Tailwind utility inline + CVA (Tier 4 CSS strategy). NO @layer
+ *   components classes throughout S-01. See slices/S-01_decisions-log.md C-18
+ *   for 4-tier CSS strategy lock rationale.
  * - 26 bespoke I07 keyframes — defer T06 chart component scope.
  * =============================================================================
  */
@@ -216,25 +225,14 @@
   --motion-slow:   400ms;
 
   /* === Section 6 Shadcn HSL Token Mapping (T02 C-12 amendment) ============
-   * shadcn primitives (components/ui/*) reference these semantic CSS vars via
-   * Tailwind classes like bg-primary, text-foreground, border-input, etc.
-   *
-   * HSL 3-value format (no hsl(), no commas) — required by Tailwind v3 opacity
-   * modifier syntax. Example: bg-primary/90 → hsl(var(--primary) / 0.9).
-   *
-   * Values map directly to MoMo palette above:
-   *   --primary 340 82% 52% ≡ #E91E63 (--pink-600 MOMO SIGNATURE)
-   *   --secondary 350 89% 60% ≡ #F43F5E (--rose-500)
-   *   --destructive 0 72% 51% ≡ #DC2626 (standard error red, not in MoMo ramps)
-   *
-   * Source of truth: MoMo palette. If sửa --pink-600, shadcn bg-primary cũng đổi
-   * theo (via HSL value derived from same hex). Note: HSL values computed once
-   * here; ensure resync if MoMo hex changes (rare).
-   *
-   * Reference: T02 Task Pack AC-24, decisions-log Section 3 C-12.
+   * Maps shadcn primitive HSL semantic vars to MoMo palette.
+   * Format: 3-value HSL (H S% L%) — NO hsl() wrapper, NO commas.
+   * Required for Tailwind v3 opacity modifier syntax: bg-primary/90 etc.
+   * Single source of truth — sửa --pink-600 hex above, --primary auto-updates.
    * ============================================================================= */
-  --background:           349 73% 97%;   /* #FDF2F4 — --bg-page-frame */
-  --foreground:           332 74% 30%;   /* #831447 — --text-primary */
+
+  --background:           333 85% 97%;   /* #FEF3F8 — --bg-tinted, page background */
+  --foreground:           332 74% 30%;   /* #831447 — --text-primary, body text */
 
   --card:                 0 0% 100%;     /* #FFFFFF — --bg-surface */
   --card-foreground:      332 74% 30%;   /* same as --foreground */
@@ -302,7 +300,8 @@ body {
 /* =============================================================================
  * @layer base — Phone Frame Layout (C-02 fix-in-place: Bug 1 + Bug 2)
  * Per PHASE_00_CROSS_INTENT_PATTERNS.md Sections 1 + 2 LOCKED templates.
- * T03 <PhoneFrame> component will WRAP these classes via React, NOT redefine CSS.
+ * T03 <PhoneFrame>/<MainScroll>/<BottomBar> components WRAP these classes via React,
+ * NOT redefine CSS (per C-18 Tier 1 LAW).
  * ============================================================================= */
 
 @layer base {
