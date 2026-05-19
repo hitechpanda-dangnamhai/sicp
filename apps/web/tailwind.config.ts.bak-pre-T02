@@ -3,37 +3,26 @@
 // =============================================================================
 // Slice:    S-01 UI Foundation
 // Task:     T01 Tokens + Utility Foundation
-//           T02 PATCH — add icp-green ramp (C-11) + shadcn semantic tokens (C-12)
 //
 // Source:   docs/phases/PHASE_00_DESIGN_SYSTEM.md Sections 1.3-1.6 (color ramps),
 //                                                Section 5 (Motion) +
 //           reports/S-01_SEMANTIC_COMPONENTS.md Section 1.1 (16 keyframes).
-//           docs/handoff/PHASE_00_CROSS_INTENT_PATTERNS.md §3.1 (trend-green C-11)
-//           components/ui/{button,input,badge,...}.tsx (shadcn HSL semantics C-12)
 //
 // Decisions:
 // - D-03 LOCKED — Tailwind 3.4.x pin (NOT v4).
 // - D-04        — Hybrid animation: 16 keyframes CSS-only path (registered here).
 //                 Framer Motion defer T04 (MicButton), T06 (BottomSheet, ChartCard).
 // - C-09        — Vitest substitution: no Jest plugin needed in Tailwind config.
-// - C-11        — Trend-green ramp added (T02). MoMo palette extension per
-//                 CROSS_INTENT_PATTERNS §3.1. CSS vars in globals.css :root.
-// - C-12        — Shadcn HSL semantic tokens added (background/foreground/primary/
-//                 secondary/destructive/muted/accent/border/input/ring). Maps via
-//                 hsl(var(--name)) consumed by shadcn primitives in components/ui/.
-//                 HSL 3-value format in globals.css :root.
 //
 // Extends:
-// - S-00b T08 baseline (pink ramp only) → adds rose/orange/amber/green ramps + 16
-//   keyframes + 16 animations + data-state variant plugin + shadcn semantic tokens.
+// - S-00b T08 baseline (pink ramp only) → adds rose/orange/amber ramps + 16
+//   keyframes + 16 animations + data-state variant plugin.
 //
 // Notes:
 // - Theme `extend.colors` maps CSS vars (defined in `app/globals.css`). Tailwind
 //   classes like `bg-icp-pink-600` resolve to `var(--pink-600)` at runtime.
 // - `keyframes` keys camelCase per Tailwind v3 convention; `animation` aliases
 //   kebab-case to match utility class names in `globals.css` @layer utilities.
-// - Shadcn semantic tokens use hsl(var(--token)) pattern so bg-primary/90 opacity
-//   modifier works (Tailwind v3 alpha-value plugin).
 // =============================================================================
 
 import type { Config } from 'tailwindcss';
@@ -95,18 +84,6 @@ const config: Config = {
           800: 'var(--amber-800)',
           900: 'var(--amber-900)',
         },
-        // === Section 1.6b Trend-Green Ramp (C-11 T02 amendment) ==============
-        // Source: PHASE_00_CROSS_INTENT_PATTERNS.md §3.1 LOCKED.
-        // Note: no 300/400/800 stops per §3.1 spec — keep parity.
-        'icp-green': {
-          50: 'var(--trend-green-50)',
-          100: 'var(--trend-green-100)',
-          200: 'var(--trend-green-200)',
-          500: 'var(--trend-green-500)',
-          600: 'var(--trend-green-600)',
-          700: 'var(--trend-green-700)',
-          900: 'var(--trend-green-900)',
-        },
         // === Semantic surface tokens =========================================
         'icp-bg': {
           page: 'var(--bg-page-frame)',
@@ -127,51 +104,6 @@ const config: Config = {
           pink: 'var(--border-pink)',
           orange: 'var(--border-orange)',
           divider: 'var(--border-divider)',
-        },
-
-        // === Section 6 Shadcn Semantic Tokens (C-12 T02 amendment) ===========
-        // Maps shadcn primitives (button/input/badge/dialog/sheet/form) HSL
-        // tokens to MoMo palette via globals.css :root mapping.
-        //
-        // hsl(var(--name)) pattern enables Tailwind v3 opacity modifiers:
-        //   bg-primary/90 → hsl(340 82% 52% / 0.9)
-        //
-        // CSS vars consumed: --background, --foreground, --primary, --secondary,
-        //   --destructive, --muted, --accent, --border, --input, --ring + their
-        //   *-foreground variants. All defined in globals.css :root Section 6.
-        // =====================================================================
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
-        primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
-        },
-        secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
-        },
-        destructive: {
-          DEFAULT: 'hsl(var(--destructive))',
-          foreground: 'hsl(var(--destructive-foreground))',
-        },
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
-        },
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
-        },
-        popover: {
-          DEFAULT: 'hsl(var(--popover))',
-          foreground: 'hsl(var(--popover-foreground))',
-        },
-        card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
         },
       },
       fontFamily: {

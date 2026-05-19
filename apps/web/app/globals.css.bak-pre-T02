@@ -3,12 +3,10 @@
  * =============================================================================
  * Slice:    S-01 UI Foundation
  * Task:     T01 Tokens + Utility Foundation
- *           T02 PATCH — append trend-green ramp (C-11) + shadcn HSL mapping (C-12)
  *
  * Source:   docs/phases/PHASE_00_DESIGN_SYSTEM.md Sections 1.1-1.9, 2, 3.3-3.5, 5
  *           reports/S-01_SEMANTIC_COMPONENTS.md Section 1.1 (16 keyframes + 11 utility classes)
  *           docs/handoff/PHASE_00_CROSS_INTENT_PATTERNS.md Sections 1 + 2 (Bug 1/2 LOCKED templates)
- *                                                          Section 3.1 (trend-green ramp — C-11)
  *
  * Decisions applied:
  * - D-01 — file structure (lib/utils.ts location).
@@ -17,23 +15,14 @@
  * - C-02 — Bug 1 (.bottom-bar solid bg + z-index) + Bug 2 (.phone-frame max-height
  *          responsive) baked fix-in-place at utility CSS layer per anh's rule.
  *          T03 <PhoneFrame> component will WRAP these classes (no redefine).
- * - C-11 — Trend-green palette extension (T02 mid-task amendment).
- *          Surfaced when T02 atoms ChipPill/Button/MiniSparkline need green semantic.
- *          T01 omitted; CROSS_INTENT_PATTERNS §3.1 LOCKED. Fix-in-place at T02.
- * - C-12 — Shadcn HSL token mapping (T02 mid-task amendment).
- *          Surfaced when shadcn primitives (button/input/badge/dialog/sheet/form)
- *          installed in T02 referenced bg-primary/text-foreground/etc HSL classes
- *          that T01 did not provide. T01 emitted MoMo palette but no shadcn HSL
- *          semantic tokens. Resolution: map shadcn HSL vars to MoMo palette
- *          (single source of truth — sửa --pink-600 ở MoMo, shadcn --primary cũng đổi).
- *          HSL 3-value format (no hsl(), no commas) required by Tailwind opacity
- *          modifier syntax (bg-primary/90 etc).
  *
  * Supersedes:
  * - S-00b T08 partial globals.css (pink ramp only) — extended to full tokens.
  *
  * Out of scope (deferred):
- * - Be Vietnam Pro @font-face — T02 emits via next/font/google in layout.tsx.
+ * - Be Vietnam Pro @font-face — defer T02 (next/font/google loader in layout.tsx).
+ * - shadcn CSS vars (--background, --foreground, --primary) — defer T02 (shadcn CLI
+ *   generates when first component installed).
  * - @layer components styles — defer per-component task (T02-T06).
  * - 26 bespoke I07 keyframes — defer T06 chart component scope.
  * =============================================================================
@@ -115,19 +104,6 @@
   --amber-800: #92400E;
   --amber-900: #78350F;
 
-  /* === Section 1.6b Trend-Green Ramp (T02 C-11 amendment) =================
-   * Source: PHASE_00_CROSS_INTENT_PATTERNS.md §3.1 LOCKED pattern.
-   * Use: "positive market signal", "rising trend", "stock up", success states.
-   * Added via T02 (T01 omitted; surfaced when atoms ChipPill/Button needed green).
-   * ============================================================================= */
-  --trend-green-50:  #ECFDF5;
-  --trend-green-100: #D1FAE5;
-  --trend-green-200: #A7F3D0;
-  --trend-green-500: #10B981;
-  --trend-green-600: #059669;
-  --trend-green-700: #047857;
-  --trend-green-900: #065F46;
-
   /* === Section 1.7 Signature Gradients (LOCKED — KHÔNG đổi) ================ */
   --grad-hero:        linear-gradient(135deg, #E91E63 0%, #EC4899 40%, #F472B6 75%, #FB923C 100%);
   --grad-orb:         radial-gradient(circle at 30% 30%, #FFF 0%, #FFE4E6 30%, #FB923C 100%);
@@ -163,16 +139,10 @@
   --shadow-input: 0 10px 26px rgba(233, 30, 99, 0.15);
   --shadow-mic:   0 10px 22px rgba(233, 30, 99, 0.50);
 
-  /* === Section 2 Typography ================================================
-   * Font CSS vars consume next/font/google variables from layout.tsx:
-   *   --font-be-vietnam-pro (Be Vietnam Pro, weights 400/500/600/700)
-   *   --font-jetbrains-mono (JetBrains Mono, weights 500/600/700)
-   * T02 AC-23: layout.tsx sets variable on <html className=...>.
-   * If next/font/google fails to load, fallback chain ensures safe rendering.
-   * ============================================================================= */
-  --font-sans:    var(--font-be-vietnam-pro), 'Be Vietnam Pro', 'Inter Variable', -apple-system, sans-serif;
-  --font-display: var(--font-be-vietnam-pro), var(--font-sans);
-  --font-mono:    var(--font-jetbrains-mono), 'JetBrains Mono Variable', 'SF Mono', monospace;
+  /* === Section 2 Typography ================================================ */
+  --font-sans:    'Be Vietnam Pro Variable', 'Inter Variable', -apple-system, sans-serif;
+  --font-display: 'Be Vietnam Pro Variable', var(--font-sans);
+  --font-mono:    'JetBrains Mono Variable', 'SF Mono', monospace;
 
   /* Type scale (consumed via Tailwind fontSize extend — defer T02 if needed):
    * Display 26/1.2/700   H1 22/1.25/700   H2 18/1.3/700   H3 16/1.4/600
@@ -214,52 +184,6 @@
   --motion-fast:   150ms;
   --motion-normal: 250ms;
   --motion-slow:   400ms;
-
-  /* === Section 6 Shadcn HSL Token Mapping (T02 C-12 amendment) ============
-   * shadcn primitives (components/ui/*) reference these semantic CSS vars via
-   * Tailwind classes like bg-primary, text-foreground, border-input, etc.
-   *
-   * HSL 3-value format (no hsl(), no commas) — required by Tailwind v3 opacity
-   * modifier syntax. Example: bg-primary/90 → hsl(var(--primary) / 0.9).
-   *
-   * Values map directly to MoMo palette above:
-   *   --primary 340 82% 52% ≡ #E91E63 (--pink-600 MOMO SIGNATURE)
-   *   --secondary 350 89% 60% ≡ #F43F5E (--rose-500)
-   *   --destructive 0 72% 51% ≡ #DC2626 (standard error red, not in MoMo ramps)
-   *
-   * Source of truth: MoMo palette. If sửa --pink-600, shadcn bg-primary cũng đổi
-   * theo (via HSL value derived from same hex). Note: HSL values computed once
-   * here; ensure resync if MoMo hex changes (rare).
-   *
-   * Reference: T02 Task Pack AC-24, decisions-log Section 3 C-12.
-   * ============================================================================= */
-  --background:           349 73% 97%;   /* #FDF2F4 — --bg-page-frame */
-  --foreground:           332 74% 30%;   /* #831447 — --text-primary */
-
-  --card:                 0 0% 100%;     /* #FFFFFF — --bg-surface */
-  --card-foreground:      332 74% 30%;   /* same as --foreground */
-
-  --popover:              0 0% 100%;     /* #FFFFFF — --bg-surface */
-  --popover-foreground:   332 74% 30%;
-
-  --primary:              340 82% 52%;   /* #E91E63 — --pink-600 MOMO SIGNATURE */
-  --primary-foreground:   0 0% 100%;     /* #FFFFFF — --text-on-color */
-
-  --secondary:            350 89% 60%;   /* #F43F5E — --rose-500 */
-  --secondary-foreground: 0 0% 100%;     /* #FFFFFF — --text-on-color */
-
-  --muted:                333 85% 97%;   /* #FEF3F8 — --bg-tinted */
-  --muted-foreground:     255 11% 51%;   /* #7C7591 — --text-muted */
-
-  --accent:               34 100% 92%;   /* #FFEDD5 — --orange-100 */
-  --accent-foreground:    332 74% 30%;   /* #831447 — --text-primary */
-
-  --destructive:          0 72% 51%;     /* #DC2626 — standard red-600 */
-  --destructive-foreground: 0 0% 100%;   /* #FFFFFF */
-
-  --border:               326 85% 90%;   /* #FBCFE8 — --border-pink */
-  --input:                326 78% 95%;   /* #FCE7F3 — --border-divider */
-  --ring:                 330 81% 60%;   /* #EC4899 — --pink-500 (focus ring) */
 }
 
 /* =============================================================================
