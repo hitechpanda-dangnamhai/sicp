@@ -1,7 +1,9 @@
 /**
- * @icp/web — Molecules test suite (T04)
+ * @icp/web — Molecules test suite (T04 + T05)
  *
- * 23 tests covering 9 Family A molecules per AC-12 distribution:
+ * 35 tests covering 13 molecules per AC-10/AC-12 distribution:
+ *
+ * Family A (T04, 23 tests):
  * - ConversationBubble: 4 (role ai, user with voiceMeta, variant greet, variant empty)
  * - PhasesCard: 3 (mode list, mode card with header, active phase highlight)
  * - ActionCard: 3 (variant default, variant stock-up mint class, compound slots)
@@ -11,6 +13,12 @@
  * - AIInsightCard: 2 (variant default, variant reasoning with tag)
  * - TrendCard: 2 (compact renders sparkline + delta, onExpand fires)
  * - ShopeeCompareCard: 2 (compact renders price-range, marker positioned)
+ *
+ * Family B (T05, 12 tests):
+ * - ProductCard: 4 (width=138 carousel render, width=172 grid render, onAdd fires, badge slot)
+ * - CartItemRow: 3 (qty stepper onQtyChange fires, stockIssue='out' banner render, formatVND price)
+ * - PaymentMethodPicker: 3 (renders all methods, selected aria-checked, onSelect fires with id)
+ * - OtpField: 2 (renders length=6 boxes default, onChange fires with concatenated value)
  *
  * jest-dom matchers per C-19 (locked T03 Phiên 15 vitest.config.ts setup).
  */
@@ -28,8 +36,16 @@ import {
   AIInsightCard,
   TrendCard,
   ShopeeCompareCard,
+  // T05 Family B
+  ProductCard,
+  CartItemRow,
+  PaymentMethodPicker,
+  OtpField,
+  I03A_138,
+  I04_172,
   type PhaseItem,
   type DrillChip,
+  type PaymentMethod,
 } from '@/components/icp/molecules';
 import { Button } from '@/components/icp/atoms';
 
@@ -343,5 +359,175 @@ describe('ShopeeCompareCard', () => {
     expect(bar).toHaveAttribute('aria-valuemin', '30000');
     expect(bar).toHaveAttribute('aria-valuemax', '50000');
     expect(bar).toHaveAttribute('aria-valuenow', '40000');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// T05 Family B Molecules (12 tests)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ───────────────────────────────────────────────────────────────────────────
+// ProductCard (4 tests)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('ProductCard', () => {
+  const baseProps = {
+    brand: 'MAGGI',
+    name: 'Nước tương Maggi 700ml',
+    price: 25500,
+  };
+
+  it('renders width=138 carousel with smaller dimensions', () => {
+    const { container } = render(<ProductCard {...I03A_138} {...baseProps} rating={4.8} />);
+    const card = container.firstChild as HTMLElement;
+    expect(card).toHaveAttribute('data-width', '138');
+    expect(card).toHaveClass('w-[138px]');
+  });
+
+  it('renders width=172 grid with larger dimensions', () => {
+    const { container } = render(
+      <ProductCard {...I04_172} {...baseProps} confidence={98} aiReason="Cùng vị" />
+    );
+    const card = container.firstChild as HTMLElement;
+    expect(card).toHaveAttribute('data-width', '172');
+    expect(card).toHaveClass('w-[172px]');
+  });
+
+  it('fires onAdd callback when add button clicked', () => {
+    const onAdd = vi.fn();
+    render(<ProductCard {...I03A_138} {...baseProps} onAdd={onAdd} />);
+    const addBtn = screen.getByLabelText('Thêm vào giỏ');
+    fireEvent.click(addBtn);
+    expect(onAdd).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders badge slot when provided (single or array)', () => {
+    render(
+      <ProductCard
+        {...I03A_138}
+        {...baseProps}
+        badge={[
+          { type: 'hot', label: 'HOT' },
+          { type: 'discount', label: '-15%' },
+        ]}
+      />
+    );
+    expect(screen.getByText('HOT')).toBeInTheDocument();
+    expect(screen.getByText('-15%')).toBeInTheDocument();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// CartItemRow (3 tests)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('CartItemRow', () => {
+  const baseProduct = {
+    brand: 'MAGGI',
+    name: 'Nước tương Maggi 700ml',
+    price: 25500,
+  };
+
+  it('fires onQtyChange callback when +/- stepper clicked', () => {
+    const onQtyChange = vi.fn();
+    render(<CartItemRow product={baseProduct} qty={2} onQtyChange={onQtyChange} />);
+    const incBtn = screen.getByLabelText('Tăng');
+    const decBtn = screen.getByLabelText('Giảm');
+    fireEvent.click(incBtn);
+    fireEvent.click(decBtn);
+    expect(onQtyChange).toHaveBeenNthCalledWith(1, 3);
+    expect(onQtyChange).toHaveBeenNthCalledWith(2, 1);
+  });
+
+  it('renders stockIssue=out banner with VN copy + "Bỏ" button', () => {
+    const onResolve = vi.fn();
+    render(
+      <CartItemRow product={baseProduct} qty={1} stockIssue="out" onResolveStockIssue={onResolve} />
+    );
+    expect(screen.getByText(/Đã hết hàng/)).toBeInTheDocument();
+    const boBtn = screen.getByRole('button', { name: 'Bỏ' });
+    fireEvent.click(boBtn);
+    expect(onResolve).toHaveBeenCalledTimes(1);
+  });
+
+  it('formats price via formatVND helper and computes line total', () => {
+    render(<CartItemRow product={baseProduct} qty={3} />);
+    // price unit: 25.500 ₫
+    expect(screen.getByText(/25\.500/)).toBeInTheDocument();
+    // line total: 76.500 ₫
+    expect(screen.getByText(/76\.500/)).toBeInTheDocument();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// PaymentMethodPicker (3 tests)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('PaymentMethodPicker', () => {
+  const methods: PaymentMethod[] = [
+    {
+      id: 'momo',
+      name: 'Ví MoMo',
+      subtitle: 'SĐT •••• 5678',
+      avatar: { type: 'gradient-text', bg: ['#D946EF', '#BE185D'], content: 'Mo' },
+    },
+    {
+      id: 'vnpay',
+      name: 'VNPay QR',
+      subtitle: 'Quét mã QR',
+      avatar: { type: 'gradient-text', bg: ['#1565C0', '#0D47A1'], content: 'VNPay' },
+    },
+    {
+      id: 'cod',
+      name: 'COD',
+      subtitle: 'Tiền mặt',
+      avatar: { type: 'gradient-icon', bg: ['#10B981', '#047857'], content: 'wallet' },
+    },
+  ];
+
+  it('renders all methods from the array', () => {
+    render(<PaymentMethodPicker methods={methods} selected="momo" />);
+    expect(screen.getByText('Ví MoMo')).toBeInTheDocument();
+    expect(screen.getByText('VNPay QR')).toBeInTheDocument();
+    expect(screen.getByText('COD')).toBeInTheDocument();
+  });
+
+  it('selected method has aria-checked=true and data-selected', () => {
+    render(<PaymentMethodPicker methods={methods} selected="vnpay" />);
+    const radios = screen.getAllByRole('radio');
+    const vnpayRadio = radios.find((r) => r.textContent?.includes('VNPay QR'));
+    expect(vnpayRadio).toHaveAttribute('aria-checked', 'true');
+    expect(vnpayRadio).toHaveAttribute('data-selected', 'true');
+  });
+
+  it('fires onSelect callback with method id when clicked', () => {
+    const onSelect = vi.fn();
+    render(<PaymentMethodPicker methods={methods} selected="momo" onSelect={onSelect} />);
+    const radios = screen.getAllByRole('radio');
+    const codRadio = radios.find((r) => r.textContent?.includes('COD'));
+    fireEvent.click(codRadio!);
+    expect(onSelect).toHaveBeenCalledWith('cod');
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// OtpField (2 tests)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('OtpField', () => {
+  it('renders length=6 boxes by default', () => {
+    const { container } = render(<OtpField autoFocus={false} />);
+    const inputs = container.querySelectorAll('input');
+    expect(inputs).toHaveLength(6);
+    const group = container.firstChild as HTMLElement;
+    expect(group).toHaveAttribute('data-length', '6');
+  });
+
+  it('fires onChange with concatenated value when digits typed', () => {
+    const onChange = vi.fn();
+    const { container } = render(<OtpField length={4} value="" onChange={onChange} autoFocus={false} />);
+    const inputs = container.querySelectorAll('input');
+    fireEvent.change(inputs[0], { target: { value: '8' } });
+    expect(onChange).toHaveBeenLastCalledWith('8');
   });
 });

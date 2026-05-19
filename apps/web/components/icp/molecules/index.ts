@@ -1,12 +1,20 @@
 /**
- * @icp/web — Family A Molecules (T04 Phiên 16)
+ * apps/web/components/icp/molecules/index.ts
  *
- * 9 AI Chat Thread molecules composing T02 atoms + T03 layout primitives.
- * Per D-01 file structure + SEMANTIC §6 catalogue.
+ * Slice:   S-01 UI Foundation
+ * Tasks:   T04 (9 Family A molecules) + T05 (4 Family B molecules)
+ *
+ * Total: 13 molecule components + type exports + 2 ProductCard presets + 2 CVA exports.
  *
  * Compact-only for TrendCard + ShopeeCompareCard per C-21 (expanded modes
  * defer S-07 V-SLICE as page composition).
+ *
+ * Family B molecules added in T05 (Phiên 17) per Concern 2 (ProductCard
+ * single-component with width preset exports I03A_138 + I04_172) and
+ * Concern 3 A1 (CartItemRow stockIssue='out' only, no 'low' skeleton).
  */
+
+// ─── T04 Family A (9 molecules) ─────────────────────────────────────────────
 
 export {
   ConversationBubble,
@@ -62,3 +70,37 @@ export {
   ShopeeCompareCard,
   type ShopeeCompareCardProps,
 } from './ShopeeCompareCard';
+
+// ─── T05 Family B (4 molecules) ─────────────────────────────────────────────
+
+export {
+  ProductCard,
+  productCardVariants,
+  I03A_138,
+  I04_172,
+  type ProductCardProps,
+  type ProductCardWidth,
+  type ProductCardBadge,
+  type ProductCardAddButton,
+} from './ProductCard';
+
+export {
+  CartItemRow,
+  type CartItemRowProps,
+  type CartItemProduct,
+  type CartItemCornerBadge,
+} from './CartItemRow';
+
+export {
+  PaymentMethodPicker,
+  type PaymentMethodPickerProps,
+  type PaymentMethod,
+  type PaymentMethodAvatar,
+  type PaymentMethodBadge,
+} from './PaymentMethodPicker';
+
+export {
+  OtpField,
+  type OtpFieldProps,
+  type OtpFieldLength,
+} from './OtpField';
