@@ -4,6 +4,8 @@
 // Slice:    S-01 UI Foundation
 // Task:     T01 Tokens + Utility Foundation
 //           T02 PATCH — add icp-green ramp (C-11) + shadcn semantic tokens (C-12)
+//           T06 PATCH — add errorPulse keyframe + 'error-pulse' animation (C-26 Q-Final-A)
+//           T07 PATCH — extend content array with stories/**/*.{ts,tsx} (ST-NEW-1)
 //
 // Source:   docs/phases/PHASE_00_DESIGN_SYSTEM.md Sections 1.3-1.6 (color ramps),
 //                                                Section 5 (Motion) +
@@ -22,10 +24,18 @@
 //                 secondary/destructive/muted/accent/border/input/ring). Maps via
 //                 hsl(var(--name)) consumed by shadcn primitives in components/ui/.
 //                 HSL 3-value format in globals.css :root.
+// - C-18        — Tier 4 lock: NO `@layer components` classes. Content path
+//                 extension below is Tier 1 base config scope, not Tier 4 — safe.
+// - ST-NEW-1    — T07 stories at apps/web/stories/** — outside default scan paths.
+//                 Extend content array so Tailwind picks up utility classes used in
+//                 story files. Without this, story-only utilities tree-shake out at
+//                 build, breaking Storybook visual fidelity.
 //
 // Extends:
-// - S-00b T08 baseline (pink ramp only) → adds rose/orange/amber/green ramps + 16
-//   keyframes + 16 animations + data-state variant plugin + shadcn semantic tokens.
+// - S-00b T08 baseline (pink ramp only) → T01 added rose/orange/amber + 16
+//   keyframes + 16 animations + data-state variant plugin → T02 added green ramp +
+//   shadcn semantic tokens → T06 added errorPulse keyframe → T07 adds stories
+//   content scan path.
 //
 // Notes:
 // - Theme `extend.colors` maps CSS vars (defined in `app/globals.css`). Tailwind
@@ -34,6 +44,9 @@
 //   kebab-case to match utility class names in `globals.css` @layer utilities.
 // - Shadcn semantic tokens use hsl(var(--token)) pattern so bg-primary/90 opacity
 //   modifier works (Tailwind v3 alpha-value plugin).
+// - T07 content scan: `./stories/**/*.{ts,tsx}` picks up Storybook story files.
+//   Tailwind purge in production build needs to see classes used in stories to
+//   keep them. Safe because stories share globals.css via .storybook/preview.ts.
 // =============================================================================
 
 import type { Config } from 'tailwindcss';
@@ -43,6 +56,7 @@ const config: Config = {
   content: [
     './app/**/*.{ts,tsx,mdx}',
     './components/**/*.{ts,tsx}',
+    './stories/**/*.{ts,tsx}', // T07 — Storybook stories utility scan (ST-NEW-1)
   ],
   theme: {
     extend: {
