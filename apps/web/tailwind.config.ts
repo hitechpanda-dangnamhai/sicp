@@ -301,6 +301,23 @@ const config: Config = {
           '0%, 100%': { transform: 'translateY(0) rotate(-1deg)' },
           '50%': { transform: 'translateY(-2px) rotate(1deg)' },
         },
+
+        // =====================================================================
+        // T06 chart-scope keyframes (Tier 3 exception per C-18, AC-13)
+        // =====================================================================
+        // Source: intent-07-state-J-error.html @keyframes errorPulse — scale +
+        // opacity oscillation distinct from T01 `glow` (opacity-only no scale)
+        // and T01 `bump` (scale 1↔1.2, 300ms one-shot vs needs 1.6s infinite).
+        // Used by: ErrorState <OrbPulse> halo, ChartCard error mode.
+        //
+        // NOTE: livePulse SKIPPED — identical to Tailwind built-in animate-pulse
+        // per Q-Final-A VERIFY Phiên 18 (opacity 1↔0.5 oscillation match).
+        // NOTE: errorShake SKIPPED — reuse T01 `shake` (1px translateX diff
+        // sub-perceptual per BRIEF R-4 visual-equivalent rule).
+        errorPulse: {
+          '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+          '50%': { transform: 'scale(1.15)', opacity: '0.5' },
+        },
       },
 
       // =====================================================================
@@ -323,6 +340,8 @@ const config: Config = {
         'confetti-fall': 'confettiFall 3s linear forwards',
         'elastic-pop': 'elasticPop 350ms cubic-bezier(0.34, 1.56, 0.64, 1)',
         'float-tag': 'floatTag 3s ease-in-out infinite',
+        // T06 chart-scope (AC-14) — see keyframes errorPulse above
+        'error-pulse': 'errorPulse 1.6s ease-in-out infinite',
       },
 
       zIndex: {

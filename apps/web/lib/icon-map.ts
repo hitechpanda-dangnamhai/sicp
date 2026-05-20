@@ -93,6 +93,13 @@ import {
   Share2,
   MoreHorizontal,
   MoreVertical,
+  // T06 additions (C-30 surface Phiên 18) — LoginForm + ErrorState + EmptyState
+  Mail,
+  Lock,
+  WifiOff,
+  Inbox,
+  Key,
+  ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -183,6 +190,14 @@ export const ICON_MAP = {
   share: Share2,
   'more-horizontal': MoreHorizontal,
   'more-vertical': MoreVertical,
+
+  // T06 additions (C-30 Phiên 18) — LoginForm + ErrorState + EmptyState
+  mail: Mail,
+  lock: Lock,
+  'wifi-off': WifiOff,
+  inbox: Inbox,
+  key: Key,
+  'shield-check': ShieldCheck,
 } as const satisfies Record<string, LucideIcon>;
 
 /**
