@@ -1,36 +1,79 @@
 # =============================================================================
-# apps/mcp/Dockerfile — ICP MCP Tool Server (JSON-RPC) — T03 stub
+# apps/mcp/Dockerfile — ICP MCP Tool Server (T04 — C-21 fix Phiên 25)
 # =============================================================================
-# Stage:    T03 stub (S-00b Foundation Scaffold, Phiên 6)
-# Purpose:  Minimal HTTP server respond GET /health → 200 {status:ok,stub:true}.
-#           T03 chỉ tạo build context resolve được tại T08. KHÔNG có MCP tool
-#           registry, KHÔNG có JSON-RPC handler, KHÔNG có psycopg/redis/OTel —
-#           defer S-02 Day 5.
+# Replaces T03 stub. Real implementation: multi-stage build with Flask + OTel
+# auto-instrumentation + JSON-RPC handler.
+#
+# C-21 fix (Phiên 25): CMD module path `mcp.server` → `src.server` to match
+# T03 packages.find pattern (where=["."], include=["src", "src.*"]).
+#
+# Stage:    T04 C-21 fix
 # Port:     5050 (per docs/phases/PHASE_01_INFRA.md line 30)
-# Base:     python:3.11-slim (per decisions-log.md D-03 — Python 3.11)
-# Replace:  S-02 Day 5 sẽ overwrite với MCP tool registry + JSON-RPC POST /rpc
-#           + GET /health controller (per docs/phases/PHASE_01_INFRA.md Day 5
-#           + C4 patch S-00 audit cho DoD-3 readiness probe).
+# Base:     python:3.11-slim
+# Pattern:  Mirror apps/ai/Dockerfile (T03 Phiên 24 working) — 2 stages.
+#
+# Lessons applied:
+#   - KI-T03-7: CMD pass explicit --host/--port
+#   - KI-T03-12: HEALTHCHECK uses curl-fsS (curl already installed)
+#   - KI-T04-2 (NEW): when uncertain, mirror T03 exactly — don't optimize
 # =============================================================================
 
-FROM python:3.11-slim
+# ---- Stage 1: builder ----
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+
+# System deps for psycopg[binary] + curl (used in runtime HEALTHCHECK).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      build-essential \
+      libpq-dev \
+      curl \
+ && rm -rf /var/lib/apt/lists/*
+
+# Copy project metadata first for Docker layer cache hit on unchanged deps.
+COPY pyproject.toml ./
+COPY src/ ./src/
+
+# pip install -e . resolves deps + makes `src` package importable.
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -e .
+
+# OTel auto-instrument registry — install instrumentation packages discovered
+# from installed deps (flask, psycopg, requests). Idempotent.
+RUN opentelemetry-bootstrap -a install
+
+# ---- Stage 2: runtime ----
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
-# Slim image không có curl built-in. Cài curl cho HEALTHCHECK directive
-# (per execution guide §4.3 line 699-700). Cleanup apt cache.
+# curl for HEALTHCHECK. libpq for psycopg runtime.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
+ && apt-get install -y --no-install-recommends \
+      libpq5 \
+      curl \
  && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml ./
+# Copy installed Python packages + entry scripts from builder.
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy app source. /app/src holds Python package `src` (per packages.find).
+COPY --from=builder /build/src /app/src
+COPY --from=builder /build/pyproject.toml /app/pyproject.toml
+
+# Re-install editable in runtime stage so `.pth` file points to /app/src.
+# (Builder stage `.pth` points to /build/src which doesn't exist in runtime.)
+RUN pip install --no-cache-dir -e .
 
 EXPOSE 5050
 
-# Stub HTTP server inline (per Q-3 ack Plan A). Same pattern apps/ai/Dockerfile
-# với port 5050. Newlines `\n` JSON-escaped → literal newlines pre-python.
-CMD ["python", "-c", "import http.server,json\nclass H(http.server.BaseHTTPRequestHandler):\n  def do_GET(self):\n    if self.path=='/health':\n      self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps({'status':'ok','stub':True}).encode())\n    else:\n      self.send_response(404);self.end_headers()\nprint('mcp stub listening on 5050',flush=True)\nhttp.server.HTTPServer(('',5050),H).serve_forever()"]
+# C-21 fix: `python -m src.server` (not `mcp.server`). Mirrors T03 pattern
+# where `src/` itself is the importable package per packages.find config.
+# KI-T03-7: explicit host/port; do NOT rely on FLASK_RUN_HOST env vars.
+CMD ["opentelemetry-instrument", "python", "-m", "src.server", "--host=0.0.0.0", "--port=5050"]
 
-# Healthcheck per decisions-log.md D-02 (stateless service defaults).
+# Healthcheck per S-00b decisions-log.md D-02 (stateless service defaults).
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
   CMD curl -fsS http://localhost:5050/health || exit 1

@@ -130,3 +130,113 @@ test:
 
 typecheck:
 	pnpm -r typecheck
+
+
+# =============================================================================
+# T03 Makefile patch — APPEND-ONLY block
+# =============================================================================
+# Source: S-02-T03 task pack §4.2 + §5 smoke plan.
+# Safety: additive only. Add to existing Makefile WITHOUT removing any
+# existing targets (up/down/test verified present per Bước 1 H output).
+#
+# Append the lines below to the END of /home/hai-dang/projects/icpp/sicp/Makefile
+# (verify no name collision first: `grep -E "^(smoke-ai|logs-ai|build-ai):" Makefile`
+# should return empty).
+# =============================================================================
+
+# =============================================================================
+# T03 Makefile patch — APPEND-ONLY block
+# =============================================================================
+# Source: S-02-T03 task pack §4.2 + §5 smoke plan.
+# Safety: additive only. Add to existing Makefile WITHOUT removing any
+# existing targets (up/down/test verified present per Bước 1 H output).
+#
+# Append the lines below to the END of /home/hai-dang/projects/icpp/sicp/Makefile
+# (verify no name collision first: `grep -E "^(smoke-ai|logs-ai|build-ai):" Makefile`
+# should return empty).
+# =============================================================================
+
+# ---- AI service (T03) ----
+.PHONY: build-ai smoke-ai logs-ai
+
+build-ai:
+	docker compose -f infra/docker-compose.yml build ai
+
+smoke-ai:
+	@echo "=== AC-3: GET /health ==="
+	@curl -fsS http://localhost:5001/health | jq -e '.status=="ok" and .service=="ai"' && echo "PASS"
+	@echo "=== AC-4: GET /ready ==="
+	@curl -fsS http://localhost:5001/ready | jq -e '.status=="ok"' && echo "PASS"
+	@echo "=== AC-5: POST /intent stub ==="
+	@curl -fsS -X POST http://localhost:5001/intent \
+		-H "Content-Type: application/json" \
+		-d '{"modality":"text","content":"hello"}' \
+		| jq -e '.request_id and .intent=="unknown" and .confidence==0.0' && echo "PASS"
+	@echo "--- triggering 2 more /intent to ensure ≥3 JSON log lines for AC-6..8 ---"
+	@curl -fsS -X POST http://localhost:5001/intent -H "Content-Type: application/json" -d '{"modality":"text","content":"smoke-a"}' > /dev/null
+	@curl -fsS -X POST http://localhost:5001/intent -H "Content-Type: application/json" -d '{"modality":"text","content":"smoke-b"}' > /dev/null
+	@sleep 1
+	@echo "=== AC-6: log schema 6 LOCKED fields (ALL JSON lines must satisfy) ==="
+	@docker logs icp-ai 2>&1 | grep '^{' \
+		| jq -es 'all(.[]; .timestamp and .level and .service and (.trace_id != null) and (.span_id != null) and .message)' \
+		| grep -q '^true$$' && echo "PASS"
+	@echo "=== AC-7: service field consistent (single value 'ai') ==="
+	@test "$$(docker logs icp-ai 2>&1 | grep '^{' | jq -r '.service' | sort -u | tr -d '\n')" = "ai" && echo "PASS"
+	@echo "=== AC-8: message snake_case (every JSON line) ==="
+	@docker logs icp-ai 2>&1 | grep '^{' | jq -r '.message' | sort -u \
+		| awk 'NF && !/^[a-z_]+\.[a-z_]+$$/ { bad=1; print "FAIL:", $$0 } END { exit bad }' && echo "PASS"
+
+logs-ai:
+	docker logs icp-ai --tail 50 -f
+# =============================================================================
+# T04 Makefile patch — APPEND-ONLY block
+# =============================================================================
+# Source: S-02-T04 task pack §4.2 + §5 smoke plan (Phiên 25).
+# Pattern: Parallel apps/ai T03 (Phiên 24) — per-service targets per C-14.
+# Safety: additive only. Append the lines below to END of Makefile WITHOUT
+# removing any existing targets.
+#
+# Verify no name collision first:
+#   grep -E "^(smoke-mcp|logs-mcp|build-mcp):" Makefile   # should return empty
+# =============================================================================
+
+# ---- MCP service (T04) ----
+.PHONY: build-mcp smoke-mcp logs-mcp
+
+build-mcp:
+	docker compose -f infra/docker-compose.yml build mcp
+
+smoke-mcp:
+	@echo "=== AC-3: GET /health ==="
+	@curl -fsS http://localhost:5050/health | jq -e '.status=="ok" and .service=="mcp"' && echo "PASS"
+	@echo "=== AC-4: JSON-RPC products.get happy path ==="
+	@curl -fsS -X POST http://localhost:5050/rpc \
+		-H "Content-Type: application/json" \
+		-d '{"jsonrpc":"2.0","method":"products.get","params":{"id":"00000000-0000-0000-0000-000000000001"},"id":1}' \
+		| jq -e '.jsonrpc=="2.0" and .id==1 and has("result")' && echo "PASS"
+	@echo "=== AC-5: JSON-RPC method-not-found ==="
+	@curl -fsS -X POST http://localhost:5050/rpc \
+		-H "Content-Type: application/json" \
+		-d '{"jsonrpc":"2.0","method":"unknown.tool","params":{},"id":2}' \
+		| jq -e '.error.code==-32601' && echo "PASS"
+	@echo "=== AC-12: system.list_tools ==="
+	@curl -fsS -X POST http://localhost:5050/rpc \
+		-H "Content-Type: application/json" \
+		-d '{"jsonrpc":"2.0","method":"system.list_tools","params":{},"id":3}' \
+		| jq -e '.result | sort == ["auth.verify_jwt","events.append","products.get"]' && echo "PASS"
+	@echo "--- triggering more /rpc to ensure ≥3 JSON log lines ---"
+	@curl -fsS -X POST http://localhost:5050/rpc -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"auth.verify_jwt","params":{"token":"smoke-token-1"},"id":4}' > /dev/null
+	@curl -fsS -X POST http://localhost:5050/rpc -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"events.append","params":{"type":"smoke.test","aggregate_type":"smoke","aggregate_id":"00000000-0000-0000-0000-000000000099","payload":{"src":"smoke-mcp"}},"id":5}' > /dev/null
+	@sleep 1
+	@echo "=== AC-6: log schema 6 LOCKED fields (ALL JSON lines must satisfy) ==="
+	@docker logs icp-mcp 2>&1 | grep '^{' \
+		| jq -es 'all(.[]; .timestamp and .level and .service and (.trace_id != null) and (.span_id != null) and .message)' \
+		| grep -q '^true$$' && echo "PASS"
+	@echo "=== AC-7: service field consistent (single value 'mcp') ==="
+	@test "$$(docker logs icp-mcp 2>&1 | grep '^{' | jq -r '.service' | sort -u | tr -d '\n')" = "mcp" && echo "PASS"
+	@echo "=== AC-8: message snake_case (every JSON line) ==="
+	@docker logs icp-mcp 2>&1 | grep '^{' | jq -r '.message' | sort -u \
+		| awk 'NF && !/^[a-z_]+\.[a-z_]+$$/ { bad=1; print "FAIL:", $$0 } END { exit bad }' && echo "PASS"
+
+logs-mcp:
+	docker logs icp-mcp --tail 50 -f

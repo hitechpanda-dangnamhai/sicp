@@ -1,21 +1,64 @@
 # =============================================================================
-# apps/ai/pyproject.toml — ICP AI Orchestration service stub (T03)
+# apps/ai/pyproject.toml — ICP AI Orchestration service (T03)
 # =============================================================================
-# T03 stub manifest. Real dependencies (Flask, LangGraph, langchain-google-genai,
-# langchain-openai, structlog, pydantic, opentelemetry-distro,
-# opentelemetry-instrumentation-flask, opentelemetry-exporter-otlp, etc.)
-# defer S-02 Day 4 per docs/phases/PHASE_01_INFRA.md line 149.
+# Replaces S-00b stub (empty deps).
 #
-# Reference: PEP 621 (project metadata in pyproject.toml).
+# Reference: docs/phases/PHASE_01_INFRA.md Day 4 deps list.
+#
+# Version pinning strategy (per S-02 T03 task pack Q-2 resolution):
+#   - Python OTel: `>=1.27,<2.0` (Python ecosystem stable 1.x late-2025).
+#     Decoupled from JS OTel pin 1.25.1 (T01 C-03 pnpm.overrides — Node-only).
+#   - LangGraph: `>=0.2,<0.3` (Q-2 resolution: range > exact pin for
+#     auto-resolve patches without manual maintenance burden).
+#   - Flask + structlog: range pin to last-known major.
 # =============================================================================
 
 [project]
 name = "icp-ai"
 version = "0.0.1"
-description = "ICP AI orchestration service stub (T03). Real Flask + LangGraph implementation defers to S-02 Day 4."
-requires-python = ">=3.11"
-dependencies = []
+description = "ICP AI orchestration service — Flask + LangGraph router + OTel."
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    # --- Web framework ---
+    "flask>=3.0,<4.0",
+    "werkzeug>=3.0,<4.0",          # Flask transitive — pin family
+    # --- LangGraph + LangChain core (router skeleton only Phase 1) ---
+    "langgraph>=0.2,<0.3",
+    "langchain-core>=0.3,<0.4",    # LangGraph 0.2.x transitive
+    # --- Logging + validation ---
+    "structlog>=24.1,<25.0",
+    "pydantic>=2.6,<3.0",
+    # --- HTTP client (MCP JSON-RPC) ---
+    "httpx>=0.27,<0.28",
+    # --- OpenTelemetry Python SDK ---
+    # Python OTel separate from JS (T01 C-03 pin 1.25.1 = Node-only).
+    "opentelemetry-api>=1.27,<2.0",
+    "opentelemetry-sdk>=1.27,<2.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.27,<2.0",
+    "opentelemetry-instrumentation-flask>=0.48b0,<1.0",
+    "opentelemetry-instrumentation-httpx>=0.48b0,<1.0",
+    "opentelemetry-distro>=0.48b0,<1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "ruff>=0.4,<1.0",
+]
 
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src", "src.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501"]
