@@ -54,6 +54,16 @@ export const EnvSchema = z.object({
   OTEL_LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   OTEL_TRACES_SAMPLER: z.string().default('parentbased_always_on'),
 
+  // Upstream service URLs (S-02 T05 — Gateway → AI HTTP client)
+  // Inside docker-compose `icp` network, hostname `ai` resolves via Compose
+  // DNS. Outside compose (e.g. host shell tests), override with localhost
+  // port-mapped URL `http://localhost:5001`.
+  AI_SERVICE_URL: z
+    .string()
+    .url()
+    .default('http://ai:5001')
+    .describe('Base URL of AI service (apps/ai/), default resolves inside docker-compose network'),
+
   // CORS (dev only — per 03_API §8)
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
 });
