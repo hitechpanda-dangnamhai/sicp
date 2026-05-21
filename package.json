@@ -18,9 +18,22 @@
     "format": "pnpm -r --parallel run format",
     "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist packages/*/dist apps/*/.next",
     "obs:up": "docker compose -f infra/docker-compose.observability.yml up -d",
-    "obs:down": "docker compose -f infra/docker-compose.observability.yml down"
+    "obs:down": "docker compose -f infra/docker-compose.observability.yml down",
+    "openapi:export": "docker compose -f infra/docker-compose.yml -f infra/docker-compose.observability.yml exec -T -e EXPORT_OPENAPI=true gateway node /workspace/apps/gateway/dist/main.js; docker compose -f infra/docker-compose.yml -f infra/docker-compose.observability.yml cp gateway:/workspace/packages/shared-types/openapi.json packages/shared-types/openapi.json",
+    "openapi:generate": "pnpm --filter @icp/shared-types exec openapi --input openapi.json --output src/api --client fetch --useUnionTypes --exportCore true --exportServices true --exportModels true --indent 2",
+    "openapi:sync": "pnpm openapi:export && pnpm openapi:generate"
   },
   "devDependencies": {
+    "openapi-typescript-codegen": "0.29.0",
     "typescript": "^5.6.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "@opentelemetry/sdk-metrics": "1.25.1",
+      "@opentelemetry/resources": "1.25.1",
+      "@opentelemetry/semantic-conventions": "1.25.1",
+      "@opentelemetry/core": "1.25.1",
+      "@opentelemetry/api-logs": "0.52.1"
+    }
   }
 }

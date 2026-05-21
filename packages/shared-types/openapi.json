@@ -1,0 +1,97 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "operationId": "HealthController_liveness",
+        "summary": "Liveness probe",
+        "description": "Returns 200 if process is up. No dependency checks.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "ok"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "operationId": "HealthController_readiness",
+        "summary": "Readiness probe",
+        "description": "Returns 200 if all dependencies are reachable. Returns 503 if any dep is down. Dependencies probed: postgres, redis, kafka, otel-collector.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service is ready"
+          },
+          "503": {
+            "description": "One or more deps unavailable"
+          }
+        },
+        "tags": [
+          "health"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "ICP Gateway API",
+    "description": "Intelligent Commerce Platform — REST API.\n\n4 mutating endpoints require `Idempotency-Key` header (UUID v4) per docs/03_API_CONTRACTS.md §1.",
+    "version": "0.0.1",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "health",
+      "description": "Liveness + readiness probes"
+    },
+    {
+      "name": "auth",
+      "description": "Authentication (S-03 First Auth Flow)"
+    },
+    {
+      "name": "intent",
+      "description": "Universal intent endpoint (S-02 T07 SSE wrapper + AI dispatch)"
+    },
+    {
+      "name": "products",
+      "description": "Product CRUD (V-SLICE)"
+    },
+    {
+      "name": "cart",
+      "description": "Shopping cart (V-SLICE S-05)"
+    },
+    {
+      "name": "orders",
+      "description": "Order checkout (V-SLICE S-06)"
+    }
+  ],
+  "servers": [
+    {
+      "url": "http://localhost:3001",
+      "description": "Local dev"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "jwt": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {}
+  }
+}

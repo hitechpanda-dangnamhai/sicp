@@ -17,10 +17,16 @@
 # để user không cần một-time setup step. `obs-down` / `down` không cần patch
 # (network persistent across down cycles; only create/idempotent on up).
 # See decisions-log.md C22.b amendment.
+#
+# C-11 Amendment (Phiên 23 2026-05-21 S-02 T02): target `contract-check` added
+# under "OpenAPI codegen" section. Runs `pnpm openapi:sync` then verifies
+# generated artifacts (openapi.json + src/api/) are committed (no drift).
+# CI integration deferred to Phase 6 polish (avoids STOP-4 GHA docker compose
+# stack startup flakiness). See S-02_decisions-log.md C-11.
 # =============================================================================
 
 .DEFAULT_GOAL := help
-.PHONY: help up down migrate seed vespa-deploy obs-up obs-down logs clean lint test typecheck
+.PHONY: help up down migrate seed vespa-deploy obs-up obs-down logs clean lint test typecheck contract-check
 
 # Note: target name `vespa:deploy` dùng dấu hai chấm sẽ break parse của make.
 # Convention: dùng `vespa-deploy` (tên target) — script được gọi vẫn là
@@ -44,6 +50,7 @@ help:
 	@echo "  make lint           — Run lint across workspaces"
 	@echo "  make test           — Run tests across workspaces"
 	@echo "  make typecheck      — Run typecheck across workspaces"
+	@echo "  make contract-check — Verify FE-BE contract sync (openapi.json + generated api/)"
 
 # --- Stack lifecycle ---------------------------------------------------------
 # Note: 2 compose files chưa tồn tại tại T01 — T07 (obs) + T08 (app) sẽ tạo.
@@ -86,6 +93,23 @@ obs-up:
 
 obs-down:
 	docker compose -f infra/docker-compose.observability.yml down
+
+# --- OpenAPI codegen (S-02 T02 — C-11) --------------------------------------
+# Verify FE-BE contract sync: regenerate openapi.json + src/api/ from current
+# Gateway runtime, then check `git diff --exit-code` to detect drift. Run
+# locally before commit. CI integration deferred Phase 6 polish (STOP-4: GHA
+# docker compose stack startup flakiness avoided).
+#
+# Prerequisite: `make up` first (gateway container must be running for
+# `openapi:export` `docker compose exec` to succeed — per C-08).
+contract-check:
+	@if ! docker compose -f infra/docker-compose.yml -f infra/docker-compose.observability.yml ps --status running --services 2>/dev/null | grep -q '^gateway$$'; then \
+		echo "ERROR: gateway container not running. Run 'make up' first."; exit 1; \
+	fi
+	pnpm openapi:sync
+	@git diff --exit-code packages/shared-types/openapi.json packages/shared-types/src/api/ \
+		&& echo "✅ Contract in sync (no drift detected)." \
+		|| (echo "❌ Contract drift detected. Commit regenerated files." && exit 1)
 
 # --- Diagnostics ------------------------------------------------------------
 logs:

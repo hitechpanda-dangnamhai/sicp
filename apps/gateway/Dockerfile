@@ -1,36 +1,74 @@
 # =============================================================================
-# apps/gateway/Dockerfile — ICP API Gateway
+# apps/gateway/Dockerfile — ICP API Gateway (S-02 T01)
 # =============================================================================
-# Stage:    T03 stub (S-00b Foundation Scaffold, Phiên 6)
-# Purpose:  Minimal HTTP server respond GET /health → 200 {status:ok,stub:true}.
-#           Goal là cho compose build context resolve được tại T08; KHÔNG có
-#           NestJS, KHÔNG có OTel SDK, KHÔNG có real controllers — defer S-02.
-# Port:     3001 (per docs/phases/PHASE_01_INFRA.md line 28)
-# Base:     node:20-alpine (per decisions-log.md D-03 — Node 20 LTS)
-# Replace:  S-02 Day 3 sẽ overwrite với multi-stage NestJS build
-#           (per docs/phases/PHASE_01_INFRA.md Day 3 + ADR per D-05 CommonJS).
+# Stage:    S-02 T01 multi-stage build (Phiên 22 2026-05-21 — C-04 final)
+# Replaces: S-00b T03 stub per PHASE_01_INFRA.md Day 3.
+# Port:     3001 (per PHASE_01_INFRA.md line 28)
+# Base:     node:20-alpine (per S-00b decisions-log D-03 — Node 20 LTS)
+#
+# Decisions applied:
+#   - C26 LOCKED — HEALTHCHECK uses IPv4 127.0.0.1 (NOT IPv6 localhost).
+#   - C-04 fix (Phiên 22) — Stage 2 copies WHOLE /workspace tree from
+#     builder (preserves pnpm .pnpm symlink store + node_modules layout)
+#     WITHOUT pruning dev deps. Image size impact: ~600MB final vs ~200MB
+#     theoretical with pure prod deps; acceptable for Hackathon scope.
+#
+#     Why NOT `pnpm prune --prod`: pnpm prune is interactive (prompts
+#     "modules will be removed and reinstalled") + reinstall depends on
+#     workspace filter which fails ("No projects matched"). Pruning aggressive
+#     can wipe node_modules entirely. Phase 06 polish: switch to `pnpm deploy
+#     --filter @icp/gateway --prod /deploy` which exports a self-contained
+#     prod-only directory.
+#
+#   - ADR-011 — OTel SDK first-import requires dist/observability/otel.js
+#     present at runtime.
 # =============================================================================
 
-FROM node:20-alpine
+# ──────── Stage 1: Builder ────────
+FROM node:20-alpine AS builder
 
-WORKDIR /app
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
-# Copy chỉ manifest stub; T03 không có src/ (defer S-02).
-# Pnpm install không cần ở T03 vì empty dependencies — root pnpm workspace
-# enumerate apps/gateway/package.json là đủ.
-COPY package.json ./
+WORKDIR /workspace
 
-# Informational (per task pack Q-5 ack). Compose `ports:` mapping trong T08
-# mới thực sự bind host port.
+# Copy workspace manifests first for layer cache efficiency.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+COPY tsconfig.base.json ./
+COPY apps/gateway/package.json ./apps/gateway/
+COPY packages/shared-types/package.json ./packages/shared-types/
+
+# Install ALL deps (incl. dev) — needed for build step.
+RUN pnpm install --frozen-lockfile --filter @icp/gateway... --filter @icp/shared-types...
+
+# Copy source.
+COPY apps/gateway ./apps/gateway
+COPY packages/shared-types ./packages/shared-types
+
+# Build gateway → emits apps/gateway/dist/.
+WORKDIR /workspace/apps/gateway
+RUN pnpm build
+
+# ──────── Stage 2: Runtime ────────
+FROM node:20-alpine AS runtime
+
+WORKDIR /workspace
+
+# C-04 fix: Copy WHOLE workspace from builder. Docker COPY preserves
+# symlinks by default → pnpm's .pnpm content-addressed store + symlink
+# architecture in node_modules/ intact. NO pruning (see header comment).
+COPY --from=builder /workspace ./
+
+# Non-root user for principle-of-least-privilege.
+RUN addgroup -S icp && adduser -S icp -G icp && chown -R icp:icp /workspace
+USER icp
+
+WORKDIR /workspace/apps/gateway
+
 EXPOSE 3001
 
-# Stub HTTP server inline (per execution guide §4.3 line 672 pattern).
-# Sử dụng CommonJS `require` per Q-1 ack — package.json không set "type",
-# default CommonJS, .js inline string parsed CJS. CMD array form (exec form)
-# đảm bảo signal forwarding tới PID 1 đúng cách.
-CMD ["node", "-e", "require('http').createServer((req,res)=>{if(req.url==='/health'){res.writeHead(200,{'Content-Type':'application/json'});res.end(JSON.stringify({status:'ok',stub:true}));}else{res.writeHead(404);res.end();}}).listen(3001,()=>console.log('gateway stub listening on 3001'))"]
+# Healthcheck per C26 — IPv4 127.0.0.1.
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=30s \
+  CMD wget -q -O- http://127.0.0.1:3001/api/v1/health || exit 1
 
-# Healthcheck per decisions-log.md D-02 (stateless service defaults).
-# `wget` built-in alpine — no extra install needed.
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
-  CMD wget -q -O- http://localhost:3001/health || exit 1
+# Start command. node direct (no pnpm wrapper), exec form for PID 1 signal forwarding.
+CMD ["node", "/workspace/apps/gateway/dist/main.js"]

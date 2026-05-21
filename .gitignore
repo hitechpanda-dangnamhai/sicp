@@ -72,6 +72,13 @@ Desktop.ini
 docker-compose.override.yml
 docker-compose.override.yaml
 
+# --- Auto-generated (S-02 T02) ----------------------------------------------
+# OpenAPI codegen output — re-generated via `pnpm openapi:sync` from
+# `packages/shared-types/openapi.json`. Per ADR-017 + 08_FE_BE_CONTRACT.md §3.
+# NOTE: `openapi.json` IS committed (codegen reproducibility + PR diff review);
+# only the generated `src/api/` folder is ignored.
+packages/shared-types/src/api/
+
 # --- Misc temp ---------------------------------------------------------------
 *.tmp
 *.bak

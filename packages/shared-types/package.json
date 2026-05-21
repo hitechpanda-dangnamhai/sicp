@@ -8,6 +8,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./dto": {
+      "types": "./dist/dto/index.d.ts",
+      "import": "./dist/dto/index.js"
+    },
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "import": "./dist/api/index.js"
     }
   },
   "scripts": {
@@ -15,7 +23,11 @@
     "dev": "tsc --watch",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
   "devDependencies": {
+    "openapi-typescript-codegen": "0.29.0",
     "typescript": "^5.4.0"
   }
 }

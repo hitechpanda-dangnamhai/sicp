@@ -1,7 +1,7 @@
 # =============================================================================
 # ICP — App Stack docker-compose
 # =============================================================================
-# Slice:    S-00b Foundation Scaffold (Phiên 11 T08)
+# Slice:    S-00b Foundation Scaffold (Phiên 11 T08) + S-02 T01 (Phiên 22 C-07)
 # Purpose:  Define 8 application services (postgres/redis/redpanda/vespa +
 #           gateway/ai/mcp/web) on shared external network `icp`.
 #           Orchestrated together với `infra/docker-compose.observability.yml`
@@ -13,6 +13,9 @@
 #                    redis lighter footprint (10s). Web 30s exception: Next.js
 #                    standalone production cold-start ~10-15s + first-route
 #                    compile buffer → align stateful tier (Skeleton line 2261).
+#                    **C-07 (Phiên 22):** gateway moved to 30s start_period
+#                    matching web pattern — NestJS bootstrap + OTel SDK init
+#                    + module resolution adds ~15-25s cold-start vs T03 stub.
 # - D-03 LOCKED    — image pins: postgres:16-alpine, redis:7-alpine,
 #                    redpanda:v23.3.10, vespa:8.350.0, node:20-alpine (built
 #                    via Dockerfile FROM lines in apps/<svc>/Dockerfile).
@@ -30,6 +33,16 @@
 #                    for the 4 build-from-source services (gateway/ai/mcp/web).
 #                    All upstream dependencies (postgres/redis/redpanda/vespa)
 #                    expose verified healthchecks; clean cold-start ordering.
+# - C-07 (Phiên 22, S-02 T01 surface) — gateway service block patched:
+#                    (a) build.context `../apps/gateway` → `..` (project root)
+#                        — T01 NestJS multi-stage Dockerfile COPYs workspace
+#                        files (pnpm-workspace.yaml, packages/shared-types/);
+#                        identical to web Q-3 A pattern.
+#                    (b) build.dockerfile → `apps/gateway/Dockerfile`.
+#                    (c) healthcheck path `/health` → `/api/v1/health` matching
+#                        NestJS controller prefix.
+#                    (d) healthcheck.start_period 10s → 30s (NestJS cold start).
+#                    Other 7 service blocks UNTOUCHED.
 #
 # Path decisions ack'd by human (Bước 1 review, Phiên 11):
 # - Q-1 A — `web` service healthcheck targets `/api/health` (Next.js Route
@@ -37,13 +50,15 @@
 # - Q-3 A — `web.build.context: ..` (repo root) + `dockerfile: apps/web/Dockerfile`
 #           because Next.js multi-stage build COPYs workspace files
 #           (pnpm-workspace.yaml, packages/shared-types/) from monorepo root.
-#           gateway/ai/mcp keep `../apps/<svc>` (T03 stubs flat single-file COPY).
-#           See `.dockerignore` at repo root (Q-7 A) to keep build context clean.
+#           **C-07 (Phiên 22): gateway extends Q-3 A pattern** for the same
+#           reason now that T01 implements real NestJS build. ai/mcp keep
+#           `../apps/<svc>` (still T03 stubs flat single-file COPY).
 # - Q-5 A — `container_name: icp-<service>` parity with T07 obs stack.
 # - Q-6 A — `version: '3.9'` parity with T07 obs compose (modern Compose v2
 #           treats this as informational; explicit version document intent).
 #
 # Source skeleton: slices/S-00b_EXECUTION_GUIDE.md Section 4.8 lines 2112-2272.
+# C-07 patch source: slices/S-02_decisions-log.md Section 3 entry C-07.
 # =============================================================================
 
 version: '3.9'
@@ -134,9 +149,14 @@ services:
   # --- Application services --------------------------------------------------
 
   gateway:
+    # C-07 (Phiên 22, S-02 T01): build.context = monorepo root (not apps/gateway/)
+    # because T01 NestJS multi-stage Dockerfile COPYs workspace files
+    # (pnpm-workspace.yaml, pnpm-lock.yaml, tsconfig.base.json, root package.json,
+    # packages/shared-types/) for pnpm workspace install. Identical pattern to
+    # web Q-3 A. See `.dockerignore` at repo root to keep build context clean.
     build:
-      context: ../apps/gateway      # T03 stub: single-file COPY context
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/gateway/Dockerfile
     image: icp/gateway:dev
     container_name: icp-gateway
     env_file: ../.env
@@ -152,12 +172,15 @@ services:
         condition: service_healthy
       redpanda:
         condition: service_healthy
+    # C-07: healthcheck path `/api/v1/health` matching NestJS controller prefix
+    # (T01 HealthController @Controller('api/v1/health')). Previously `/health`
+    # for T03 stub. start_period 30s for NestJS bootstrap + OTel SDK init.
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3001/health || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3001/api/v1/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 30s
 
   ai:
     build:
