@@ -1,21 +1,28 @@
 {
   "name": "@icp/shared-types",
   "version": "0.0.1",
-  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
     },
     "./dto": {
       "types": "./dist/dto/index.d.ts",
-      "import": "./dist/dto/index.js"
+      "default": "./dist/dto/index.js"
+    },
+    "./behavior": {
+      "types": "./dist/behavior/index.d.ts",
+      "default": "./dist/behavior/index.js"
+    },
+    "./sse": {
+      "types": "./dist/sse/index.d.ts",
+      "default": "./dist/sse/index.js"
     },
     "./api": {
       "types": "./dist/api/index.d.ts",
-      "import": "./dist/api/index.js"
+      "default": "./dist/api/index.js"
     }
   },
   "scripts": {

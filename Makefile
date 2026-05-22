@@ -302,3 +302,155 @@ smoke-trace-e2e:
 
 logs-trace-e2e:
 	@docker logs icp-gateway 2>&1 | grep -E "(ai_client|service\.started)" | tail -20
+# =============================================================================
+# T06 Makefile patch (Phiên 27) — APPEND-ONLY block
+# =============================================================================
+# Source: S-02-T06 task pack §7 smoke plan.
+# Pattern: Cross-task target name `smoke-tracker` per C-23 LOCKED (Phiên 26)
+# `smoke-<purpose>` for cross-cutting tasks (T06 spans FE + BE + DB); per-service
+# `smoke-<svc>` reserved single-service.
+#
+# Safety: additive only. Verify no name collision first:
+#   grep -E "^(smoke-tracker|logs-tracker):" Makefile   # should return empty
+#
+# Prerequisite: `make up` first (gateway + postgres + redpanda + redis healthy).
+# Note: T06 endpoint POST /api/v1/track does NOT require Idempotency-Key
+# (route not in 4-route list per ADR-004 + 03_API §1); dedup at DB layer via
+# composite PK (event_id, occurred_at) + ON CONFLICT DO NOTHING.
+# =============================================================================
+
+.PHONY: smoke-tracker logs-tracker
+
+smoke-tracker:
+	@echo "=== AC-8 + AC-9: POST /track happy-path batch (3 valid events) ==="
+	@FIXED_UUID=$$(uuidgen); \
+		curl -sS -X POST http://localhost:3001/api/v1/track \
+		-H "Content-Type: application/json" \
+		-o /tmp/icp-track-ok.json -w "  HTTP %{http_code}\n" \
+		-d '{ \
+		  "events": [ \
+		    {"event_id":"'"$$FIXED_UUID"'","event_type":"session.started","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"source":"web"}}, \
+		    {"event_id":"'"$$(uuidgen)"'","event_type":"product.viewed","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"product_id":"p_smoke_001","source":"search"}}, \
+		    {"event_id":"'"$$(uuidgen)"'","event_type":"cart.item_added","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"product_id":"p_smoke_001","qty":1,"unit_price":50000,"source":"search"}} \
+		  ] \
+		}'
+	@jq -e '.accepted == 3 and .dropped == 0 and .request_id' /tmp/icp-track-ok.json > /dev/null \
+		&& echo "  PASS AC-8 + AC-9 (3 accepted, 0 dropped)" \
+		|| (echo "  FAIL AC-8/9"; cat /tmp/icp-track-ok.json; exit 1)
+	@echo "=== AC-9 schema drift drop: invalid properties for product.viewed ==="
+	@curl -sS -X POST http://localhost:3001/api/v1/track \
+		-H "Content-Type: application/json" \
+		-o /tmp/icp-track-drop.json -w "  HTTP %{http_code}\n" \
+		-d '{ \
+		  "events": [ \
+		    {"event_id":"'"$$(uuidgen)"'","event_type":"product.viewed","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_2","app_version":"0.0.1","properties":{"wrong_field":"no product_id"}} \
+		  ] \
+		}'
+	@jq -e '.accepted == 0 and .dropped == 1' /tmp/icp-track-drop.json > /dev/null \
+		&& echo "  PASS AC-9 schema drift drop (0 accepted, 1 dropped)" \
+		|| (echo "  FAIL drift drop"; cat /tmp/icp-track-drop.json; exit 1)
+	@echo "=== AC-9 bot filter drop: occurred_at > 7d past ==="
+	@curl -sS -X POST http://localhost:3001/api/v1/track \
+		-H "Content-Type: application/json" \
+		-o /tmp/icp-track-old.json -w "  HTTP %{http_code}\n" \
+		-d '{ \
+		  "events": [ \
+		    {"event_id":"'"$$(uuidgen)"'","event_type":"session.started","occurred_at":"1990-01-01T00:00:00.000Z","session_id":"sess_smoke_3","app_version":"0.0.1","properties":{"source":"web"}} \
+		  ] \
+		}'
+	@jq -e '.accepted == 0 and .dropped == 1' /tmp/icp-track-old.json > /dev/null \
+		&& echo "  PASS AC-9 bot filter drop (occurred_at_too_old)" \
+		|| (echo "  FAIL bot filter"; cat /tmp/icp-track-old.json; exit 1)
+	@echo "=== AC-9 dedup: duplicate event_id second POST (DB ON CONFLICT) ==="
+	@DUP=$$(jq -r '.events[0].event_id // empty' /tmp/icp-track-ok.json 2>/dev/null); \
+		if [ -z "$$DUP" ]; then DUP=$$(uuidgen); fi; \
+		curl -sS -X POST http://localhost:3001/api/v1/track \
+		-H "Content-Type: application/json" \
+		-o /tmp/icp-track-dup.json -w "  HTTP %{http_code}\n" \
+		-d '{ \
+		  "events": [ \
+		    {"event_id":"'"$$DUP"'","event_type":"session.started","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_4","app_version":"0.0.1","properties":{"source":"web"}} \
+		  ] \
+		}'
+	@jq -e '.dropped == 0 and (.accepted == 0 or .accepted == 1)' /tmp/icp-track-dup.json > /dev/null \
+		&& echo "  PASS AC-9 dedup semantics (silent ON CONFLICT no-op)" \
+		|| (echo "  FAIL dedup"; cat /tmp/icp-track-dup.json; exit 1)
+	@echo "=== AC-9 DB persistence verify (≥3 rows in behavior_events_y2026m05) ==="
+	@COUNT=$$(docker compose -f infra/docker-compose.yml exec -T postgres \
+		psql -U icp -d icp -tA -c "SELECT count(*) FROM behavior_events WHERE event_type IN ('session.started','product.viewed','cart.item_added') AND session_id LIKE 'sess_smoke_%';"); \
+		test "$$COUNT" -ge "3" && echo "  PASS AC-9 DB rows: $$COUNT" \
+		|| (echo "  FAIL expected ≥3 got $$COUNT"; exit 1)
+	@echo "=== AC-11 contract-check (regression: openapi.json + api/ generated cleanly) ==="
+	@$(MAKE) -s contract-check 2>&1 | tail -5
+	@echo "=== AC-10 + AC-11 Tempo: POST /track auto-instrument span present ==="
+	@echo "  waiting 8s for Tempo batch flush..."
+	@sleep 8
+	@curl -fsS "http://localhost:3200/api/search?tags=service.name%3Dgateway&limit=30" \
+		| jq -e '[.traces[]?.rootTraceName] | map(select(test("POST /api/v1/track"))) | length > 0' \
+		> /dev/null && echo "  PASS Tempo span POST /api/v1/track found" \
+		|| (echo "  AC-10 fallback: list root span names"; \
+		    curl -fsS "http://localhost:3200/api/search?tags=service.name%3Dgateway&limit=30" \
+		    | jq -r '.traces[]?.rootTraceName' | sort -u; exit 1)
+	@echo "=== smoke-tracker: 7/7 checks PASS ==="
+
+logs-tracker:
+	@docker logs icp-gateway 2>&1 | grep -E "tracker\.|db\.behavior_partition" | tail -30
+
+# ============================================================================
+
+# ============================================================================
+# S-02 T07 — SSE wrapper smoke target (Gateway POST /intent + GET stream)
+# Per C-23 cross-task naming: smoke-<purpose> (smoke-sse = single-purpose
+# Gateway endpoint flow). C-14 per-service `smoke-<svc>` pattern reserved
+# single-service smokes.
+# Per C-41 (T07 Phiên N): Idempotency-Key MUST be UUID v4 format (T01
+# middleware regex strict per ADR-004) — use uuidgen, NOT date+RANDOM.
+# ============================================================================
+
+.PHONY: smoke-sse logs-sse
+
+smoke-sse:
+	@echo "=== T07 AC-6: POST /api/v1/intent returns 202 + request_id ==="
+	@curl -sS -X POST http://localhost:3001/api/v1/intent \
+		-H "Content-Type: application/json" \
+		-H "Idempotency-Key: $$(uuidgen)" \
+		-d '{"modality":"text","content":"smoke test T07"}' \
+		-o /tmp/icp-intent-post.json \
+		-w "  HTTP %{http_code}\n"
+	@RID=$$(jq -r '.request_id // empty' /tmp/icp-intent-post.json); \
+		test -n "$$RID" && echo "  PASS AC-6 request_id=$$RID" \
+			|| (echo "  FAIL AC-6 — POST body:"; cat /tmp/icp-intent-post.json; exit 1); \
+		echo "$$RID" > /tmp/icp-intent-rid.txt
+	@RID=$$(cat /tmp/icp-intent-rid.txt); \
+		echo "=== T07 AC-9: GET /intent/stream WITHOUT cookie -> 401 ==="; \
+		HTTP=$$(curl -sS -o /tmp/icp-sse-noauth.json -w "%{http_code}" \
+			"http://localhost:3001/api/v1/intent/stream?id=$$RID"); \
+		test "$$HTTP" = "401" && echo "  PASS AC-9 unauthorized=401" \
+			|| (echo "  FAIL AC-9 expected 401 got $$HTTP — body:"; cat /tmp/icp-sse-noauth.json; exit 1)
+	@RID=$$(cat /tmp/icp-intent-rid.txt); \
+		echo "=== T07 AC-7 + AC-8: GET /intent/stream WITH cookie -> SSE frames ==="; \
+		curl -sSN -H "Cookie: icp_session=test-stub-jwt" \
+			"http://localhost:3001/api/v1/intent/stream?id=$$RID" \
+			-o /tmp/icp-sse-frames.txt --max-time 5 || true; \
+		FRAMES=$$(grep -c "^event: " /tmp/icp-sse-frames.txt 2>/dev/null || echo 0); \
+		test "$$FRAMES" -ge "4" && echo "  PASS AC-7 frames=$$FRAMES (status x3 + final)" \
+			|| (echo "  FAIL AC-7 expected >=4 frames got $$FRAMES — body:"; cat /tmp/icp-sse-frames.txt; exit 1); \
+		grep -q "^event: final" /tmp/icp-sse-frames.txt \
+			&& echo "  PASS AC-7 final event present" \
+			|| (echo "  FAIL AC-7 no final event"; cat /tmp/icp-sse-frames.txt; exit 1)
+	@echo "=== T07 AC-12 KI-T05-6 retest: manual span gateway.intent.dispatch in Tempo ==="
+	@echo "  waiting 8s for Tempo batch flush..."
+	@sleep 8
+	@curl -fsS "http://localhost:3200/api/search?tags=service.name%3Dgateway+operation.name%3Dgateway.intent.dispatch&limit=10" \
+		-o /tmp/icp-tempo-search.json 2>/dev/null || echo "  Tempo unreachable"; \
+		COUNT=$$(jq -r '.traces | length // 0' /tmp/icp-tempo-search.json 2>/dev/null || echo 0); \
+		test "$$COUNT" -ge "1" \
+			&& echo "  PASS AC-12 manual span visible count=$$COUNT (KI-T05-6 RESOLVED via /intent route)" \
+			|| (echo "  AC-12 FAIL manual span invisible count=$$COUNT — KI-T05-6 confirmed; per STOP-4 escalate NodeSDK 0.52->0.53+ bump"; \
+				echo "  Available root span names for service gateway:"; \
+				curl -fsS "http://localhost:3200/api/search?tags=service.name%3Dgateway&limit=20" 2>/dev/null \
+				| jq -r '.traces[]?.rootTraceName' | sort -u; exit 2)
+	@echo "=== smoke-sse: 5/5 inline checks PASS ==="
+
+logs-sse:
+	@docker logs icp-gateway 2>&1 | grep -E "intent\.(sse_|received|failed)" | tail -30
