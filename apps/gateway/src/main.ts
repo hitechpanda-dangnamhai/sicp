@@ -7,6 +7,12 @@
  * docs/06_OBSERVABILITY.md §3.1: "Trong main.ts: import './observability/otel';
  * — BẮT BUỘC ở dòng đầu, trước mọi import khác". Otherwise Node module cache
  * is sealed before auto-instrumentations can patch http/express/ioredis/etc.
+ *
+ * S-03 T02 amendment: + `app.use(cookieParser())` global middleware after
+ * `enableCors()` per S-03 C-13 RESOLVED Phiên 32. Replaces S-02 T07 inline
+ * `readCookie()` helper in intent.controller.ts (S02-C-40 handoff closure).
+ * cookie-parser populates `req.cookies` typed dict — JwtAuthGuard reads from
+ * there instead of parsing `req.headers.cookie` manually.
  */
 
 // ↓↓↓ MUST BE FIRST. DO NOT MOVE. ↓↓↓
@@ -17,6 +23,7 @@ import { NestFactory } from '@nestjs/core';
 import { INestApplication, Logger as NestLogger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { patchNestJsSwagger } from 'nestjs-zod';
+import cookieParser from 'cookie-parser';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { AppModule } from './app.module';
@@ -41,10 +48,12 @@ function buildSwaggerDocument(app: INestApplication) {
         'per docs/03_API_CONTRACTS.md §1.',
     )
     .setVersion(process.env.APP_VERSION ?? '0.0.1')
-    .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'jwt',
-    )
+    .addCookieAuth('icp_session', {
+      type: 'apiKey',
+      in: 'cookie',
+      name: 'icp_session',
+      description: 'httpOnly session cookie issued by POST /auth/login (per ADR-019 + S-03 C-01).',
+    })
     .addServer('http://localhost:3001', 'Local dev')
     .addTag('health', 'Liveness + readiness probes')
     .addTag('auth', 'Authentication (S-03 First Auth Flow)')
@@ -59,9 +68,6 @@ function buildSwaggerDocument(app: INestApplication) {
 
 async function exportOpenApi(app: INestApplication): Promise<void> {
   const doc = buildSwaggerDocument(app);
-  // Resolve relative to package root (apps/gateway/). At runtime cwd may
-  // be /app inside container; resolve relative to this file's compiled dir.
-  // From apps/gateway/dist/main.js → ../../packages/shared-types/openapi.json
   const outPath = resolve(
     __dirname,
     '..',
@@ -87,18 +93,9 @@ async function exportOpenApi(app: INestApplication): Promise<void> {
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
-    // NestJS built-in logger is bypassed; we use pino via createLogger() in
-    // service classes. Suppress NestJS internal "info: route mapped" noise
-    // by setting logger=false; keep 'error' for actual Nest framework errors.
     logger: ['error', 'warn'],
     bufferLogs: false,
   });
-
-  // Global validation: T01 uses `nestjs-zod` per-DTO via `createZodDto()`
-  // (see 08_FE_BE_CONTRACT.md §4.2). NO global ValidationPipe needed — that
-  // would require `class-validator` + `class-transformer` deps which we don't
-  // use. Phase 06: if mixed Zod/class-validator emerges, add ValidationPipe
-  // back here AFTER installing both deps.
 
   // CORS — dev mode per 03_API §8
   app.enableCors({
@@ -106,9 +103,13 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
-  // EXPORT_OPENAPI=true short-circuit: write openapi.json to shared-types
-  // package and exit. Used by `pnpm openapi:export` script (T02 will add
-  // openapi:generate + openapi:sync to consume this).
+  // S-03 T02 — Global cookie-parser middleware (replaces S-02 T07 inline
+  // readCookie helper per C-13 RESOLVED). JwtAuthGuard reads req.cookies.icp_session.
+  // No secret arg → cookies parsed but NOT signed (we use httpOnly + Secure
+  // for trust; JWT itself is signed via JWT_SECRET).
+  app.use(cookieParser());
+
+  // EXPORT_OPENAPI=true short-circuit
   if (process.env.EXPORT_OPENAPI === 'true') {
     await exportOpenApi(app);
     await app.close();
@@ -122,7 +123,6 @@ async function bootstrap(): Promise<void> {
   });
 
   // Trust proxy header (X-Forwarded-For) for accurate client IP in logs
-  // when behind reverse proxy (relevant for prod; dev OK either way).
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.set('trust proxy', 1);
 
@@ -141,9 +141,6 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((err) => {
-  // Bootstrap-level error: log + exit. OTel SDK shutdown is wired in
-  // observability/otel.ts SIGTERM/SIGINT handlers; bootstrap failure won't
-  // emit them — instead log directly to stdout in canonical schema shape.
   const nestLogger = new NestLogger('bootstrap');
   nestLogger.error(
     JSON.stringify({

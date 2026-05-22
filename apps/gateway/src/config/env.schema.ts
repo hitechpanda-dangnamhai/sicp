@@ -10,6 +10,11 @@
  *
  * Source-of-truth for env names: INDEX_PROJECT.md `.env.example` row (S-00b T01)
  * + docs/06_OBSERVABILITY.md §16 OTel env vars.
+ *
+ * S-03 T02 amendment: +JWT_ACCESS_TTL_HOURS + JWT_REFRESH_TTL_DAYS + COOKIE_SECURE
+ * per PHASE_02_AUTH_SEARCH §A "JWT HS256 ... exp 24h" + "Refresh ... exp 30d".
+ * COOKIE_SECURE default false for dev (HTTP localhost); production must override
+ * via .env to `true` (per ADR-019 + 03_API_CONTRACTS §1.1).
  */
 
 import { z } from 'zod';
@@ -26,16 +31,38 @@ export const EnvSchema = z.object({
     .url()
     .describe('Postgres connection URL, e.g. postgres://user:pass@postgres:5432/icp'),
 
-  // Cache (idempotency + future session storage)
+  // Cache (idempotency + session storage)
   REDIS_URL: z
     .string()
     .url()
     .describe('Redis connection URL, e.g. redis://redis:6379'),
 
-  // Auth (validated here; actual JWT verify implementation in S-03)
+  // Auth (validated here; actual JWT verify implementation in S-03 T02)
   JWT_SECRET: z.string().min(32, {
     message: 'JWT_SECRET must be at least 32 characters for HS256 security',
   }),
+
+  // S-03 T02 — JWT TTLs per PHASE_02 §A. Coerce because env vars arrive as strings.
+  JWT_ACCESS_TTL_HOURS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(24)
+    .describe('Access JWT TTL in hours (per PHASE_02 §A "exp 24h")'),
+  JWT_REFRESH_TTL_DAYS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30)
+    .describe('Refresh token TTL in days (per PHASE_02 §A "exp 30d")'),
+
+  // S-03 T02 — Cookie security flag. dev=false (HTTP localhost); prod=true.
+  // Parsed as string "true"/"false" → boolean via transform.
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true')
+    .describe('Set Secure flag on auth cookies (dev=false for HTTP localhost; prod=true)'),
 
   // Kafka (broker list for future producer use; T01 doesn't publish yet)
   KAFKA_BROKERS: z
@@ -55,9 +82,6 @@ export const EnvSchema = z.object({
   OTEL_TRACES_SAMPLER: z.string().default('parentbased_always_on'),
 
   // Upstream service URLs (S-02 T05 — Gateway → AI HTTP client)
-  // Inside docker-compose `icp` network, hostname `ai` resolves via Compose
-  // DNS. Outside compose (e.g. host shell tests), override with localhost
-  // port-mapped URL `http://localhost:5001`.
   AI_SERVICE_URL: z
     .string()
     .url()

@@ -454,3 +454,12 @@ smoke-sse:
 
 logs-sse:
 	@docker logs icp-gateway 2>&1 | grep -E "intent\.(sse_|received|failed)" | tail -30
+
+# --- S-03 T02 Auth smoke ----------------------------------------------------
+.PHONY: smoke-auth logs-auth
+
+smoke-auth:
+	@bash apps/gateway/test/smoke-auth.sh
+
+logs-auth:
+	@docker logs icp-gateway 2>&1 | grep -E "auth\.(login|logout|me|token|refresh)|gateway\.auth\." | tail -30
