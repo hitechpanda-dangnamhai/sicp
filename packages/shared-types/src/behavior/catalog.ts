@@ -13,18 +13,30 @@
  * missing → compile error at consumer site, not runtime failure. Per
  * `07_BEHAVIOR_LOGS.md` §8 type safety contract.
  *
- * **Scope T06 (Phase 2, BRIEF §4 Non-Goals):** First 3 event types only —
- * `session.started`, `product.viewed`, `cart.item_added` — sufficient để
- * smoke test pipeline. Full catalog (~25 types per `07_BEHAVIOR §3`)
- * populated incrementally per V-SLICE first-need.
+ * **Scope evolution:**
+ * - **T06 (S-02 Phiên 27):** First 3 types — `session.started`, `product.viewed`,
+ *   `cart.item_added` — sufficient để smoke test pipeline per BRIEF §4.
+ * - **T03 (S-03 Phiên 33):** +5 types — `auth.signed_in`, `auth.signed_out`,
+ *   `auth.password_reset_requested`, `nav.settings_section_opened`,
+ *   `error.report_requested` — per V-SLICE S-03 First Auth Flow scope
+ *   (DM-7 + DM-8 + C-07 + C-09).
+ * - **Total T03 end:** 8 types. Full catalog (~25 per `07_BEHAVIOR §3`) populated
+ *   incrementally per V-SLICE first-need.
  *
  * @see docs/07_BEHAVIOR_LOGS.md §3 (event catalog) + §8 (type safety)
  * @see LOG_CATALOG.md Section B (behavior event types — append-only registry)
  *
- * S-02 T06 emit.
+ * S-02 T06 emit. Extended S-03 T03 Phiên 33 (+5 schemas per C-07 + C-09 + DM-7).
  */
 
 import { z } from 'zod';
+import {
+  AuthSignedInPropertiesSchema,
+  AuthSignedOutPropertiesSchema,
+  AuthPasswordResetRequestedPropertiesSchema,
+} from './auth-events.js';
+import { NavSettingsSectionOpenedPropertiesSchema } from './nav-events.js';
+import { ErrorReportRequestedPropertiesSchema } from './error-events.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Properties schemas (Zod runtime validation per event type)
@@ -68,16 +80,27 @@ export const CartItemAddedPropertiesSchema = z
  *
  * **Append rule:** Add new event type here ONLY after entry in
  * `LOG_CATALOG.md` Section B (per ADR-014 catalog-first governance).
+ *
+ * **Discriminated union note:** `BehaviorEventSchema` in `./tracker.ts`
+ * auto-extends as this map grows — Zod 3.x `discriminatedUnion` requires
+ * ≥2 variants; 8 variants for T03 fully supported.
  */
 export const PROPERTIES_SCHEMA_MAP = {
+  // S-02 T06 — baseline 3 types
   'session.started': SessionStartedPropertiesSchema,
   'product.viewed': ProductViewedPropertiesSchema,
   'cart.item_added': CartItemAddedPropertiesSchema,
+  // S-03 T03 — +5 types (Auth + Navigation + Error subsets)
+  'auth.signed_in': AuthSignedInPropertiesSchema,
+  'auth.signed_out': AuthSignedOutPropertiesSchema,
+  'auth.password_reset_requested': AuthPasswordResetRequestedPropertiesSchema,
+  'nav.settings_section_opened': NavSettingsSectionOpenedPropertiesSchema,
+  'error.report_requested': ErrorReportRequestedPropertiesSchema,
 } as const;
 
 /**
  * Union of all registered behavior event types — keys of
- * `PROPERTIES_SCHEMA_MAP`. T06 = 3 types; expands per V-SLICE.
+ * `PROPERTIES_SCHEMA_MAP`. T06 = 3 types; T03 = 8 types; expands per V-SLICE.
  */
 export type BehaviorEventType = keyof typeof PROPERTIES_SCHEMA_MAP;
 
@@ -97,6 +120,12 @@ export type PropertiesMap = {
  * ```ts
  * type CartProps = PropertiesFor<'cart.item_added'>;
  * // { product_id: string; qty: number; unit_price: number; source: ...; from_query?: string }
+ *
+ * type AuthInProps = PropertiesFor<'auth.signed_in'>;
+ * // { method: 'password' }
+ *
+ * type NavProps = PropertiesFor<'nav.settings_section_opened'>;
+ * // { section: 'notifications' | 'security' | 'help' }
  * ```
  */
 export type PropertiesFor<T extends BehaviorEventType> = PropertiesMap[T];

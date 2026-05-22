@@ -1,13 +1,14 @@
 /**
  * apps/gateway/src/auth/auth.controller.ts
  *
- * S-03 T02 — Auth controller exposing 4 REST endpoints per `03_API_CONTRACTS §1.1`
+ * S-03 T02 — Auth controller exposing 5 REST endpoints per `03_API_CONTRACTS §1.1`
  * (post Phase 1 inline reconcile):
  *
- *   POST /api/v1/auth/login    — issue session (NO Guard; reads body)
- *   POST /api/v1/auth/logout   — invalidate session (Guard required)
- *   GET  /api/v1/auth/me       — current user (Guard required)
- *   POST /api/v1/auth/refresh  — rotating refresh (custom cookie check, NO Guard)
+ *   POST /api/v1/auth/login            — issue session (NO Guard; reads body)
+ *   POST /api/v1/auth/logout           — invalidate session (Guard required)
+ *   GET  /api/v1/auth/me               — current user (Guard required)
+ *   POST /api/v1/auth/refresh          — rotating refresh (custom cookie check, NO Guard)
+ *   POST /api/v1/auth/forgot-password  — stub (NO Guard; reads body; S-03 T03)
  *
  * Cookie response shape per S-03 C-01 + ADR-019 LOCKED:
  *   - `icp_session`  httpOnly + SameSite=Lax  + Path=/                + Max-Age=accessTTL if rememberMe
@@ -21,7 +22,8 @@
  * Idempotency MW: NOT applied per S-03 C-13 (per-route opt-in, /auth/* not
  * in MW route list).
  *
- * S-03 T02 emit.
+ * S-03 T02 emit. Extended S-03 T03 Phiên 33 Batch 4 (+POST /forgot-password
+ * stub endpoint per S-03 C-03 + 03_API §1.1).
  */
 
 import {
@@ -49,6 +51,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard, type AuthedRequest } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto, MeResponseDto } from './dto/auth-response.dto';
+import { ForgotPasswordDto, ForgotPasswordResponseDto } from './dto/forgot-password.dto';
 import {
   InvalidCredentialsError,
   RefreshRejectedError,
@@ -252,6 +255,46 @@ export class AuthController {
         if (err instanceof UnauthorizedException) throw err;
         span.recordException(err instanceof Error ? err : new Error(String(err)));
         throw err;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // POST /auth/forgot-password — S-03 T03 stub per S-03 C-03 + 03_API §1.1
+  // ────────────────────────────────────────────────────────────────────────
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Request password reset — stub (no real SMTP)',
+    description:
+      'Per S-03 C-03 stub Phase 02. Always returns {sent: true} regardless of ' +
+      'email existence (no user enumeration per OWASP). Emits ' +
+      'auth.password_reset_requested behavior event for analytics tracking. NO ' +
+      'database query, NO SMTP integration. Phase 6 productionization adds real ' +
+      'email service + reset token table.',
+  })
+  @ApiResponse({ status: 200, type: ForgotPasswordResponseDto })
+  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<{ sent: true }> {
+    const tracer = getTracer();
+    const span = tracer.startSpan('gateway.auth.forgot_password');
+    return context.with(trace.setSpan(context.active(), span), async () => {
+      try {
+        await this.authService.forgotPassword({ email: body.email });
+        return { sent: true as const };
+      } catch (err) {
+        // Catch ALL errors — do NOT leak user existence via specific responses
+        // per OWASP no-enumeration. Behavior event emission is fire-and-forget
+        // (AuthService.forgotPassword never throws per service contract), but
+        // defensive catch here handles any unforeseen runtime issues.
+        span.recordException(err instanceof Error ? err : new Error(String(err)));
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: err instanceof Error ? err.message : String(err),
+        });
+        return { sent: true as const }; // Always return success
       } finally {
         span.end();
       }

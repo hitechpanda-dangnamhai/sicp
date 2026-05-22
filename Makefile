@@ -317,6 +317,20 @@ logs-trace-e2e:
 # Note: T06 endpoint POST /api/v1/track does NOT require Idempotency-Key
 # (route not in 4-route list per ADR-004 + 03_API §1); dedup at DB layer via
 # composite PK (event_id, occurred_at) + ON CONFLICT DO NOTHING.
+#
+# C-16 amendment (Phiên 33 2026-05-22 S-03 T03 cross-slice cleanup):
+# (1) 4 `-d '{ \\\n ... \\\n }'` multi-line bodies → single-line JSON. Bash
+#     does NOT join `\<newline>` inside single quotes — curl received literal
+#     backslash bytes → 400 "Expected property name or '}' in JSON at position
+#     2". Mirror T07 smoke-sse single-line pattern (already PASS).
+# (2) AC-10 Tempo query limit=30 + post-fetch jq filter → direct `http.target`
+#     tag query + limit=10 (more robust under mixed-traffic conditions: S-02
+#     auth/tracker + S-03 auth shared Tempo retention window).
+# Pattern LOCKED for future smoke targets:
+#   - Avoid multi-line `-d '{...}'` inside single quotes.
+#   - Tempo span verification: prefer direct tag filter (http.target/operation.name)
+#     over post-fetch jq scan on a recent-N window.
+# See S-03_decisions-log.md C-16.
 # =============================================================================
 
 .PHONY: smoke-tracker logs-tracker
@@ -324,16 +338,12 @@ logs-trace-e2e:
 smoke-tracker:
 	@echo "=== AC-8 + AC-9: POST /track happy-path batch (3 valid events) ==="
 	@FIXED_UUID=$$(uuidgen); \
+		NOW=$$(date -u +%Y-%m-%dT%H:%M:%S.000Z); \
+		UUID2=$$(uuidgen); UUID3=$$(uuidgen); \
 		curl -sS -X POST http://localhost:3001/api/v1/track \
 		-H "Content-Type: application/json" \
 		-o /tmp/icp-track-ok.json -w "  HTTP %{http_code}\n" \
-		-d '{ \
-		  "events": [ \
-		    {"event_id":"'"$$FIXED_UUID"'","event_type":"session.started","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"source":"web"}}, \
-		    {"event_id":"'"$$(uuidgen)"'","event_type":"product.viewed","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"product_id":"p_smoke_001","source":"search"}}, \
-		    {"event_id":"'"$$(uuidgen)"'","event_type":"cart.item_added","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"product_id":"p_smoke_001","qty":1,"unit_price":50000,"source":"search"}} \
-		  ] \
-		}'
+		-d '{"events":[{"event_id":"'"$$FIXED_UUID"'","event_type":"session.started","occurred_at":"'"$$NOW"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"source":"web"}},{"event_id":"'"$$UUID2"'","event_type":"product.viewed","occurred_at":"'"$$NOW"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"product_id":"p_smoke_001","source":"search"}},{"event_id":"'"$$UUID3"'","event_type":"cart.item_added","occurred_at":"'"$$NOW"'","session_id":"sess_smoke_1","app_version":"0.0.1","properties":{"product_id":"p_smoke_001","qty":1,"unit_price":50000,"source":"search"}}]}'
 	@jq -e '.accepted == 3 and .dropped == 0 and .request_id' /tmp/icp-track-ok.json > /dev/null \
 		&& echo "  PASS AC-8 + AC-9 (3 accepted, 0 dropped)" \
 		|| (echo "  FAIL AC-8/9"; cat /tmp/icp-track-ok.json; exit 1)
@@ -341,11 +351,7 @@ smoke-tracker:
 	@curl -sS -X POST http://localhost:3001/api/v1/track \
 		-H "Content-Type: application/json" \
 		-o /tmp/icp-track-drop.json -w "  HTTP %{http_code}\n" \
-		-d '{ \
-		  "events": [ \
-		    {"event_id":"'"$$(uuidgen)"'","event_type":"product.viewed","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_2","app_version":"0.0.1","properties":{"wrong_field":"no product_id"}} \
-		  ] \
-		}'
+		-d '{"events":[{"event_id":"'"$$(uuidgen)"'","event_type":"product.viewed","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_2","app_version":"0.0.1","properties":{"wrong_field":"no product_id"}}]}'
 	@jq -e '.accepted == 0 and .dropped == 1' /tmp/icp-track-drop.json > /dev/null \
 		&& echo "  PASS AC-9 schema drift drop (0 accepted, 1 dropped)" \
 		|| (echo "  FAIL drift drop"; cat /tmp/icp-track-drop.json; exit 1)
@@ -353,25 +359,18 @@ smoke-tracker:
 	@curl -sS -X POST http://localhost:3001/api/v1/track \
 		-H "Content-Type: application/json" \
 		-o /tmp/icp-track-old.json -w "  HTTP %{http_code}\n" \
-		-d '{ \
-		  "events": [ \
-		    {"event_id":"'"$$(uuidgen)"'","event_type":"session.started","occurred_at":"1990-01-01T00:00:00.000Z","session_id":"sess_smoke_3","app_version":"0.0.1","properties":{"source":"web"}} \
-		  ] \
-		}'
+		-d '{"events":[{"event_id":"'"$$(uuidgen)"'","event_type":"session.started","occurred_at":"1990-01-01T00:00:00.000Z","session_id":"sess_smoke_3","app_version":"0.0.1","properties":{"source":"web"}}]}'
 	@jq -e '.accepted == 0 and .dropped == 1' /tmp/icp-track-old.json > /dev/null \
 		&& echo "  PASS AC-9 bot filter drop (occurred_at_too_old)" \
 		|| (echo "  FAIL bot filter"; cat /tmp/icp-track-old.json; exit 1)
 	@echo "=== AC-9 dedup: duplicate event_id second POST (DB ON CONFLICT) ==="
 	@DUP=$$(jq -r '.events[0].event_id // empty' /tmp/icp-track-ok.json 2>/dev/null); \
 		if [ -z "$$DUP" ]; then DUP=$$(uuidgen); fi; \
+		NOW=$$(date -u +%Y-%m-%dT%H:%M:%S.000Z); \
 		curl -sS -X POST http://localhost:3001/api/v1/track \
 		-H "Content-Type: application/json" \
 		-o /tmp/icp-track-dup.json -w "  HTTP %{http_code}\n" \
-		-d '{ \
-		  "events": [ \
-		    {"event_id":"'"$$DUP"'","event_type":"session.started","occurred_at":"'"$$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"'","session_id":"sess_smoke_4","app_version":"0.0.1","properties":{"source":"web"}} \
-		  ] \
-		}'
+		-d '{"events":[{"event_id":"'"$$DUP"'","event_type":"session.started","occurred_at":"'"$$NOW"'","session_id":"sess_smoke_4","app_version":"0.0.1","properties":{"source":"web"}}]}'
 	@jq -e '.dropped == 0 and (.accepted == 0 or .accepted == 1)' /tmp/icp-track-dup.json > /dev/null \
 		&& echo "  PASS AC-9 dedup semantics (silent ON CONFLICT no-op)" \
 		|| (echo "  FAIL dedup"; cat /tmp/icp-track-dup.json; exit 1)
@@ -385,12 +384,12 @@ smoke-tracker:
 	@echo "=== AC-10 + AC-11 Tempo: POST /track auto-instrument span present ==="
 	@echo "  waiting 8s for Tempo batch flush..."
 	@sleep 8
-	@curl -fsS "http://localhost:3200/api/search?tags=service.name%3Dgateway&limit=30" \
-		| jq -e '[.traces[]?.rootTraceName] | map(select(test("POST /api/v1/track"))) | length > 0' \
-		> /dev/null && echo "  PASS Tempo span POST /api/v1/track found" \
-		|| (echo "  AC-10 fallback: list root span names"; \
-		    curl -fsS "http://localhost:3200/api/search?tags=service.name%3Dgateway&limit=30" \
-		    | jq -r '.traces[]?.rootTraceName' | sort -u; exit 1)
+	@curl -fsS "http://localhost:3200/api/search?tags=service.name%3Dgateway%20http.target%3D%2Fapi%2Fv1%2Ftrack&limit=10" \
+		| jq -e '.traces | length > 0' \
+		> /dev/null && echo "  PASS Tempo span POST /api/v1/track found (http.target filter)" \
+		|| (echo "  AC-10 fallback: list root span names (limit=100 mixed-traffic safe)"; \
+		    curl -fsS "http://localhost:3200/api/search?tags=service.name%3Dgateway&limit=100" \
+		    | jq -r '.traces[]?.rootTraceName' | sort | uniq -c; exit 1)
 	@echo "=== smoke-tracker: 7/7 checks PASS ==="
 
 logs-tracker:
@@ -463,3 +462,24 @@ smoke-auth:
 
 logs-auth:
 	@docker logs icp-gateway 2>&1 | grep -E "auth\.(login|logout|me|token|refresh)|gateway\.auth\." | tail -30
+
+# --- S-03 T03 Auth Behavior Events smoke ------------------------------------
+# Source: S-03-T03 task pack §3.5.
+# Pattern: cross-task `smoke-<purpose>` per C-23 LOCKED — covers Gateway
+# AuthService loopback emit (login/logout/forgot-password) → behavior_events
+# DB sink verify. Anchored to seed user merchant1@demo.icp per C14-bis.
+#
+# Prerequisite:
+#   - `make up` first (gateway + postgres + redis running)
+#   - `make seed` (merchant1@demo.icp / demo1234 exists with display_name="Anh Nam")
+#
+# Compatible with C-11 host-side execution via DATABASE_URL=localhost:5432
+# override (workaround verified T01 Phiên 31 Bước 4).
+.PHONY: smoke-auth-events logs-auth-events
+
+smoke-auth-events:
+	@DATABASE_URL=$${DATABASE_URL:-postgresql://icp:icp_dev_password@localhost:5432/icp} \
+		bash apps/gateway/test/smoke-auth-events.sh
+
+logs-auth-events:
+	@docker logs icp-gateway 2>&1 | grep -E "auth\.(signed_|password_reset_requested)|tracker\.(loopback_failed|batch_)" | tail -30

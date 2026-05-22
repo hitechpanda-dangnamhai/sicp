@@ -1,24 +1,37 @@
 /**
  * apps/gateway/src/auth/auth.service.ts
  *
- * AuthService — thin facade over 4 use-cases. Adds ops logging at the service
+ * AuthService — thin facade over 5 use-cases. Adds ops logging at the service
  * boundary (use-cases stay pure orchestration; service emits operational
  * logs per LOG_CATALOG.md).
  *
- * Behavior event emission (auth.signed_in / auth.signed_out /
- * auth.password_reset_requested) is OUT OF T02 SCOPE — T03 will inject
- * TrackingService here once TrackingModule exports it. T02 emits ops logs
- * only (Loki-side), zero behavior event emission. Placeholder TODOs marked
- * inline for T03 hook points.
+ * **Behavior event emission (S-03 T03 Phiên 33):**
+ * Per S-03 DM-7 + C-14 RESOLVED, AuthService injects `TrackingService` and
+ * emits 3 server-side behavior events via loopback `ingest()` call (NOT HTTP
+ * self-call):
+ *   - `auth.signed_in` post-login_succeeded
+ *   - `auth.signed_out` post-logout_succeeded
+ *   - `auth.password_reset_requested` post-forgotPassword
  *
- * S-03 T02 emit.
+ * **Fire-and-forget pattern:** `emitAuthEvent()` catches all errors and logs
+ * `tracker.loopback_failed` warn — DOES NOT throw. Behavior event emission
+ * MUST NOT break auth flow per ADR-014 design (catalog-first governance
+ * tolerates analytics gaps; auth correctness is non-negotiable).
+ *
+ * S-03 T02 emit. Extended S-03 T03 Phiên 33 Batch 3 (+TrackingService inject
+ * + emitAuthEvent helper + replace 2 TODO at login/logout) + Batch 4
+ * (+ForgotPasswordUseCase + forgotPassword method + emit auth.password_reset_requested).
  */
 
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { LoginUseCase, type LoginCommand, type LoginResult } from './application/login.use-case';
 import { LogoutUseCase, type LogoutCommand } from './application/logout.use-case';
 import { GetMeUseCase, type GetMeCommand } from './application/get-me.use-case';
 import { RefreshUseCase, type RefreshCommand, type RefreshResult } from './application/refresh.use-case';
+import { ForgotPasswordUseCase, type ForgotPasswordCommand } from './application/forgot-password.use-case';
+import { TrackingService } from '../tracking/tracking.service';
+import type { BehaviorEvent, BehaviorEventType, PropertiesFor } from '@icp/shared-types';
 import { createLogger, type IcpLogPayload } from '../observability';
 import type { MeResponse } from './domain/user.entity';
 import {
@@ -41,6 +54,8 @@ export class AuthService {
     private readonly logoutUC: LogoutUseCase,
     private readonly getMeUC: GetMeUseCase,
     private readonly refreshUC: RefreshUseCase,
+    private readonly forgotPasswordUC: ForgotPasswordUseCase,
+    private readonly tracking: TrackingService,
   ) {}
 
   async login(cmd: LoginCommand & { rememberMe: boolean }): Promise<LoginResult> {
@@ -59,7 +74,13 @@ export class AuthService {
         } as IcpLogPayload,
         'auth.login_succeeded',
       );
-      // TODO(T03): trackingService.emit('auth.signed_in', {user_id, method: 'password'})
+      // S-03 T03 — emit auth.signed_in behavior event (fire-and-forget)
+      void this.emitAuthEvent(
+        'auth.signed_in',
+        { method: 'password' },
+        result.user.id,
+        result.jti,
+      );
       return result;
     } catch (err) {
       if (err instanceof InvalidCredentialsError) {
@@ -85,7 +106,8 @@ export class AuthService {
       } as IcpLogPayload,
       'auth.logout_succeeded',
     );
-    // TODO(T03): trackingService.emit('auth.signed_out', {user_id})
+    // S-03 T03 — emit auth.signed_out behavior event (fire-and-forget)
+    void this.emitAuthEvent('auth.signed_out', {}, cmd.userId, cmd.jti);
   }
 
   async me(cmd: GetMeCommand): Promise<MeResponse> {
@@ -140,6 +162,71 @@ export class AuthService {
         );
       }
       throw err;
+    }
+  }
+
+  /**
+   * Stub forgot-password handler per S-03 C-03 (no SMTP, no DB query, no
+   * user enumeration). Always succeeds. Emits ops log + behavior event.
+   *
+   * NEVER throws — controller layer catches any internal error and still
+   * returns `{sent: true}` to client (prevent enumeration via error response).
+   */
+  async forgotPassword(cmd: ForgotPasswordCommand): Promise<void> {
+    const result = await this.forgotPasswordUC.execute(cmd);
+    // S-03 T03 — emit auth.password_reset_requested behavior event (fire-and-forget)
+    // user_id = undefined (no session — anonymous endpoint per `03_API §1.1`)
+    // session_id = 'system' literal (no jti available — pre-authentication flow)
+    void this.emitAuthEvent(
+      'auth.password_reset_requested',
+      { email_hash: result.emailHash },
+      undefined,
+      'system',
+    );
+  }
+
+  /**
+   * Emit a behavior event via TrackingService loopback (NOT HTTP).
+   *
+   * Fire-and-forget pattern — catches all errors and logs `tracker.loopback_failed`
+   * warn. NEVER throws. Behavior event emission failure must not break auth flow
+   * per ADR-014 (catalog-first analytics tolerates gaps).
+   *
+   * @param eventType — must exist in `PROPERTIES_SCHEMA_MAP` (compile-time check)
+   * @param properties — type-narrowed to schema for this event_type
+   * @param userId — UUID of authenticated user (undefined for password_reset)
+   * @param sessionId — jti for login/logout; literal `'system'` for password_reset
+   */
+  protected async emitAuthEvent<T extends BehaviorEventType>(
+    eventType: T,
+    properties: PropertiesFor<T>,
+    userId: string | undefined,
+    sessionId: string,
+  ): Promise<void> {
+    const event = {
+      event_id: randomUUID(),
+      event_type: eventType,
+      occurred_at: new Date().toISOString(),
+      user_id: userId,
+      session_id: sessionId,
+      app_version: process.env.APP_VERSION ?? '0.0.1',
+      properties,
+    } as unknown as BehaviorEvent;
+
+    try {
+      await this.tracking.ingest({ events: [event] }, randomUUID());
+    } catch (err) {
+      this.log.warn(
+        {
+          message: 'tracker.loopback_failed',
+          extras: {
+            event_type: eventType,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        } as IcpLogPayload,
+        'tracker.loopback_failed',
+      );
+      // Swallow — behavior event emission must not break auth flow
     }
   }
 

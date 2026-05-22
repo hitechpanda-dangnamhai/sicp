@@ -102,6 +102,205 @@
           "tracker"
         ]
       }
+    },
+    "/api/v1/intent": {
+      "post": {
+        "operationId": "IntentController_dispatch",
+        "summary": "Dispatch intent to AI service",
+        "description": "Returns request_id for SSE stream pickup. See `GET /intent/stream`.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntentRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "intent"
+        ]
+      }
+    },
+    "/api/v1/intent/stream": {
+      "get": {
+        "operationId": "IntentController_stream",
+        "summary": "SSE stream of intent events",
+        "description": "Emits 10 typed events (per 03_API §3) + heartbeat keepalive. Requires icp_session cookie.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "intent"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "summary": "Authenticate user (email + password) — issue session cookies",
+        "description": "Returns 200 with 2 Set-Cookie headers (icp_session SameSite=Lax + icp_refresh SameSite=Strict) and body {user: PublicUser}. NO tokens in body per ADR-019 + S-03 C-01.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "summary": "Invalidate current session",
+        "description": "Requires icp_session cookie. Clears both auth cookies (Max-Age=0) + DEL Redis session:{jti} + UPDATE PG sessions.revoked_at=NOW(). Idempotent.",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "operationId": "AuthController_getMe",
+        "summary": "Get current user profile",
+        "description": "Returns 200 with user shape including avatar_initials (server-computed) and last_login_at (MAX issued_at from sessions). Requires icp_session cookie.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "summary": "Rotating refresh — exchange refresh cookie for new pair",
+        "description": "Reads icp_refresh cookie (NOT icp_session — separate path). Atomically revokes old refresh + issues new pair. Replay → 401. Per S-03 C-06.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          },
+          "401": {
+            "description": "Refresh token missing/expired/revoked"
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "operationId": "AuthController_forgotPassword",
+        "summary": "Request password reset — stub (no real SMTP)",
+        "description": "Per S-03 C-03 stub Phase 02. Always returns {sent: true} regardless of email existence (no user enumeration per OWASP). Emits auth.password_reset_requested behavior event for analytics tracking. NO database query, NO SMTP integration. Phase 6 productionization adds real email service + reset token table.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForgotPasswordResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "auth"
+        ]
+      }
     }
   },
   "info": {
@@ -144,10 +343,11 @@
   ],
   "components": {
     "securitySchemes": {
-      "jwt": {
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "type": "http"
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "icp_session",
+        "description": "httpOnly session cookie issued by POST /auth/login (per ADR-019 + S-03 C-01)."
       }
     },
     "schemas": {
@@ -517,6 +717,530 @@
                     "event_type",
                     "properties"
                   ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "auth.signed_in"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "method": {
+                          "type": "string",
+                          "enum": [
+                            "password"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "method"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "auth.signed_out"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {}
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "auth.password_reset_requested"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "email_hash": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "email_hash"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "nav.settings_section_opened"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "section": {
+                          "type": "string",
+                          "enum": [
+                            "notifications",
+                            "security",
+                            "help"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "section"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "error.report_requested"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "trace_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "error_code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      "required": [
+                        "trace_id",
+                        "error_code"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
                 }
               ]
             }
@@ -524,6 +1248,173 @@
         },
         "required": [
           "events"
+        ]
+      },
+      "IntentRequestDto": {
+        "type": "object",
+        "properties": {
+          "modality": {
+            "type": "string",
+            "enum": [
+              "text",
+              "image",
+              "voice"
+            ]
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000
+          },
+          "hint": {
+            "type": "string",
+            "enum": [
+              "import",
+              "buy",
+              "search",
+              "recommend"
+            ]
+          }
+        },
+        "required": [
+          "modality"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255
+          },
+          "password": {
+            "type": "string",
+            "minLength": 6,
+            "maxLength": 255
+          },
+          "remember_me": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "LoginResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "merchant",
+                  "customer",
+                  "admin"
+                ]
+              },
+              "display_name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "avatar_initials": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2
+              }
+            },
+            "required": [
+              "id",
+              "email",
+              "role",
+              "display_name",
+              "avatar_initials"
+            ]
+          }
+        },
+        "required": [
+          "user"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "merchant",
+              "customer",
+              "admin"
+            ]
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "avatar_initials": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2
+          },
+          "last_login_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "role",
+          "display_name",
+          "avatar_initials",
+          "last_login_at"
+        ]
+      },
+      "ForgotPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 255
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ForgotPasswordResponseDto": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sent"
         ]
       }
     }

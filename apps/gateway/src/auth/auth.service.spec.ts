@@ -2,10 +2,15 @@
  * apps/gateway/src/auth/auth.service.spec.ts
  *
  * S-03 T02 Integration test — AuthService end-to-end.
+ * Extended S-03 T03 Phiên 33 Batch 6 (+3 NEW tests AC-12.a / AC-12.b / AC-12.c
+ * for behavior event loopback emit + afterEach cleanup extend for
+ * behavior_events).
  *
  * Strategy per Phiên 32 human decision: FULL REAL — Postgres + Redis +
  * bcryptjs + jsonwebtoken. No mocks. Catches SQL/JSON/cookie/crypto bugs
- * that mocks would hide.
+ * that mocks would hide. T03 extension wires real TrackingService +
+ * TrackingRepository + ForgotPasswordUseCase to verify behavior_events
+ * actually persist (fire-and-forget loopback path).
  *
  * Pre-conditions (test setup BUỘC):
  *   - Postgres + Redis up via docker-compose
@@ -22,24 +27,33 @@
  *
  * Cleanup strategy:
  *   - afterEach: DELETE all sessions for merchant1@demo.icp + DEL Redis
- *     keys session:* matching test-created jtis. Preserves S-02 idempotency
- *     cache (idem:* namespace untouched).
+ *     keys session:* matching test-created jtis + DELETE behavior_events for
+ *     test user_id OR session_id='system' (forgot-password row). Preserves
+ *     S-02 idempotency cache (idem:* namespace untouched).
  *   - afterAll: close PG + Redis connections.
  *
  * Coverage maps to Task Pack ACs:
- *   - AC-1 login happy path → it('AC-1 ...')
- *   - AC-2 rememberMe → it('AC-2 ...')
- *   - AC-3 wrong password → it('AC-3 ...')
- *   - AC-4 /auth/me with session → it('AC-4 ...')
- *   - AC-5 logout invalidation → it('AC-5 ...')
- *   - AC-6 rotating refresh + replay rejection → it('AC-6 ...')
+ *   - T02 baseline (7 tests):
+ *     AC-1 login happy path → it('AC-1 ...')
+ *     AC-2 rememberMe → it('AC-2 ...')
+ *     AC-3 wrong password → it('AC-3 ...')
+ *     AC-3.b unknown email → it('AC-3.b ...')
+ *     AC-4 /auth/me → it('AC-4 ...')
+ *     AC-5 logout invalidation → it('AC-5 ...')
+ *     AC-6 rotating refresh + replay rejection → it('AC-6 ...')
+ *   - T03 extension (3 tests):
+ *     AC-12.a login emits auth.signed_in → it('AC-12.a ...')
+ *     AC-12.b logout emits auth.signed_out → it('AC-12.b ...')
+ *     AC-12.c forgotPassword emits + no user lookup → it('AC-12.c ...')
+ *
+ * Target: 10/10 PASS.
  */
 
-import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from 'vitest';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import Redis from 'ioredis';
-import { compare, hash } from 'bcryptjs';
+import { compare } from 'bcryptjs';
 import { PgPool } from '../database/pg-pool.provider';
 import { RedisClient } from '../idempotency/redis.client';
 import { JwtHelper } from './jwt.helper';
@@ -50,6 +64,9 @@ import { LoginUseCase } from './application/login.use-case';
 import { LogoutUseCase } from './application/logout.use-case';
 import { GetMeUseCase } from './application/get-me.use-case';
 import { RefreshUseCase } from './application/refresh.use-case';
+import { ForgotPasswordUseCase } from './application/forgot-password.use-case';
+import { TrackingRepository } from '../tracking/tracking.repository';
+import { TrackingService } from '../tracking/tracking.service';
 import { AuthService } from './auth.service';
 import {
   InvalidCredentialsError,
@@ -59,6 +76,10 @@ import {
 const TEST_EMAIL = 'merchant1@demo.icp';
 const TEST_PASSWORD = 'demo1234';
 const TEST_DISPLAY_NAME = 'Anh Nam';
+
+/** Wait helper — give fire-and-forget loopback emit time to complete PG INSERT. */
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+const LOOPBACK_FLUSH_MS = 500;
 
 /**
  * Lightweight ConfigService stub returning env-driven values. Avoids the
@@ -93,7 +114,7 @@ function makeConfig(): ConfigService {
   return fakeConfig as ConfigService;
 }
 
-describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken)', () => {
+describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + TrackingService)', () => {
   let pool: Pool;
   let redis: Redis;
   let pgPool: PgPool;
@@ -102,6 +123,9 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken)', 
   let userRepo: PostgresUserRepository;
   let sessionRepo: PostgresSessionRepository;
   let sessionStore: RedisSessionStore;
+  let trackingRepo: TrackingRepository;
+  let trackingService: TrackingService;
+  let forgotPasswordUC: ForgotPasswordUseCase;
   let authService: AuthService;
   let testUserId: string;
 
@@ -148,6 +172,11 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken)', 
     userRepo = new PostgresUserRepository(pgPool);
     sessionRepo = new PostgresSessionRepository(pgPool);
     sessionStore = new RedisSessionStore(redisClient);
+
+    // T03 — Tracking layer (real PG insert path for loopback emit).
+    trackingRepo = new TrackingRepository(pgPool);
+    trackingService = new TrackingService(trackingRepo);
+
     const loginUC = new LoginUseCase(
       userRepo,
       sessionRepo,
@@ -166,16 +195,34 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken)', 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       config as any,
     );
-    authService = new AuthService(loginUC, logoutUC, getMeUC, refreshUC);
+    forgotPasswordUC = new ForgotPasswordUseCase();
 
-    // Pre-clean any orphan test sessions from prior runs.
+    authService = new AuthService(
+      loginUC,
+      logoutUC,
+      getMeUC,
+      refreshUC,
+      forgotPasswordUC,
+      trackingService,
+    );
+
+    // Pre-clean any orphan test data from prior runs.
     await pool.query(`DELETE FROM sessions WHERE user_id = $1`, [testUserId]);
+    await pool.query(
+      `DELETE FROM behavior_events WHERE user_id = $1 OR session_id = 'system'`,
+      [testUserId],
+    );
     await cleanRedisSessions(redis);
   });
 
   afterEach(async () => {
-    // Clear sessions created during this test only.
+    // Clear sessions + behavior_events created during this test only.
+    // session_id='system' covers forgot-password rows (no user_id, no jti).
     await pool.query(`DELETE FROM sessions WHERE user_id = $1`, [testUserId]);
+    await pool.query(
+      `DELETE FROM behavior_events WHERE user_id = $1 OR session_id = 'system'`,
+      [testUserId],
+    );
     await cleanRedisSessions(redis);
   });
 
@@ -364,6 +411,79 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken)', 
     // Redis: old jti gone, new jti present
     expect(await sessionStore.get(oldJti)).toBeNull();
     expect(await sessionStore.get(refreshed.jti)).not.toBeNull();
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // AC-12.a — Login emits auth.signed_in behavior event (T03 fire-and-forget)
+  // ──────────────────────────────────────────────────────────────────────
+  it('AC-12.a: login emits auth.signed_in behavior event via TrackingService loopback', async () => {
+    const login = await authService.login({
+      email: TEST_EMAIL,
+      password: TEST_PASSWORD,
+      rememberMe: false,
+    });
+
+    // Wait for fire-and-forget loopback to complete PG INSERT
+    await sleep(LOOPBACK_FLUSH_MS);
+
+    const rows = await pool.query<{ event_type: string; user_id: string; session_id: string; properties: Record<string, unknown> }>(
+      `SELECT event_type, user_id, session_id, properties FROM behavior_events
+       WHERE event_type = 'auth.signed_in' AND user_id = $1`,
+      [login.user.id],
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0].session_id).toBe(login.jti);
+    expect(rows.rows[0].properties).toEqual({ method: 'password' });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // AC-12.b — Logout emits auth.signed_out behavior event (T03 fire-and-forget)
+  // ──────────────────────────────────────────────────────────────────────
+  it('AC-12.b: logout emits auth.signed_out behavior event with empty properties', async () => {
+    const login = await authService.login({
+      email: TEST_EMAIL,
+      password: TEST_PASSWORD,
+      rememberMe: false,
+    });
+    await authService.logout({ jti: login.jti, userId: login.user.id });
+
+    // Wait for both signed_in (from login) + signed_out (from logout) to flush
+    await sleep(LOOPBACK_FLUSH_MS);
+
+    const rows = await pool.query<{ event_type: string; user_id: string; session_id: string; properties: Record<string, unknown> }>(
+      `SELECT event_type, user_id, session_id, properties FROM behavior_events
+       WHERE event_type = 'auth.signed_out' AND user_id = $1`,
+      [login.user.id],
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0].session_id).toBe(login.jti);
+    expect(rows.rows[0].properties).toEqual({});
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // AC-12.c + AC-13 — forgotPassword emits behavior event + NO user lookup
+  // ──────────────────────────────────────────────────────────────────────
+  it('AC-12.c + AC-13: forgotPassword emits auth.password_reset_requested with email_hash, no DB user lookup', async () => {
+    // Spy: UserRepo.findByEmail must NOT be called (no enumeration)
+    const findByEmailSpy = vi.spyOn(userRepo, 'findByEmail');
+
+    await authService.forgotPassword({ email: TEST_EMAIL });
+
+    // No user lookup — endpoint is anonymous, no DB query for enumeration
+    expect(findByEmailSpy).not.toHaveBeenCalled();
+    findByEmailSpy.mockRestore();
+
+    // Wait for fire-and-forget loopback
+    await sleep(LOOPBACK_FLUSH_MS);
+
+    const rows = await pool.query<{ event_type: string; user_id: string | null; session_id: string; properties: Record<string, string> }>(
+      `SELECT event_type, user_id, session_id, properties FROM behavior_events
+       WHERE event_type = 'auth.password_reset_requested' AND session_id = 'system'`,
+    );
+    expect(rows.rows).toHaveLength(1);
+    expect(rows.rows[0].user_id).toBeNull(); // No session yet — anonymous endpoint
+    expect(rows.rows[0].session_id).toBe('system');
+    expect(rows.rows[0].properties.email_hash).toMatch(/^[0-9a-f]{16}$/); // SHA-256 hex 16 chars
   });
 });
 
