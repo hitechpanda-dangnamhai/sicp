@@ -501,3 +501,52 @@ smoke-dashboard:
 
 logs-dashboard:
 	@docker logs icp-gateway 2>&1 | grep -E "dashboard\.|gateway\.dashboard\." | tail -30
+
+# --- S-03 T06 E2E Playwright smoke + cleanup ---------------------------------
+# Source: S-03-T06 task pack §3 (NEW Phiên N+5)
+# Pattern: chain `e2e-cleanup` + Playwright FE E2E tests.
+#   - C-T06-1 RESOLVED-INLINE per D-23 LAW: SKIP BE Jest E2E (auth.e2e-spec.ts)
+#     since `make smoke-auth` (T02 owner) covers full BE contract 10/10.
+#   - Cleanup pattern reused from `smoke-auth.sh` lines 44-56 (PG DELETE
+#     sessions + Redis DEL session:* for canonical test user) — deterministic.
+#
+# Prerequisite:
+#   - `make up` first (gateway + postgres + redis + web running)
+#   - `make seed` (merchant1@demo.icp / demo1234 exists with display_name="Anh Nam")
+#   - Chromium already installed: `pnpm --filter web exec playwright install chromium`
+#     (idempotent — skip if cached). S-01 T07 baseline pattern.
+.PHONY: e2e-cleanup smoke-e2e
+
+# Reusable cleanup target — wipes prior test sessions for deterministic state.
+# Used by:
+#   - Playwright `beforeEach` hook in auth-flow.spec.ts + dashboard.spec.ts
+#   - Manual repeat-run before `make smoke-e2e`
+e2e-cleanup:
+	@echo "=== e2e-cleanup: wipe sessions for merchant1@demo.icp ==="
+	@docker compose -f infra/docker-compose.yml exec -T postgres psql -U icp -d icp -tA -c \
+		"DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = 'merchant1@demo.icp');" \
+		> /dev/null
+	@REDIS_KEYS=$$(docker compose -f infra/docker-compose.yml exec -T redis redis-cli KEYS 'session:*' 2>/dev/null | grep -v '^$$' || true); \
+		if [ -n "$$REDIS_KEYS" ]; then \
+			echo "$$REDIS_KEYS" | xargs -r docker compose -f infra/docker-compose.yml exec -T redis redis-cli DEL > /dev/null; \
+		fi
+	@echo "  OK (PG sessions + Redis session:* wiped)"
+
+# Full E2E smoke target — chains cleanup + Playwright 5 tests.
+# Expected output (per Task Pack §5):
+#   === e2e-cleanup: wipe sessions for merchant1@demo.icp ===
+#     OK (PG sessions + Redis session:* wiped)
+#   === Playwright: install chromium (idempotent) ===
+#   === Playwright: run e2e/auth-flow.spec.ts + e2e/dashboard.spec.ts ===
+#   Running 5 tests using 1 worker
+#     ✓ [chromium] › auth-flow.spec.ts › happy login → /home
+#     ✓ [chromium] › auth-flow.spec.ts › wrong password → state-C inline alert
+#     ✓ [chromium] › auth-flow.spec.ts › logout → /auth/login
+#     ✓ [chromium] › dashboard.spec.ts › /home loaded with header + stats + tiles
+#     ✓ [chromium] › dashboard.spec.ts › D-28 avatar tap → /me
+#   5 passed
+smoke-e2e: e2e-cleanup
+	@echo "=== Playwright: install chromium (idempotent) ==="
+	@pnpm --filter web exec playwright install chromium --with-deps 2>&1 | grep -v "is already installed" || true
+	@echo "=== Playwright: run e2e/auth-flow.spec.ts + e2e/dashboard.spec.ts ==="
+	@pnpm --filter web exec playwright test

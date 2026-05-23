@@ -7,6 +7,7 @@
  * singleton once per browser tab and starts auto-flush ticker.
  *
  * Slice:    S-03 T05 — C-NN-T05-NEW-5 RESOLVED-INLINE (Phiên N+3)
+ *           + C-T06-NEW-1 RESOLVED-INLINE (Phiên N+5) — setUser API name fix
  *
  * **Why this exists** (root cause C-NN-T05-NEW-5):
  *   T03b shipped `nav.tile_clicked` emit (Phiên 36 home/page.tsx) and T05
@@ -24,7 +25,7 @@
  *      `<TrackerUserSync>` child can call `useMe()` to read user id.
  *   3. On mount: lazy-init Tracker singleton with sessionId (sessionStorage
  *      persist per tab lifetime) + appVersion + start auto-flush ticker.
- *   4. When `useMe` resolves user identity → `tracker.setUserId(me.id)` so
+ *   4. When `useMe` resolves user identity → `tracker.setUser(me.id)` so
  *      subsequent events carry `user_id` (pseudonymized analytics).
  *   5. On unmount: `tracker.stop()` clears flush timer (StrictMode safe —
  *      `_tracker` singleton ref NOT reset, only timer killed).
@@ -41,15 +42,23 @@
  * **userId sync** (separate child component):
  *   Splits responsibility — outer `<TrackerProvider>` handles init+start
  *   without depending on auth context (decoupled). Inner `<TrackerUserSync>`
- *   reads useMe and updates tracker.setUserId — failures here don't block
+ *   reads useMe and updates tracker.setUser — failures here don't block
  *   tracker start.
  *
  * Decisions applied:
  * - **D-04 (S-02)** — Auto-flush 5s LOCKED. Tracker.start() schedules ticker.
  * - **C-NN-T05-NEW-5** — Tracker init missing from app boot, resolved here.
+ * - **C-T06-NEW-1** (Phiên N+5) — Public API name is `setUser(userId)` per
+ *   `tracker.ts:137` canonical (S-02 T06 ownership). Earlier draft used
+ *   `setUserId` which doesn't exist on Tracker class. Fix: 3 occurrences
+ *   (2 JSDoc + 1 code call site line 102) renamed `setUserId` → `setUser`.
+ *   tracker.ts UNCHANGED. Latent T05 N+3 ship — surfaced by T06 Bước 8
+ *   per-workspace `pnpm --filter web exec tsc --noEmit` first run
+ *   (monorepo root-level `pnpm tsc` falls back to help, never caught).
  *
  * S-03 T05 emit (Phiên N+3 Bước 4 inline-fix — initial commit only after
  * Check 5 smoke surfaces 0-row DB anomaly via psql verify).
+ * S-03 T06 Phiên N+5 — setUser API name fix per C-T06-NEW-1.
  */
 
 import * as React from 'react';
@@ -99,7 +108,7 @@ function TrackerUserSync({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
     if (userId === undefined) return;
     try {
-      getTracker().setUserId(userId);
+      getTracker().setUser(userId);
     } catch {
       // Tracker not initialized yet — shouldn't happen because outer effect
       // runs first, but guard anyway.
