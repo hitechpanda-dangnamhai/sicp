@@ -37,6 +37,10 @@ import {
   EmptyState,
   ErrorState,
   LoginForm,
+  // T03b Dashboard hub (S-03 Phiên 36)
+  DashboardHeader,
+  HeroInsightCard,
+  HomeInputBar,
 } from '@/components/icp/organisms';
 
 // =============================================================================
@@ -419,5 +423,49 @@ describe('<LoginForm>', () => {
       { email: 'test@example.com', password: 'secret123' },
       expect.anything(),
     );
+  });
+});
+
+// =============================================================================
+// T03b Dashboard hub (S-03 Phiên 36) — DashboardHeader (1 test)
+// =============================================================================
+
+describe('DashboardHeader', () => {
+  it('renders brand block + bell + dynamic initials avatar from props per D-06', () => {
+    render(<DashboardHeader initials="AN" />);
+    expect(screen.getByText('ICP')).toBeInTheDocument();
+    expect(screen.getByText('Trợ lý kinh doanh thông minh')).toBeInTheDocument();
+    expect(screen.getByLabelText('Thông báo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tài khoản')).toHaveTextContent('AN');
+  });
+});
+
+// =============================================================================
+// HeroInsightCard (1 test)
+// =============================================================================
+
+describe('HeroInsightCard', () => {
+  it('renders tag + title + subtitle + 2 decorative CTAs per D-08 + D-09', () => {
+    render(<HeroInsightCard />);
+    expect(screen.getByText('AI VỪA PHÁT HIỆN')).toBeInTheDocument();
+    expect(screen.getByText(/Doanh thu tuần này giảm/)).toBeInTheDocument();
+    expect(screen.getByText(/2 nguyên nhân chính/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Xem phân tích/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Để sau' })).toBeInTheDocument();
+  });
+});
+
+// =============================================================================
+// HomeInputBar (1 test)
+// =============================================================================
+
+describe('HomeInputBar', () => {
+  it('renders disabled input + 2 decorative buttons per D-12', () => {
+    render(<HomeInputBar />);
+    const input = screen.getByLabelText('Hỏi tôi bất cứ điều gì');
+    expect(input).toBeInTheDocument();
+    expect(input).toBeDisabled();
+    expect(screen.getByLabelText('Chụp ảnh')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nói')).toBeInTheDocument();
   });
 });

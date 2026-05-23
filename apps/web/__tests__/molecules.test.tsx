@@ -43,6 +43,10 @@ import {
   OtpField,
   I03A_138,
   I04_172,
+  // T03b Dashboard (S-03 Phiên 36)
+  StatBar,
+  HeroTile,
+  ListTile,
   type PhaseItem,
   type DrillChip,
   type PaymentMethod,
@@ -529,5 +533,130 @@ describe('OtpField', () => {
     const inputs = container.querySelectorAll('input');
     fireEvent.change(inputs[0], { target: { value: '8' } });
     expect(onChange).toHaveBeenLastCalledWith('8');
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// T03b Dashboard (S-03 Phiên 36) — StatBar (3 tests)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('StatBar', () => {
+  it('renders 3 cells with raw integer values', () => {
+    render(<StatBar ordersToday={8} revenueToday={2_400_000} inventoryCount={142} />);
+    expect(screen.getByText('8')).toBeInTheDocument();
+    expect(screen.getByText('142')).toBeInTheDocument();
+    expect(screen.getByText('đơn hôm nay')).toBeInTheDocument();
+    expect(screen.getByText('doanh thu')).toBeInTheDocument();
+    expect(screen.getByText('tồn kho')).toBeInTheDocument();
+  });
+
+  it('formats revenue 2_400_000 as "2.4" + "M" suffix per mockup compact display', () => {
+    render(<StatBar ordersToday={8} revenueToday={2_400_000} inventoryCount={142} />);
+    expect(screen.getByText('2.4')).toBeInTheDocument();
+    expect(screen.getByText('M')).toBeInTheDocument();
+  });
+
+  it('formats revenue 850_000 as "850" + "K" suffix (compact under 1M)', () => {
+    render(<StatBar ordersToday={3} revenueToday={850_000} inventoryCount={50} />);
+    expect(screen.getByText('850')).toBeInTheDocument();
+    expect(screen.getByText('K')).toBeInTheDocument();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// T03b Dashboard — HeroTile (2 tests)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('HeroTile', () => {
+  it('renders title + subtitle + badge when provided + fires onClick', () => {
+    const onClick = vi.fn();
+    render(
+      <HeroTile
+        accent="pink"
+        iconName="camera-plus"
+        title="Nhập hàng"
+        subtitle="Chụp ảnh là có ngay"
+        badge="hot"
+        onClick={onClick}
+      />,
+    );
+    expect(screen.getByText('Nhập hàng')).toBeInTheDocument();
+    expect(screen.getByText('Chụp ảnh là có ngay')).toBeInTheDocument();
+    expect(screen.getByText('HOT')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button'));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders orange accent + AI badge with footerSlot composition', () => {
+    render(
+      <HeroTile
+        accent="orange"
+        iconName="chart-arcs"
+        title="Phân tích"
+        subtitle="Trend, doanh thu, tồn kho"
+        badge="ai"
+        footerSlot={<span data-testid="hero-footer">sparkline</span>}
+      />,
+    );
+    expect(screen.getByText('Phân tích')).toBeInTheDocument();
+    expect(screen.getByText('AI')).toBeInTheDocument();
+    expect(screen.getByTestId('hero-footer')).toBeInTheDocument();
+  });
+});
+
+// ───────────────────────────────────────────────────────────────────────────
+// T03b Dashboard — ListTile (3 tests)
+// ───────────────────────────────────────────────────────────────────────────
+
+describe('ListTile', () => {
+  it('renders title + chips + trailingText + fires onClick', () => {
+    const onClick = vi.fn();
+    render(
+      <ListTile
+        accent="pink"
+        iconName="search"
+        title="Tìm sản phẩm"
+        chips={[{ text: 'Gõ hoặc nói' }]}
+        trailingText="50+ mặt hàng"
+        onClick={onClick}
+      />,
+    );
+    expect(screen.getByText('Tìm sản phẩm')).toBeInTheDocument();
+    expect(screen.getByText('Gõ hoặc nói')).toBeInTheDocument();
+    expect(screen.getByText('50+ mặt hàng')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button'));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders inline AI badge when badgeInline="ai"', () => {
+    render(
+      <ListTile
+        accent="rose"
+        iconName="lightbulb"
+        title="Gợi ý sản phẩm"
+        badgeInline="ai"
+        chips={[{ text: 'Chụp ảnh' }]}
+      />,
+    );
+    expect(screen.getByText('Gợi ý sản phẩm')).toBeInTheDocument();
+    expect(screen.getByText('AI')).toBeInTheDocument();
+  });
+
+  it('renders cart count badge + mono value when countBadge + monoValue provided', () => {
+    render(
+      <ListTile
+        accent="fuchsia"
+        iconName="shopping-cart"
+        title="Giỏ hàng"
+        countBadge={3}
+        monoValue="100.000 ₫"
+        monoSuffix="· 3 món"
+      />,
+    );
+    expect(screen.getByText('Giỏ hàng')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    expect(screen.getByText('100.000 ₫')).toBeInTheDocument();
+    expect(screen.getByText('· 3 món')).toBeInTheDocument();
+    expect(screen.getByLabelText('3 items')).toBeInTheDocument();
   });
 });

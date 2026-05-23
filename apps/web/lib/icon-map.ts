@@ -1,29 +1,41 @@
 /**
  * apps/web/lib/icon-map.ts — Centralized icon name registry
  *
- * Slice:    S-01 UI Foundation
- * Task:     T02 Atoms (AC-3, AC-4)
+ * Slice:    S-01 UI Foundation (T02) + S-03 T03b (Phiên 36 — Tabler upgrade)
  *
- * Purpose:  Provides typed icon name union + lucide-react component mapping
- *           consumed by <Icon name=> atom (atoms/Icon.tsx). Single source of
- *           truth for icon catalogue across all S-01 atoms + downstream
- *           molecules/organisms (T04-T06).
+ * Purpose:  Provides typed icon name union + component mapping consumed by
+ *           <Icon name=> atom (atoms/Icon.tsx). Single source of truth for
+ *           icon catalogue across all S-01 atoms + downstream molecules/
+ *           organisms (T04-T06) + S-03 Dashboard hub (T03b).
  *
- * Strategy: lucide-react covers ~95% of mockup icons. Brand SVGs (BrainIcon,
- *           OrbPulse internals) are NOT in this map — they have dedicated atom
- *           components with inline SVG.
+ * Strategy: HYBRID — lucide-react for ~95% icons (Storybook T07 verified
+ *           39 components match mockup), Tabler React for 20 icons that
+ *           appear in `golden-reference-mockup.html` ground-truth where
+ *           Tabler shape differs visibly from lucide equivalent.
  *
- * Adding new icons: import from 'lucide-react' → add to ICON_MAP record.
- *                   Type IconName auto-updates via keyof.
+ * Tabler upgrade (S-03 Phiên 36 per user choice "B install @tabler/icons-react"):
+ *   - lucide fallbacks `chart-arcs → Activity`, `camera-plus → Aperture`
+ *     were SHAPE-WRONG (verified screenshot comparison vs mockup).
+ *   - Tabler shapes match mockup byte-for-byte (mockup uses Tabler webfont
+ *     via CDN; Tabler React uses same SVG source).
+ *   - 20 icons total replaced: bell, bolt, bulb, camera, camera-plus,
+ *     chart-arcs, chart-line, chevron-right, home, inbox, message-circle,
+ *     microphone, package, receipt, search, shopping-bag, shopping-cart,
+ *     sparkles, trending-up, user.
  *
- * Source:   golden-reference-mockup.html (30+ ti-* inline SVG references)
- *           intent-{01..08} mockups (inline SVG observed during EBT v2 SCAN).
+ * Adding new icons: import from 'lucide-react' OR '@tabler/icons-react' →
+ *                   add to ICON_MAP. Type IconName auto-updates via keyof.
  */
 
+import type { LucideIcon } from 'lucide-react';
+import type { TablerIcon } from '@tabler/icons-react';
+
+// ─────────────────────────────────────────────────────────────────────
+// Lucide imports — icons NOT replaced by Tabler (47 icons)
+// ─────────────────────────────────────────────────────────────────────
 import {
   // Navigation
   ChevronLeft,
-  ChevronRight,
   ChevronUp,
   ChevronDown,
   ArrowLeft,
@@ -33,36 +45,26 @@ import {
   Plus,
   Minus,
   Check,
-  Search,
   Settings,
   Filter,
   RefreshCw,
   // Commerce
-  ShoppingCart,
-  ShoppingBag,
   CreditCard,
   Wallet,
-  Receipt,
   Tag,
-  Package,
   Truck,
   // Voice / Media
-  Mic,
   MicOff,
-  Camera,
   Image as ImageIcon,
   Volume2,
   VolumeX,
   Play,
   Pause,
   // AI / Brand
-  Sparkles,
   Lightbulb,
   Zap,
-  TrendingUp,
   TrendingDown,
   BarChart3,
-  LineChart,
   PieChart,
   // Status
   CheckCircle2,
@@ -72,11 +74,9 @@ import {
   Info,
   Loader2,
   // User
-  User,
   Users,
   LogIn,
   LogOut,
-  Bell,
   Heart,
   Star,
   // Files
@@ -93,72 +93,117 @@ import {
   Share2,
   MoreHorizontal,
   MoreVertical,
-  // T06 additions (C-30 surface Phiên 18) — LoginForm + ErrorState + EmptyState
+  // T06 additions (C-30 Phiên 18) — LoginForm + ErrorState + EmptyState
   Mail,
   Lock,
   WifiOff,
-  Inbox,
   Key,
   ShieldCheck,
-  type LucideIcon,
 } from 'lucide-react';
 
+// ─────────────────────────────────────────────────────────────────────
+// Tabler imports — 20 icons used in golden-reference-mockup.html
+// ─────────────────────────────────────────────────────────────────────
+import {
+  IconBell,
+  IconBolt,
+  IconBulb,
+  IconCamera,
+  IconCameraPlus,
+  IconChartArcs,
+  IconChartLine,
+  IconChevronRight,
+  IconHome,
+  IconInbox,
+  IconMessageCircle,
+  IconMicrophone,
+  IconPackage,
+  IconReceipt,
+  IconSearch,
+  IconShoppingBag,
+  IconShoppingCart,
+  IconSparkles,
+  IconTrendingUp,
+  IconUser,
+} from '@tabler/icons-react';
+
 /**
- * ICON_MAP — kebab-case name → lucide component.
+ * IconComponent — union of lucide-react LucideIcon + Tabler TablerIcon types.
  *
- * Convention: kebab-case names match Tabler/lucide naming where possible.
+ * **Why union instead of intersection** (Final Fix v3 — C-32 RESOLVED):
+ *   - Lucide `LucideIcon` types `stroke: string` (strict)
+ *   - Tabler `TablerIcon` types `stroke: string | number` (loose, Omit + re-add)
+ *   - Intersection `Lucide & Tabler` impossible — `stroke` field conflict
+ *   - Custom `Omit<SVGProps, 'stroke'>` superset approach (v1 fix sai) breaks
+ *     lucide which expects `stroke: string` strict
+ *   - **Union approach: each component preserves its own library's exact type**
+ *   - Consumer (atoms/Icon.tsx) calls `<LucideOrTablerComponent size={n} />` — both
+ *     libraries accept `size: number | string` so no caller-side type narrowing needed
+ *
+ * Pattern locked V-SLICE consumers forward.
+ */
+export type IconComponent = LucideIcon | TablerIcon;
+
+/**
+ * ICON_MAP — kebab-case name → React component (lucide OR Tabler).
+ *
+ * Convention: kebab-case names match Tabler naming (mockup canonical source).
  * Use `<Icon name="chevron-left" />` in atom/molecule code.
  */
 export const ICON_MAP = {
-  // Navigation
+  // ─── Navigation ───
   'chevron-left': ChevronLeft,
-  'chevron-right': ChevronRight,
+  'chevron-right': IconChevronRight, // Tabler — used in mockup tiles
   'chevron-up': ChevronUp,
   'chevron-down': ChevronDown,
   'arrow-left': ArrowLeft,
   'arrow-right': ArrowRight,
   x: X,
 
-  // Actions
+  // ─── Actions ───
   plus: Plus,
   minus: Minus,
   check: Check,
-  search: Search,
+  search: IconSearch, // Tabler — mockup List Tile "Tìm sản phẩm"
   settings: Settings,
   filter: Filter,
   refresh: RefreshCw,
 
-  // Commerce
-  'shopping-cart': ShoppingCart,
-  'shopping-bag': ShoppingBag,
+  // ─── Commerce ───
+  'shopping-cart': IconShoppingCart, // Tabler — mockup List Tile "Giỏ hàng"
+  'shopping-bag': IconShoppingBag,   // Tabler — mockup List Tile "Mua hàng"
   'credit-card': CreditCard,
   wallet: Wallet,
-  receipt: Receipt,
+  receipt: IconReceipt,              // Tabler — mockup StatBar "đơn hôm nay"
   tag: Tag,
-  package: Package,
+  package: IconPackage,              // Tabler — mockup StatBar "tồn kho"
   truck: Truck,
 
-  // Voice / Media
-  mic: Mic,
+  // ─── Voice / Media ───
+  mic: IconMicrophone,               // Tabler — mockup HomeInputBar voice button
+  microphone: IconMicrophone,
   'mic-off': MicOff,
-  camera: Camera,
+  camera: IconCamera,                // Tabler — mockup HomeInputBar image button
   image: ImageIcon,
   'volume-up': Volume2,
   'volume-mute': VolumeX,
   play: Play,
   pause: Pause,
 
-  // AI / Brand
-  sparkles: Sparkles,
+  // ─── AI / Brand ───
+  sparkles: IconSparkles,            // Tabler — mockup Header logo + Hero orb
   lightbulb: Lightbulb,
+  bulb: IconBulb,                    // Tabler — mockup List Tile "Gợi ý sản phẩm"
   zap: Zap,
-  'trending-up': TrendingUp,
+  bolt: IconBolt,                    // Tabler — mockup Tile "5 giây" chip
+  'trending-up': IconTrendingUp,     // Tabler — mockup StatBar "doanh thu"
   'trending-down': TrendingDown,
   'chart-bar': BarChart3,
-  'chart-line': LineChart,
+  'chart-line': IconChartLine,       // Tabler — mockup Hero CTA "Xem phân tích"
+  'chart-arcs': IconChartArcs,       // Tabler — mockup Hero Tile "Phân tích"
   'chart-pie': PieChart,
 
-  // Status
+  // ─── Status ───
   'check-circle': CheckCircle2,
   'x-circle': XCircle,
   'alert-circle': AlertCircle,
@@ -166,23 +211,23 @@ export const ICON_MAP = {
   info: Info,
   loader: Loader2,
 
-  // User
-  user: User,
+  // ─── User ───
+  user: IconUser,                    // Tabler — mockup HomeBottomNav "Cửa hàng"
   users: Users,
   'log-in': LogIn,
   'log-out': LogOut,
-  bell: Bell,
+  bell: IconBell,                    // Tabler — mockup Header bell
   heart: Heart,
   star: Star,
 
-  // Files
+  // ─── Files ───
   'file-text': FileText,
   edit: Edit3,
   trash: Trash2,
   eye: Eye,
   'eye-off': EyeOff,
 
-  // Misc
+  // ─── Misc ───
   'map-pin': MapPin,
   calendar: Calendar,
   clock: Clock,
@@ -191,14 +236,22 @@ export const ICON_MAP = {
   'more-horizontal': MoreHorizontal,
   'more-vertical': MoreVertical,
 
-  // T06 additions (C-30 Phiên 18) — LoginForm + ErrorState + EmptyState
+  // ─── T06 additions (C-30 Phiên 18) ───
   mail: Mail,
   lock: Lock,
   'wifi-off': WifiOff,
-  inbox: Inbox,
+  inbox: IconInbox,                  // Tabler — mockup HomeBottomNav "Đề xuất"
   key: Key,
   'shield-check': ShieldCheck,
-} as const satisfies Record<string, LucideIcon>;
+
+  // ─── T03b additions (S-03 Phiên 36 — Tabler React component upgrade) ───
+  // Per user choice "B install @tabler/icons-react" Phiên 36 Batch 6b.
+  // Previous lucide fallbacks (Activity, Aperture, Home, MessageCircle) were
+  // SHAPE-WRONG vs mockup. Replaced with pixel-perfect Tabler React.
+  home: IconHome,                              // Tabler — mockup HomeBottomNav "Trang chính"
+  'message-circle': IconMessageCircle,         // Tabler — mockup HomeBottomNav "Trò chuyện"
+  'camera-plus': IconCameraPlus,               // Tabler — mockup Hero Tile "Nhập hàng"
+} as const satisfies Record<string, IconComponent>;
 
 /**
  * IconName — TypeScript union of all registered icon names.
@@ -211,13 +264,13 @@ export const ICON_MAP = {
 export type IconName = keyof typeof ICON_MAP;
 
 /**
- * Get a lucide component by registered name. Type-safe — TS catches typos.
+ * Get an icon component by registered name. Type-safe — TS catches typos.
  *
  * @example
  *   const Icon = getIconComponent('chevron-left');
  *   <Icon size={16} strokeWidth={2.5} />
  */
-export function getIconComponent(name: IconName): LucideIcon {
+export function getIconComponent(name: IconName): IconComponent {
   return ICON_MAP[name];
 }
 

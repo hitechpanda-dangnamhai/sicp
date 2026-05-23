@@ -104,3 +104,21 @@ export {
   type OtpFieldProps,
   type OtpFieldLength,
 } from './OtpField';
+
+// ─── T03b Dashboard hub (3 molecules — S-03 Phiên 36) ───────────────────────
+
+export { StatBar, type StatBarProps } from './StatBar';
+
+export {
+  HeroTile,
+  type HeroTileProps,
+  type HeroTileAccent,
+  type HeroTileBadgeKind,
+} from './HeroTile';
+
+export {
+  ListTile,
+  type ListTileProps,
+  type ListTileAccent,
+  type ListTileChip,
+} from './ListTile';

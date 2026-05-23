@@ -22,3 +22,6 @@ export { MainScroll, type MainScrollProps } from './MainScroll';
 export { BottomBar, type BottomBarProps } from './BottomBar';
 export { TopBar, type TopBarProps } from './TopBar';
 export { AppHeader, type AppHeaderProps } from './AppHeader';
+
+// T03b Dashboard hub (S-03 Phiên 36) — decorative 4-tab bottom nav per D-13 + C-24
+export { HomeBottomNav, type HomeBottomNavProps } from './HomeBottomNav';

@@ -4,50 +4,67 @@
  * apps/web/components/icp/organisms/LoginForm.tsx
  *
  * Organism: <LoginForm> — I08 login form composing shadcn Form + Input + Button
+ *                        + Checkbox (T04 patch) + Next.js Link (T04 patch)
  *
- * Slice:    S-01 UI Foundation
- * Task:     T06 AC-11
+ * Slice:    S-01 UI Foundation T06 (initial)
+ *           S-03 T04 PATCH — +rememberMe Checkbox inline + "Quên mật khẩu?" Link
  *
- * Source:   intent-08-state-A-login.html visual contract
+ * Source:   intent-08-state-A-login.html visual contract lines 149-178
  *           SEMANTIC_COMPONENTS Section 5.7 — I08 minimal CSS (1 bespoke class),
  *           rebuild as shadcn `<Form>` + `<Input>` + `<Button>` per ADR-033 stack
  *
  * Reach:    I08 only (S-03 V-SLICE Auth primary consumer)
  *
- * Decisions applied:
+ * Decisions applied (S-01 T06 inherited):
  * - C-07 navigation-agnostic — onSubmit callback returning Promise<void> | void;
- *   V-SLICE S-03 wraps in Server Action or fetch at page level per C-29 resolution
+ *   V-SLICE S-03 wraps in TanStack mutation at page level per D-19 RESOLVED
  *   (NO Server Action at organism layer — keeps component portable)
- * - C-08 + D-05 VN inline — field labels + placeholders + error messages hardcoded VN
+ * - C-08 + S01-D-05 VN inline — field labels + placeholders + error messages hardcoded VN
  * - C-13 N/A — uses shadcn Input native, no CVA collision
  * - C-15 CLIENT — useForm() hook + useState for show/hide password toggle
  * - C-18 Tier 4 Tailwind utility inline
  * - C-22 atom interface verified — composes shadcn Form/FormField/FormItem/
  *   FormLabel/FormControl/FormMessage + shadcn Input + T02 Button (extended) + T02 Icon
+ *   + shadcn Checkbox (T04 NEW via `pnpm dlx shadcn@latest add checkbox`)
  * - C-29 RESOLVED — `onSubmit` callback prop only per C-07; V-SLICE S-03 attaches
- *   Server Action at page level (compose pattern not redesign)
+ *   TanStack mutation at page level (compose pattern not redesign) per D-19
  * - C-30 — uses NEW icons `mail` + `lock` + `eye` + `eye-off` (registered in
  *   icon-map.ts T06 patch AC-16)
+ *
+ * S-03 T04 PATCH decisions:
+ * - **D-18** — "Quên mật khẩu?" link uses Next.js `<Link href="/auth/forgot-password">`
+ *   for SPA client-side navigation (prefetch enabled, no full reload)
+ * - **D-20** — rememberMe Checkbox inline row layout: flex justify-between with
+ *   "Ghi nhớ tôi" left + "Quên mật khẩu?" right, below password field, above
+ *   submit button. State management: react-hook-form `rememberMe: boolean`
+ *   field via Controller (Checkbox is non-native, NOT register). Default `false`.
+ *   Mockup ref: lines 172-178.
  *
  * Pre-classification per C-24: SINGLE-INTENT ≤300 LOC (I08 only single V-SLICE)
  *
  * Validation:
  * - Email: required + RFC pattern match (react-hook-form built-in regex rule)
  * - Password: required + min 6 chars (basic; production should be stricter)
- * - No zod dependency added at T06 — uses react-hook-form built-in rules
+ * - rememberMe: boolean, no validation (always valid)
+ * - No zod dependency added — uses react-hook-form built-in rules
  *
  * Public API:
  *   <LoginForm
- *     onSubmit={async ({ email, password }) => {
- *       await signIn(email, password);
+ *     onSubmit={async ({ email, password, rememberMe }) => {
+ *       await mutateAsync({ email, password, remember_me: rememberMe });
  *     }}
  *     loading={isPending}
  *     error="Email hoặc mật khẩu không đúng"
  *   />
+ *
+ * **Boundary mapping** (T04 page.tsx responsibility):
+ *   FE camelCase `rememberMe` ↔ BE snake_case `remember_me` (codegen LoginDto).
+ *   See `app/auth/login/page.tsx` `toLoginDto()` helper.
  */
 
 import * as React from 'react';
-import { useForm, type SubmitHandler } from 'react-hook-form';
+import Link from 'next/link';
+import { useForm, Controller, type SubmitHandler } from 'react-hook-form';
 import {
   Form,
   FormField,
@@ -57,6 +74,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/icp/atoms';
 import { Icon } from '@/components/icp/atoms';
 import { cn } from '@/lib/utils';
@@ -64,12 +82,17 @@ import { cn } from '@/lib/utils';
 export interface LoginFormData {
   email: string;
   password: string;
+  /** S-03 T04 D-20 patch — "Ghi nhớ tôi" checkbox state.
+   *  Maps to BE `remember_me: boolean` at page.tsx boundary (NOT here).
+   *  When true → BE sets cookie Max-Age=accessTtlSeconds; when false → session cookie.
+   */
+  rememberMe: boolean;
 }
 
 export interface LoginFormProps {
   /** Fires when form submits with valid data. Return Promise to keep `loading`
    *  state in sync at consumer level (T06 stays CLIENT-only via prop; V-SLICE
-   *  S-03 attaches Server Action wrapper per C-29). */
+   *  S-03 attaches TanStack mutation wrapper per D-19). */
   onSubmit: SubmitHandler<LoginFormData>;
   /** External loading state — when true, submit button shows spinner + disabled */
   loading?: boolean;
@@ -90,6 +113,7 @@ export function LoginForm({ onSubmit, loading = false, error, defaultValues, cla
     defaultValues: {
       email: defaultValues?.email ?? '',
       password: defaultValues?.password ?? '',
+      rememberMe: defaultValues?.rememberMe ?? false,
     },
     mode: 'onBlur',
   });
@@ -200,7 +224,7 @@ export function LoginForm({ onSubmit, loading = false, error, defaultValues, cla
           )}
         />
 
-        {/* Submit button */}
+        {/* Submit button — moved BEFORE rememberMe row per mockup lines 168-178 order */}
         <Button
           type="submit"
           variant="pink-grad"
@@ -211,6 +235,41 @@ export function LoginForm({ onSubmit, loading = false, error, defaultValues, cla
         >
           Đăng nhập
         </Button>
+
+        {/* rememberMe Checkbox + Forgot password link inline row (T04 D-20)
+            Mockup ref: lines 172-178
+              - Left: <label> with 14×14 checkbox + "Ghi nhớ tôi" 11px #9F1239
+              - Right: <a> "Quên mật khẩu?" 11px #BE185D font-semibold cursor-pointer
+            Layout: flex justify-between items-center mt-3 */}
+        <div className="flex justify-between items-center mt-1">
+          <Controller
+            control={form.control}
+            name="rememberMe"
+            render={({ field }) => (
+              <label
+                htmlFor="login-remember-me"
+                className="flex items-center gap-1.5 text-[11px] text-icp-rose-700 cursor-pointer select-none"
+              >
+                <Checkbox
+                  id="login-remember-me"
+                  checked={field.value}
+                  onCheckedChange={(checked) => field.onChange(checked === true)}
+                  disabled={loading}
+                  className="h-[14px] w-[14px] rounded-[4px] border-icp-pink-200 bg-icp-pink-50
+                             data-[state=checked]:bg-icp-pink-700 data-[state=checked]:border-icp-pink-700
+                             data-[state=checked]:text-white"
+                />
+                Ghi nhớ tôi
+              </label>
+            )}
+          />
+          <Link
+            href="/auth/forgot-password"
+            className="text-[11px] text-icp-pink-700 font-semibold hover:text-icp-pink-800 transition-colors"
+          >
+            Quên mật khẩu?
+          </Link>
+        </div>
       </form>
     </Form>
   );

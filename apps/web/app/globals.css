@@ -451,6 +451,25 @@ body {
     -webkit-text-fill-color: transparent;
     color: transparent;
   }
+
+  /* 12. .hero-bg — Hero AI Insight gradient (S-03 T03b per C-25 RESOLVED Phiên 36).
+     Mockup ground-truth: golden-reference-mockup.html line 48:
+     `.hero-bg { background: linear-gradient(135deg, #E91E63 0%, #EC4899 40%, #F472B6 75%, #FB923C 100%); }`
+     Vivid pink→orange diagonal — white text reads on top, decorative radial
+     overlays + sparkle dots layered above per HeroInsightCard composition. */
+  .hero-bg {
+    background: linear-gradient(135deg, #E91E63 0%, #EC4899 40%, #F472B6 75%, #FB923C 100%);
+  }
+
+  /* 13. .orb — Hero Insight pulse-ring orb idle drift (S-03 T03b per C-25 RESOLVED Phiên 36).
+     Mockup ground-truth: golden-reference-mockup.html line 43:
+     `.orb { animation: drift 4s ease-in-out infinite; }`
+     Reuses existing `@keyframes drift` (T07 Batch 3 A1 per #7 .drift class).
+     Distinct from .drift via semantic intent — .orb specifically for AI agent
+     avatar in Hero Insight context; .drift is generic bob-idle for tiles/icons. */
+  .orb {
+    animation: drift 4s ease-in-out infinite;
+  }
 }
 /* ═══════════════════════════════════════════════════════════════════════
    T07 BATCH 3 A8 — Custom scrollbar styling (window + MainScroll)
@@ -494,3 +513,41 @@ body {
    (e.g., DrillChipRow horizontal scroll). Existing [&::-webkit-scrollbar]:hidden
    Tailwind arbitrary class continues to work — these rules are overridden by
    specificity when component sets display:none on the pseudo-element. ── */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   S-03 T04 SPLASH ANIMATIONS — keyframes cho SplashContent.tsx organism
+
+   Per `docs/mockups/intent-08/intent-08-state-0-splash.html` lines 41-49:
+   Brain glow (opacity+scale pulse), node pulse (satellite dots),
+   pop (initial scale-in), slide-up (text+CTA reveal), btn-bump (CTA hover idle).
+
+   Prefixed `splash-*` to avoid collision với T03b/T07 existing keyframes
+   (drift/pulseRing in tailwind.config 'animation' map).
+
+   D-14 (pagination dots decorative) + D-15 (Aida brand) per S-03 T04.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@keyframes splash-brainGlow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%      { opacity: 0.8; transform: scale(1.1); }
+}
+
+@keyframes splash-nodePulse {
+  0%, 100% { transform: scale(1);   opacity: 0.7; }
+  50%      { transform: scale(1.5); opacity: 1; }
+}
+
+@keyframes splash-pop {
+  0%   { transform: scale(0.92); opacity: 0; }
+  100% { transform: scale(1);    opacity: 1; }
+}
+
+@keyframes splash-slideUp {
+  0%   { transform: translateY(12px); opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes splash-btnBump {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
+}

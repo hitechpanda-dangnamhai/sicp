@@ -1,0 +1,64 @@
+/* =============================================================================
+ * apps/web/app/home/home.module.css — Scoped page styles for /home Dashboard.
+ *
+ * Source:    docs/mockups/golden-reference-mockup.html lines 13-49 (verbatim CSS rules)
+ * Strategy:  CSS Module → unique class names → NO conflict with T01 globals.css.
+ *            Mockup body + phone-frame + .tile animation rules copied here.
+ * =============================================================================
+ */
+
+/* Page wrapper — replaces mockup <body> rules for /home route only.
+   Per Next.js App Router, body element is owned by root layout; we apply
+   the same visual rules to a wrapper div via this scoped class. */
+.pageWrap {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+  background: #FDF2F4;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 14px;
+  color: #831447;
+}
+
+@media (min-width: 1024px) {
+  .pageWrap {
+    padding: 32px;
+  }
+}
+
+/* Phone frame — mockup line 23-32 verbatim. */
+.phoneFrame {
+  width: 100%;
+  max-width: 414px;
+  background: linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%);
+  border-radius: 24px;
+  overflow: hidden;
+  border: 0.5px solid #F9D8E4;
+  box-shadow: 0 20px 60px rgba(233, 30, 99, 0.18);
+}
+
+@media (min-width: 1024px) {
+  .phoneFrame {
+    box-shadow: 0 32px 80px rgba(233, 30, 99, 0.24);
+  }
+}
+
+/* Tile entrance animation — mockup line 48. */
+@keyframes tilePop {
+  0% {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.tile {
+  animation: tilePop 0.5s ease-out backwards;
+}

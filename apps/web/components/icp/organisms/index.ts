@@ -91,3 +91,9 @@ export {
   type ErrorStateProps,
   type ErrorStateTip,
 } from './ErrorState';
+
+// ─── T03b Dashboard hub (3 organisms — S-03 Phiên 36) ────────────────────────
+
+export { DashboardHeader, type DashboardHeaderProps } from './DashboardHeader';
+export { HeroInsightCard, type HeroInsightCardProps } from './HeroInsightCard';
+export { HomeInputBar, type HomeInputBarProps } from './HomeInputBar';

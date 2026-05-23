@@ -22,7 +22,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { createRef } from 'react';
 
 import { PhoneFrame } from '@/components/icp/PhoneFrame';
-import { MainScroll, BottomBar, TopBar, AppHeader } from '@/components/icp/layout';
+import { MainScroll, BottomBar, TopBar, AppHeader, HomeBottomNav } from '@/components/icp/layout';
 
 // =============================================================================
 // PhoneFrame
@@ -209,5 +209,20 @@ describe('AppHeader', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tùy chọn' }));
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onAction).toHaveBeenCalledTimes(1);
+  });
+});
+
+// =============================================================================
+// T03b HomeBottomNav (S-03 Phiên 36) — 4-tab decorative nav per D-13
+// =============================================================================
+
+describe('HomeBottomNav', () => {
+  it('renders 4 tabs with Trang chính active + Đề xuất badge "2" per D-13', () => {
+    render(<HomeBottomNav />);
+    expect(screen.getByLabelText('Trang chính')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByLabelText('Trò chuyện')).not.toHaveAttribute('aria-current');
+    expect(screen.getByLabelText('Đề xuất')).not.toHaveAttribute('aria-current');
+    expect(screen.getByLabelText('Cửa hàng')).not.toHaveAttribute('aria-current');
+    expect(screen.getByLabelText('2 đề xuất mới')).toHaveTextContent('2');
   });
 });

@@ -1,30 +1,44 @@
 /**
- * apps/web/app/page.tsx — Root page placeholder
+ * apps/web/app/page.tsx — Root splash page (state-0)
  *
- * Slice:    S-00b T08 (initial) + S-01 T03 PATCH Phiên 15 (per C-20)
+ * Slice:    S-03 T04 — Auth Pages (Splash + Login + Forgot)
+ * Replaces: S-00b T08 placeholder + S-01 T03 PhoneFrame wrap (legacy)
  *
- * Status:   Placeholder. Renders <PhoneFrame> wrapper around "ICP loaded"
- *           heading for landing route `/`.
+ * **Server Component** (no 'use client' directive) — `cookies()` only works
+ * server-side. Server-side cookie check happens BEFORE any HTML renders:
  *
- * Decisions:
- * - C-20 (T03 Phiên 15) — `<PhoneFrame mode>` required prop per C-01 RESOLVED
- *   forced consumer migration. This consumer was emitted S-00b T08 before
- *   C-01 decided 2 modes. Patch: add `mode="chat"` (conservative default —
- *   Family A pattern, internal scroll). Future page.tsx redesign may switch
- *   to `mode="app"` per actual UX.
+ *   - User authed (`icp_session` cookie present) → `redirect('/home')` (Next.js
+ *     307 server-side bounce; no splash flash)
+ *   - User anonymous → render <SplashContent /> client component
  *
- * Notes:
- * - This is a placeholder route. Real intent pages will be emitted in
- *   S-03+ V-SLICE work consuming layout primitives via @/components/icp/layout.
+ * Decisions applied:
+ * - **D-16** (Phiên N) — Splash auth-gate via Server Component cookies() check,
+ *   NOT middleware patch. Pattern preserves T03b middleware.ts shipped state
+ *   (zero regression smoke-dashboard 10/10). LAYER_MATRIX M11 design.
+ * - **D-17** (Phiên N) — Post-login redirect target `/home` LOCKED. No `?next`
+ *   query param consumed. Single entry point UX.
+ *
+ * Cross-screen brand naming (D-15):
+ *   - Splash `/` renders brand "Aida" (mockup IS LAW + Phase 00 handoff intent)
+ *   - Dashboard `/home` (T03b shipped) renders "ICP" (repo namespace)
+ *   - Intentional split: Aida = product UX brand, ICP = codebase namespace
+ *
+ * Mockup ref: `docs/mockups/intent-08/intent-08-state-0-splash.html` (159 LOC)
  */
-import { PhoneFrame } from '@/components/icp/PhoneFrame';
 
-export default function HomePage() {
-  return (
-    <PhoneFrame mode="chat">
-      <main className="flex h-full w-full items-center justify-center">
-        <h1 className="text-xl font-bold text-icp-pink-800">ICP loaded</h1>
-      </main>
-    </PhoneFrame>
-  );
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { SplashContent } from '@/components/icp/organisms/SplashContent';
+
+const SESSION_COOKIE = 'icp_session';
+
+export default function RootPage() {
+  // Server-side cookie presence check (Edge runtime fast O(1) lookup).
+  // Validity check happens at BE per protected request via JwtAuthGuard;
+  // here we only gate splash render vs dashboard redirect.
+  if (cookies().has(SESSION_COOKIE)) {
+    redirect('/home');
+  }
+
+  return <SplashContent />;
 }
