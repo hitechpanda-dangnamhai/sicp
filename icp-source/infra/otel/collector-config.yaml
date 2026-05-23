@@ -1,0 +1,78 @@
+# OpenTelemetry Collector configuration for ICP local dev.
+#
+# C22.a (Phiên 10 LOCKED): Logs exporter strategy = `otlphttp/loki` targeting
+#   Loki's native OTLP ingest endpoint `http://loki:3100/otlp` (Q-2 B-controlled).
+#   The deprecated standalone `loki` exporter is NOT used here. See
+#   `decisions-log.md` C22.a for rationale + trade-offs. Loki 2.9.4 supports
+#   OTLP ingest natively when `limits_config.allow_structured_metadata: true`
+#   (see `loki-config.yaml`).
+#
+# Traces / metrics exporters unchanged from skeleton:
+#   - `otlp/tempo` → Tempo OTLP gRPC at `tempo:4317`
+#   - `prometheusremotewrite` → Prometheus remote_write at
+#     `http://prometheus:9090/api/v1/write`
+#
+# Config file is mounted at `/etc/otelcol/config.yaml` and selected explicitly
+# via the `--config=/etc/otelcol/config.yaml` command flag (Q-4 A LOCKED).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 10s
+    send_batch_size: 8192
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+    spike_limit_mib: 128
+
+exporters:
+  # C22.a Q-2 B-controlled — modern OTLP HTTP ingest into Loki (NOT deprecated
+  # standalone `loki` exporter). Loki backend retained; only exporter strategy
+  # changed. `endpoint` is the OTLP base URL; the exporter auto-appends the
+  # signal path (`/v1/logs`) per OTLP HTTP spec.
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    tls:
+      insecure: true
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite]
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      address: 0.0.0.0:8888

@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Intent 06 — Xác nhận đơn hàng</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+    background: #FDF2F4;
+    min-height: 100vh;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 14px;
+    color: #831447;
+  }
+  .phone-frame {
+    width: 100%;
+    max-width: 414px;
+    background: linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%);
+    border-radius: 24px;
+    overflow: hidden;
+    border: 0.5px solid #F9D8E4;
+    box-shadow: 0 20px 60px rgba(233,30,99,0.18);
+    display: flex;
+    flex-direction: column;
+    min-height: 844px;
+    position: relative;
+  }
+  @media (min-width: 1024px) {
+    body { padding: 32px; }
+    .phone-frame { box-shadow: 0 32px 80px rgba(233,30,99,0.24); }
+  }
+  button { font-family: inherit; cursor: pointer; }
+  input { font-family: inherit; }
+
+  @keyframes pop { 0%{transform:scale(0.95); opacity:0} 100%{transform:scale(1); opacity:1} }
+  @keyframes slideUp { 0%{transform:translateY(10px); opacity:0} 100%{transform:translateY(0); opacity:1} }
+  @keyframes brainGlow { 0%,100%{opacity:0.4} 50%{opacity:0.7} }
+  @keyframes nodePulse { 0%,100%{transform:scale(1); opacity:0.7} 50%{transform:scale(1.4); opacity:1} }
+  @keyframes drift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+
+  .pop { animation: pop 0.5s ease-out backwards; }
+  .slide-up { animation: slideUp 0.4s ease-out backwards; }
+  .drift { animation: drift 4s ease-in-out infinite; }
+
+  .ico { width: 1em; height: 1em; display: inline-block; vertical-align: -0.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5M11 18l-6-6 6-6"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 18l6-6-6-6"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-map-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.7A2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.8.3 1.8.6 2.8.7a2 2 0 0 1 1.8 2z"/></symbol>
+    <symbol id="i-truck" viewBox="0 0 24 24"><path d="M3 17h13V5H3zM16 9h4l3 4v4h-7"/><circle cx="7" cy="19" r="2"/><circle cx="18" cy="19" r="2"/></symbol>
+    <symbol id="i-credit-card" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 6v6c0 5.5 3.5 10.7 8 12 4.5-1.3 8-6.5 8-12V6z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></symbol>
+    <symbol id="i-bottle" viewBox="0 0 24 24"><path d="M10 2h4M10 2v3l-2 2v13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V7l-2-2V2"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+    <symbol id="i-cash" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></symbol>
+    <symbol id="i-bank" viewBox="0 0 24 24"><path d="m3 21 18 0M3 10h18M5 6l7-4 7 4M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  </defs>
+</svg>
+
+<div class="phone-frame">
+
+  <!-- STATUS BAR -->
+  <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 22px 0; font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700; color:#831447; flex-shrink:0;">
+    <span>9:41</span>
+    <div style="display:flex; gap:6px; align-items:center;">
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
+        <rect x="0" y="6" width="2" height="4" rx="0.5" fill="#831447"/>
+        <rect x="4" y="4" width="2" height="6" rx="0.5" fill="#831447"/>
+        <rect x="8" y="2" width="2" height="8" rx="0.5" fill="#831447"/>
+        <rect x="12" y="0" width="2" height="10" rx="0.5" fill="#831447"/>
+      </svg>
+      <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
+        <path d="M7 9.5 L1 4 a8 8 0 0 1 12 0z" stroke="#831447" stroke-width="1.2" fill="none" stroke-linejoin="round"/>
+      </svg>
+      <div style="width:22px; height:11px; border:1px solid #831447; border-radius:3px; padding:1px; position:relative;">
+        <div style="width:80%; height:100%; background:#831447; border-radius:1px;"></div>
+        <div style="position:absolute; right:-3px; top:3px; width:2px; height:5px; background:#831447; border-radius:0 1px 1px 0;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <div style="padding:14px 18px 10px; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+    <div style="display:flex; align-items:center; gap:10px;">
+      <button aria-label="Quay lại" style="background:#FFFFFF; border:0.5px solid #FBCFE8; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#BE185D; box-shadow:0 2px 8px rgba(233,30,99,0.1);">
+        <svg class="ico" style="font-size:17px"><use href="#i-arrow-left"/></svg>
+      </button>
+      <div>
+        <div style="font-size:16px; color:#831447; font-weight:700; letter-spacing:-0.3px;">Xác nhận đơn hàng</div>
+        <div style="font-size:10px; color:#BE185D; font-weight:500; display:flex; align-items:center; gap:4px;">
+          <span style="width:5px; height:5px; background:#10B981; border-radius:50%;"></span>
+          Bước 2/3 • Kiểm tra & thanh toán
+        </div>
+      </div>
+    </div>
+    <div style="background:linear-gradient(135deg, #FB923C, #EA580C); color:#fff; padding:5px 10px; border-radius:12px; font-size:11px; font-weight:700; box-shadow:0 4px 10px rgba(234,88,12,0.3);">4 món</div>
+  </div>
+
+  <!-- PROGRESS STEPPER -->
+  <div style="padding:0 20px 14px; flex-shrink:0;">
+    <div style="display:flex; align-items:center; gap:6px;">
+      <div style="flex:1; display:flex; align-items:center; gap:6px;">
+        <div style="width:22px; height:22px; background:linear-gradient(135deg, #10B981, #059669); border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(16,185,129,0.32);">
+          <svg class="ico" style="font-size:13px; color:#fff; stroke-width:3"><use href="#i-check"/></svg>
+        </div>
+        <span style="font-size:10px; color:#047857; font-weight:600;">Giỏ hàng</span>
+      </div>
+      <div style="flex:1; height:2px; background:linear-gradient(90deg, #10B981, #E91E63); border-radius:1px;"></div>
+      <div style="flex:1; display:flex; align-items:center; gap:6px;">
+        <div style="width:22px; height:22px; background:linear-gradient(135deg, #E91E63, #F43F5E); border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(233,30,99,0.35); color:#fff; font-size:11px; font-weight:700; font-family:'JetBrains Mono', monospace;">2</div>
+        <span style="font-size:10px; color:#BE185D; font-weight:700;">Xác nhận</span>
+      </div>
+      <div style="flex:1; height:2px; background:#FCE7F3; border-radius:1px;"></div>
+      <div style="flex:1; display:flex; align-items:center; gap:6px;">
+        <div style="width:22px; height:22px; background:#FCE7F3; border:0.5px solid #FBCFE8; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#BE185D; font-size:11px; font-weight:700; font-family:'JetBrains Mono', monospace;">3</div>
+        <span style="font-size:10px; color:#9F1239; font-weight:500;">Hoàn tất</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCROLLABLE CONTENT -->
+  <div style="flex:1; overflow-y:auto; padding:0 16px 240px;">
+
+    <!-- BRAIN HINT -->
+    <div class="pop" style="margin-bottom:12px;">
+      <div style="display:flex; gap:10px; align-items:flex-start; background:linear-gradient(135deg, #FFFFFF, #FEF3F8); border:0.5px solid #FBCFE8; border-radius:16px; padding:10px 12px; box-shadow:0 4px 12px rgba(233,30,99,0.08);">
+        <div class="drift" style="flex-shrink:0;">
+          <svg width="36" height="36" viewBox="0 0 240 240">
+            <defs>
+              <radialGradient id="brain-core-mini" cx="40%" cy="35%">
+                <stop offset="0%" stop-color="#FFE4E6"/>
+                <stop offset="60%" stop-color="#F9A8D4"/>
+                <stop offset="100%" stop-color="#BE185D"/>
+              </radialGradient>
+              <radialGradient id="brain-aura-mini" cx="50%" cy="50%">
+                <stop offset="0%" stop-color="rgba(233,30,99,0.35)"/>
+                <stop offset="100%" stop-color="rgba(251,146,60,0)"/>
+              </radialGradient>
+            </defs>
+            <circle cx="120" cy="120" r="100" fill="url(#brain-aura-mini)" style="animation:brainGlow 3s ease-in-out infinite;"/>
+            <path d="M 77 104 Q 69 86 86 77 Q 94 65 111 70 Q 120 58 132 66 Q 154 62 158 85 Q 172 94 162 111 Q 172 128 158 140 Q 154 158 132 158 Q 120 172 108 158 Q 86 158 82 140 Q 69 128 77 111 Z" fill="url(#brain-core-mini)" filter="drop-shadow(0 4px 10px rgba(190,24,93,0.4))"/>
+            <path d="M 94 86 Q 120 95 137 86 M 86 112 Q 120 120 154 112 M 94 137 Q 120 130 137 137" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.7"/>
+            <circle cx="34" cy="72" r="6" fill="#E91E63" style="animation:nodePulse 2s ease-in-out infinite;"/>
+            <circle cx="206" cy="86" r="6" fill="#FB923C" style="animation:nodePulse 2s ease-in-out infinite 0.5s;"/>
+          </svg>
+        </div>
+        <div style="flex:1; font-size:12px; color:#831447; line-height:1.5; font-weight:500;">
+          Anh kiểm tra giúp em <b style="color:#BE185D;">địa chỉ giao hàng</b> và <b style="color:#BE185D;">phương thức thanh toán</b> nhé. Em đã giữ giá <b style="color:#BE185D;">15 phút</b>.
+        </div>
+      </div>
+    </div>
+
+    <!-- SHIPPING ADDRESS CARD -->
+    <div class="slide-up" style="animation-delay:0.05s; background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:16px; padding:14px; margin-bottom:12px; box-shadow:0 4px 12px rgba(233,30,99,0.06);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <svg class="ico" style="font-size:14px; color:#BE185D"><use href="#i-map-pin"/></svg>
+          <span style="font-size:10px; color:#BE185D; font-weight:700; letter-spacing:1px; text-transform:uppercase;">Giao đến</span>
+        </div>
+        <button style="background:#FCE7F3; border:none; color:#BE185D; padding:5px 11px; border-radius:9px; font-size:10px; font-weight:700;">Đổi</button>
+      </div>
+      <div style="display:flex; gap:10px;">
+        <div style="width:38px; height:38px; background:linear-gradient(135deg, #FCE7F3, #FBCFE8); border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg class="ico" style="font-size:18px; color:#BE185D"><use href="#i-map-pin"/></svg>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+            <span style="font-size:13px; color:#831447; font-weight:700;">Anh Nam</span>
+            <span style="font-size:9px; color:#9F1239; font-family:'JetBrains Mono', monospace;">•</span>
+            <span style="font-size:11px; color:#9F1239; font-family:'JetBrains Mono', monospace;">0912 345 678</span>
+            <span style="background:#FCE7F3; color:#BE185D; font-size:9px; font-weight:700; padding:1px 6px; border-radius:5px; letter-spacing:0.3px;">MẶC ĐỊNH</span>
+          </div>
+          <div style="font-size:11px; color:#831447; line-height:1.5; font-weight:500;">
+            12 Nguyễn Huệ, Phường Bến Nghé,<br/>Quận 1, TP. Hồ Chí Minh
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ORDER ITEMS CARD -->
+    <div class="slide-up" style="animation-delay:0.1s; background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:16px; padding:14px; margin-bottom:12px; box-shadow:0 4px 12px rgba(233,30,99,0.06);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <svg class="ico" style="font-size:14px; color:#BE185D"><use href="#i-truck"/></svg>
+          <span style="font-size:10px; color:#BE185D; font-weight:700; letter-spacing:1px; text-transform:uppercase;">Sản phẩm (4)</span>
+        </div>
+        <button style="background:transparent; border:none; color:#BE185D; font-size:10px; font-weight:600; display:flex; align-items:center; gap:3px;">
+          Sửa giỏ
+          <svg class="ico" style="font-size:11px"><use href="#i-chevron-right"/></svg>
+        </button>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center; padding-bottom:10px; border-bottom:0.5px solid #FCE7F3; margin-bottom:10px;">
+        <div style="width:44px; height:44px; background:linear-gradient(135deg, #FEF3C7, #FCD34D); border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg class="ico" style="font-size:22px; color:#92400E; opacity:0.7"><use href="#i-bottle"/></svg>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:11px; color:#831447; font-weight:600; line-height:1.3; margin-bottom:2px;">Nước tương Maggi đậm đặc 700ml</div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:10px; color:#9F1239; font-family:'JetBrains Mono', monospace;">×2</span>
+            <span style="font-size:10px; color:#9F1239;">•</span>
+            <span style="font-size:11px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace;">51.000₫</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center; padding-bottom:10px; border-bottom:0.5px solid #FCE7F3; margin-bottom:10px;">
+        <div style="width:44px; height:44px; background:linear-gradient(135deg, #FEE2E2, #FCA5A5); border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg class="ico" style="font-size:22px; color:#991B1B; opacity:0.7"><use href="#i-bottle"/></svg>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:11px; color:#831447; font-weight:600; line-height:1.3; margin-bottom:2px;">Tương ớt Chin-su 250g</div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:10px; color:#9F1239; font-family:'JetBrains Mono', monospace;">×1</span>
+            <span style="font-size:10px; color:#9F1239;">•</span>
+            <span style="font-size:11px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace;">17.000₫</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center; padding-bottom:10px; border-bottom:0.5px solid #FCE7F3; margin-bottom:10px;">
+        <div style="width:44px; height:44px; background:linear-gradient(135deg, #DBEAFE, #93C5FD); border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg class="ico" style="font-size:22px; color:#1E40AF; opacity:0.65"><use href="#i-bottle"/></svg>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:11px; color:#831447; font-weight:600; line-height:1.3; margin-bottom:2px;">Hạt nêm Maggi vị thịt heo 400g</div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:10px; color:#9F1239; font-family:'JetBrains Mono', monospace;">×1</span>
+            <span style="font-size:10px; color:#9F1239;">•</span>
+            <span style="font-size:11px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace;">35.000₫</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div style="width:44px; height:44px; background:linear-gradient(135deg, #FED7AA, #FB923C); border-radius:9px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+          <svg class="ico" style="font-size:22px; color:#9A3412; opacity:0.7"><use href="#i-bottle"/></svg>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:11px; color:#831447; font-weight:600; line-height:1.3; margin-bottom:2px;">Nước tương Maggi cao cấp 500ml</div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="font-size:10px; color:#9F1239; font-family:'JetBrains Mono', monospace;">×1</span>
+            <span style="font-size:10px; color:#9F1239;">•</span>
+            <span style="font-size:11px; color:#BE123C; font-weight:700; font-family:'JetBrains Mono', monospace;">42.000₫</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAYMENT METHOD CARD -->
+    <div class="slide-up" style="animation-delay:0.15s; background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:16px; padding:14px; margin-bottom:12px; box-shadow:0 4px 12px rgba(233,30,99,0.06);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <svg class="ico" style="font-size:14px; color:#BE185D"><use href="#i-credit-card"/></svg>
+          <span style="font-size:10px; color:#BE185D; font-weight:700; letter-spacing:1px; text-transform:uppercase;">Phương thức thanh toán</span>
+        </div>
+        <button style="background:#FCE7F3; border:none; color:#BE185D; padding:5px 11px; border-radius:9px; font-size:10px; font-weight:700;">Đổi</button>
+      </div>
+
+      <!-- Selected MoMo -->
+      <div style="display:flex; gap:10px; align-items:center; padding:10px; background:linear-gradient(135deg, #FCE7F3, #FBCFE8); border:0.5px solid #E91E63; border-radius:12px;">
+        <div style="width:42px; height:42px; background:linear-gradient(135deg, #D946EF, #BE185D); border-radius:11px; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 10px rgba(190,24,93,0.32); font-size:13px; color:#fff; font-weight:700; font-family:'JetBrains Mono', monospace;">Mo</div>
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px;">
+            <span style="font-size:13px; color:#831447; font-weight:700;">Ví MoMo</span>
+            <span style="background:linear-gradient(135deg, #10B981, #059669); color:#fff; font-size:8px; font-weight:700; padding:1px 5px; border-radius:4px; letter-spacing:0.3px;">−2%</span>
+          </div>
+          <div style="font-size:10px; color:#9F1239;">SĐT •••• 5678 • Còn 1.250.000₫</div>
+        </div>
+        <div style="width:22px; height:22px; background:linear-gradient(135deg, #E91E63, #F43F5E); border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 8px rgba(233,30,99,0.35); flex-shrink:0;">
+          <svg class="ico" style="font-size:13px; color:#fff; stroke-width:3"><use href="#i-check"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROMO + NOTE -->
+    <div class="slide-up" style="animation-delay:0.2s; background:linear-gradient(135deg, #FFFFFF, #FEF3F8); border:0.5px dashed #FBCFE8; border-radius:12px; padding:10px 12px; margin-bottom:10px; display:flex; align-items:center; gap:10px;">
+      <svg class="ico" style="font-size:16px; color:#BE185D; flex-shrink:0"><use href="#i-tag"/></svg>
+      <div style="flex:1; min-width:0;">
+        <div style="display:flex; align-items:center; gap:5px;">
+          <span style="font-size:11px; color:#BE185D; font-weight:700; font-family:'JetBrains Mono', monospace;">SALE15</span>
+          <span style="font-size:10px; color:#9F1239;">đã áp dụng</span>
+        </div>
+        <div style="font-size:10px; color:#10B981; font-weight:600;">Tiết kiệm 21.750₫</div>
+      </div>
+      <svg class="ico" style="font-size:14px; color:#BE185D"><use href="#i-chevron-right"/></svg>
+    </div>
+
+    <div class="slide-up" style="animation-delay:0.25s; background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:12px; padding:10px 12px; margin-bottom:14px; display:flex; align-items:center; gap:10px;">
+      <svg class="ico" style="font-size:16px; color:#BE185D; flex-shrink:0"><use href="#i-note"/></svg>
+      <input type="text" placeholder="Ghi chú cho người giao hàng..." style="flex:1; background:transparent; border:none; outline:none; font-size:12px; color:#831447; font-weight:500;" />
+    </div>
+
+  </div>
+
+  <!-- FIXED FOOTER: Summary + CTA -->
+  <div style="position:absolute; bottom:0; left:0; right:0; background:#FFFFFF; border-top:0.5px solid #FCE7F3; padding:14px 18px 20px; box-shadow:0 -8px 24px rgba(233,30,99,0.08); border-radius:18px 18px 24px 24px;">
+
+    <div style="margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+        <span style="font-size:12px; color:#9F1239;">Tạm tính (4 món)</span>
+        <span style="font-size:13px; color:#831447; font-weight:600; font-family:'JetBrains Mono', monospace;">145.000₫</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+        <span style="font-size:12px; color:#9F1239;">Giảm giá (SALE15)</span>
+        <span style="font-size:13px; color:#10B981; font-weight:600; font-family:'JetBrains Mono', monospace;">−21.750₫</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+        <span style="font-size:12px; color:#9F1239;">Vận chuyển</span>
+        <span style="font-size:13px; color:#10B981; font-weight:600; font-family:'JetBrains Mono', monospace;">Miễn phí</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:12px; color:#9F1239;">Khuyến mãi MoMo</span>
+        <span style="font-size:13px; color:#10B981; font-weight:600; font-family:'JetBrains Mono', monospace;">−2.465₫</span>
+      </div>
+    </div>
+
+    <div style="height:0.5px; background:#FCE7F3; margin:0 -2px 12px;"></div>
+
+    <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:14px;">
+      <div>
+        <div style="font-size:11px; color:#9F1239; font-weight:500; margin-bottom:2px;">Tổng thanh toán</div>
+        <div style="font-size:9px; color:#9F1239; opacity:0.7;">Đã bao gồm VAT</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:22px; font-weight:700; background:linear-gradient(135deg, #E91E63, #FB923C); -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; font-family:'JetBrains Mono', monospace; letter-spacing:-0.5px; line-height:1;">120.785₫</div>
+      </div>
+    </div>
+
+    <button style="width:100%; background:linear-gradient(135deg, #E91E63, #F43F5E 50%, #FB923C); border:none; color:#fff; padding:14px; border-radius:16px; font-size:15px; font-weight:700; box-shadow:0 12px 28px rgba(233,30,99,0.42); display:flex; align-items:center; justify-content:center; gap:8px; letter-spacing:0.2px;">
+      <svg class="ico" style="font-size:18px"><use href="#i-lock"/></svg>
+      Đặt hàng & thanh toán
+    </button>
+
+    <div style="display:flex; align-items:center; justify-content:center; gap:5px; margin-top:10px;">
+      <svg class="ico" style="font-size:12px; color:#10B981"><use href="#i-shield"/></svg>
+      <span style="font-size:10px; color:#9F1239; font-weight:500;">Bảo mật bởi MoMo • Hoàn tiền 100% nếu lỗi</span>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

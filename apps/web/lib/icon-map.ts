@@ -99,6 +99,8 @@ import {
   WifiOff,
   Key,
   ShieldCheck,
+  // T05 addition (S-03 Phiên N+2) — MeSettingsMenu help row (state-F)
+  HelpCircle,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -251,6 +253,12 @@ export const ICON_MAP = {
   home: IconHome,                              // Tabler — mockup HomeBottomNav "Trang chính"
   'message-circle': IconMessageCircle,         // Tabler — mockup HomeBottomNav "Trò chuyện"
   'camera-plus': IconCameraPlus,               // Tabler — mockup Hero Tile "Nhập hàng"
+
+  // ─── T05 additions (S-03 Phiên N+2 — MeSettingsMenu state-F profile) ───
+  // Source: intent-08-state-F-logout.html line 175 + symbol `i-help` lines 83 —
+  // settings menu row 3 "Trợ giúp Hướng dẫn, liên hệ". Lucide `HelpCircle`
+  // shape (circle + question mark) matches mockup byte-for-byte.
+  help: HelpCircle,
 } as const satisfies Record<string, IconComponent>;
 
 /**

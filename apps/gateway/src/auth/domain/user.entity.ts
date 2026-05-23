@@ -43,11 +43,18 @@ export interface PublicUser {
 }
 
 /**
- * /auth/me response shape — `PublicUser` + `last_login_at` from sessions
- * MAX(issued_at) query per S-03 C-05 + C-07.
+ * /auth/me response shape — `PublicUser` + `last_login_at` + `session_expires_at`
+ * from sessions MAX(issued_at) / MAX(expires_at) queries.
+ *
+ * S-03 T02: `last_login_at` per C-05 + C-07.
+ * S-03 T05 (Phiên N+2): `session_expires_at` per D-24 + C-33 — additive field
+ * for FE state-F profile page "Phiên: Còn Xh" countdown (computed-on-render).
  */
 export interface MeResponse extends PublicUser {
   last_login_at: string | null; // ISO8601 or null if no prior session
+  /** ISO8601 UTC of MAX(sessions.expires_at) where user has active session;
+   *  null if no active session. Pattern: D-24 BE additive extension. */
+  session_expires_at: string | null;
 }
 
 /**

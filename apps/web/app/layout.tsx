@@ -5,6 +5,10 @@
  *           — `<QueryProvider>` wrap per C-26 RESOLVED Phiên 35.
  *           Extended S-03 T04 — `<AuthProvider>` wrap per D-21 LOCKED
  *           (parallel API to TanStack useMe for V-SLICE consumer flexibility).
+ *           Extended S-03 T05 (Phiên N+3) — `<TrackerProvider>` wrap per
+ *           C-NN-T05-NEW-5 RESOLVED-INLINE (latent T03b bug: tracker singleton
+ *           never initialized → all `getTracker().track()` calls threw +
+ *           caught silently → `nav.*` events never persisted to DB).
  *
  * Source:   docs/phases/PHASE_00_DESIGN_SYSTEM.md Section 2 (Typography).
  *           T01 KI-3 deferred font loader → T02 implements.
@@ -13,13 +17,17 @@
  *           Sets `--font-be-vietnam-pro` CSS var on <body>; globals.css consumes
  *           via `--font-sans` already pointing to 'Be Vietnam Pro' name (T01).
  *
- * **Provider nesting order (T04 update)**:
+ * **Provider nesting order (T05 update)**:
  *   <QueryProvider>            ← T03b: singleton QueryClient + OpenAPI config
  *     <AuthProvider>           ← T04: consumes useMe internally, exposes Context
- *       {children}
+ *       <TrackerProvider>      ← T05: init + start Tracker singleton; inner
+ *                                child reads useMe for setUserId sync
+ *         {children}
  *
  * AuthProvider depends on QueryClient (via useMe → useQuery) → MUST be inside
- * QueryProvider. Reverse order throws "useQuery outside provider" error.
+ * QueryProvider. TrackerProvider's inner TrackerUserSync also depends on
+ * useMe → MUST be inside QueryProvider (it's also inside AuthProvider but
+ * doesn't depend on AuthContext directly — could be peer).
  *
  * Why CSS variable strategy: future flexibility if T03+ needs theme switching
  * without touching layout. Tailwind's font-sans utility will inherit through
@@ -33,6 +41,7 @@ import type { Metadata } from 'next';
 import { Be_Vietnam_Pro, JetBrains_Mono } from 'next/font/google';
 import { QueryProvider } from '@/lib/providers/query-provider';
 import { AuthProvider } from '@/lib/auth/auth-context';
+import { TrackerProvider } from '@/lib/providers/tracker-provider';
 import './globals.css';
 
 const beVietnamPro = Be_Vietnam_Pro({
@@ -63,7 +72,9 @@ export default function RootLayout({
     <html lang="vi" className={`${beVietnamPro.variable} ${jetbrainsMono.variable}`}>
       <body>
         <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <TrackerProvider>{children}</TrackerProvider>
+          </AuthProvider>
         </QueryProvider>
       </body>
     </html>

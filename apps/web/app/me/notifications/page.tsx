@@ -1,0 +1,98 @@
+'use client';
+
+/**
+ * apps/web/app/me/notifications/page.tsx
+ *
+ * Stub route — Thông báo (Notifications) section.
+ *
+ * Slice:    S-03 T05 — 3 stub settings routes per AC-37 + DM-10(d)
+ *
+ * **Why stub?** BRIEF non-goal: "❌ Real notifications/security/help pages
+ * (stub routes emit event + render placeholder; defer S-04+)". This route
+ * exists solely to:
+ *   1. Make `/me/notifications` `<Link>` navigable from `<MeSettingsMenu>`.
+ *   2. Emit `nav.settings_section_opened{section:'notifications'}` on mount
+ *      (per AC-37 + DM-8 catalog) for behavior analytics.
+ *
+ * **Event emit timing** (AC-37):
+ *   - Fires ONCE per page mount via `useEffect(() => {...}, [])`.
+ *   - NOT on `<Link>` click in MeSettingsMenu (would double-emit + might fire
+ *     even if navigation aborted — destination onMount is single source of
+ *     truth for "section actually opened").
+ *
+ * **Phase 6 promotion path**: When notifications backend exists, this stub
+ * gets replaced by real data fetching + UI. The event emit stays as the
+ * top-level instrumentation hook (Loki + behavior_events search by section).
+ *
+ * S-03 T05 emit (Phiên N+2 Batch 5).
+ */
+
+import * as React from 'react';
+import { useRouter } from 'next/navigation';
+import { getTracker } from '@/lib/tracker';
+import { Icon } from '@/components/icp/atoms';
+
+export default function MeNotificationsStubPage() {
+  const router = useRouter();
+
+  React.useEffect(() => {
+    // AC-37 — Fire once on mount. Tracker buffer auto-flushes per D-04 (5s).
+    try {
+      getTracker().track('nav.settings_section_opened', { section: 'notifications' });
+    } catch (err) {
+      if (typeof console !== 'undefined') {
+        console.error('nav.settings_section_opened emit failed', err);
+      }
+    }
+  }, []);
+
+  return (
+    <div className="fixed inset-0 overflow-y-auto flex items-start justify-center bg-[#FDF2F4] px-[14px] py-6 lg:p-8 text-[#831447]">
+      <div
+        className="w-full max-w-[414px] rounded-3xl overflow-hidden flex flex-col relative
+                   border-[0.5px] border-[#F9D8E4]
+                   shadow-[0_20px_60px_rgba(233,30,99,0.18)] lg:shadow-[0_32px_80px_rgba(233,30,99,0.24)]"
+        style={{
+          background: 'linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%)',
+          minHeight: 844,
+        }}
+      >
+        {/* Top bar — back button + title */}
+        <div className="px-[18px] pt-[14px] flex items-center gap-2.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => router.push('/me')}
+            aria-label="Quay lại"
+            className="bg-white border-[0.5px] border-[#FBCFE8] w-9 h-9 rounded-full
+                       flex items-center justify-center text-[#BE185D]
+                       shadow-[0_2px_8px_rgba(233,30,99,0.1)]
+                       active:scale-[0.95] transition-all
+                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <Icon name="arrow-left" size={16} />
+          </button>
+          <div className="text-[15px] text-[#831447] font-bold tracking-[-0.2px]">
+            Thông báo
+          </div>
+        </div>
+
+        {/* Placeholder body */}
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 text-center">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4
+                       bg-gradient-to-br from-[#FCE7F3] to-[#FBCFE8] text-[#BE185D]"
+            aria-hidden="true"
+          >
+            <Icon name="bell" size={28} />
+          </div>
+          <div className="text-[15px] text-[#831447] font-semibold mb-1.5">
+            Tính năng đang phát triển
+          </div>
+          <div className="text-[12px] text-[#9F1239] leading-[1.5] max-w-[260px]">
+            Em sẽ sớm cập nhật trang Thông báo để anh quản lý đơn hàng và khuyến mãi tại đây.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

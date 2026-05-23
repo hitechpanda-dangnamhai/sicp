@@ -3,39 +3,55 @@
 /**
  * apps/web/app/auth/login/page.tsx
  *
- * Login page — state-A per `docs/mockups/intent-08/intent-08-state-A-login.html`.
+ * Login page — state machine 5-state per DM-18 (mockup state-A/B/C/D/E full).
  *
- * Slice:    S-03 T04 — Auth Pages
+ * Slice:    S-03 T04 — Auth Pages (state-A baseline)
+ *           S-03 T05 — State machine REPLACE: state-A idle + state-B isPending
+ *                      + state-C wrong-credentials (LoginForm error + shake key)
+ *                      + state-D network error (ErrorState replace form)
+ *                      + state-E success (LoginSuccessTransition organism)
+ *
+ * **State branching logic** (D-25 + D-26 LOCKED):
+ *   - `loginMutation.isSuccess` → render `<LoginSuccessTransition>` (state-E)
+ *   - `errorClass === 'network'` → render `<ErrorState>` REPLACE form (state-D)
+ *   - `errorClass === 'wrong_credentials'` → render LoginForm + error banner + shake (state-C)
+ *   - `errorClass === 'generic'` → render LoginForm + error banner NO shake (state-C-fallback)
+ *   - else → render LoginForm (state-A idle OR state-B isPending — LoginForm internally
+ *     handles loading-state via `loading` prop disabling fields + spinner)
  *
  * **Composition (page-level layout, NOT in LoginForm organism)**:
  *   - Phone-frame (reuse splash style: 414px max + gradient bg + 844px min-height)
  *   - Status bar mock (9:41 + signal/wifi/battery decorative)
- *   - Brain mini 96×96 with drift animation
- *   - Brand "Chào mừng trở lại" gradient + tagline
- *   - <LoginForm> S-01 organism (patched +rememberMe per Batch 3) wired with useLogin
- *   - Demo hint card — BE seed canonical credentials (C-28 RESOLVED)
- *   - JWT security footer
- *
- * **Why state-A only (not B/C/D/E)**:
- *   Per S-03_LAYER_MATRIX line 100, T04 owns mockup state-A only. State B/C/D/E/F
- *   = T05 scope. T04 covers:
- *     - state-A render (this page)
- *     - state-C wrong-password (LoginForm `error` prop displays inline red banner)
- *     - happy path → redirect /home (D-17 via useLogin onSuccess)
- *   NOT T04: animated state-B spinner overlay, state-D network error card, state-E
- *   success brain check-pop redirect. Those = T05.
+ *   - Conditional inner: state-E full-replace OR (brand + brain + form-or-errorstate + demo + footer)
  *
  * Decisions applied:
- * - **D-17** — useLogin onSuccess → router.push('/home'); NO `?next` consume
+ * - **D-17** — Login destination /home (UNCHANGED — only LOCUS moved per C-34)
  * - **D-19** — TanStack mutation only (useLogin internal)
- * - **D-20** — LoginForm patched +rememberMe Checkbox inline (Batch 3 emit)
+ * - **D-20** — LoginForm patched +rememberMe Checkbox inline (T04 ship)
+ * - **D-25** — State machine page locus: page owns transition timing,
+ *   `LoginSuccessTransition` owns 2s setTimeout cleanup-aware
+ * - **D-26** — Strict error classification: `classifyLoginError(error)` returns
+ *   4-way union. 401 → state-C (inline + shake). No-status (network) → state-D
+ *   (ErrorState replace). Other 4xx/5xx → state-C-fallback (inline NO shake).
  * - **C-28** — Demo hint render BE seed `merchant1@demo.icp` / `demo1234`
+ * - **C-34** — `useLogin.onSuccess` no longer pushes; navigation in
+ *   LoginSuccessTransition useEffect setTimeout(2000)
+ * - **C-35** — `formatLoginError` REPLACED by `classifyLoginError` (4-way)
  *
- * Mockup reference: `intent-08-state-A-login.html` lines 110-200
+ * Mockup references:
+ *   - state-A: `intent-08-state-A-login.html` lines 110-200 (form idle)
+ *   - state-B: `intent-08-state-B-loading.html` lines 144-171 (form locked + spinner)
+ *   - state-C: `intent-08-state-C-wrong-password.html` lines 149-183 (.pop.shake + alert banner)
+ *   - state-D: `intent-08-state-D-network-error.html` lines 148-175 (ErrorState replace)
+ *   - state-E: `intent-08-state-E-success.html` lines 111-171 (BrainXL + check-pop + greeting + 2s progress)
  */
 
+import * as React from 'react';
 import { useLogin } from '@/lib/auth/use-login';
-import { LoginForm, type LoginFormData } from '@/components/icp/organisms/LoginForm';
+import { LoginForm, type LoginFormData, ErrorState } from '@/components/icp/organisms';
+import { LoginSuccessTransition } from '@/components/icp/organisms/LoginSuccessTransition';
+import { Button, Icon } from '@/components/icp/atoms';
+import { reportError } from '@/lib/error/use-error-report';
 
 /**
  * Map FE LoginFormData (camelCase: `rememberMe`) → BE LoginDto (snake_case:
@@ -51,25 +67,108 @@ function toLoginDto(data: LoginFormData) {
 }
 
 /**
- * Map BE 401 + other errors → VN-localized error message for LoginForm display.
+ * 4-way error classification per D-26 + C-35 RESOLVED-INLINE (Phiên N+2).
+ *
+ * Branches login page state machine:
+ *   - `'none'`              — no error (state-A idle OR state-B isPending)
+ *   - `'wrong_credentials'` — HTTP 401 → state-C: LoginForm error + animate-shake keyed restart
+ *   - `'network'`           — fetch rejected pre-response (no `status`) → state-D: ErrorState replace form
+ *   - `'generic'`           — other 4xx/5xx → state-C-fallback: LoginForm error NO shake (different errorKey)
+ *
+ * **Structural distinction** `error.status === 401` (auth fail HTTP completed)
+ * vs `!error.status` (network — fetch reject TypeError) is V-SLICE pattern LOCKED.
+ *
+ * Codegen `ApiError` shape (from `@icp/shared-types/api/core/ApiError`):
+ *   `{status: number, statusText: string, url: string, body: any}`. Network
+ *   failures throw raw `TypeError("Failed to fetch")` or similar (no status).
  */
-function formatLoginError(error: Error | null): string | undefined {
-  if (!error) return undefined;
-  // Codegen ApiError shape: error.message contains BE response body description.
-  // BE 401 returns `{error: 'INVALID_CREDENTIALS'}` per Phase 00 handoff §4.
-  // Show user-friendly VN message regardless of underlying error code.
-  if (error.message.toLowerCase().includes('401') || error.message.toLowerCase().includes('invalid')) {
+export type LoginErrorClass = 'none' | 'wrong_credentials' | 'network' | 'generic';
+
+function classifyLoginError(error: Error | null): LoginErrorClass {
+  if (!error) return 'none';
+  // Codegen ApiError has `status: number`; raw network errors don't.
+  const apiErr = error as { status?: number };
+  if (apiErr.status === 401) return 'wrong_credentials';
+  if (typeof apiErr.status !== 'number') return 'network';
+  return 'generic';
+}
+
+/**
+ * VN-localized error message for state-C inline banner. Used for both
+ * `'wrong_credentials'` (401) and `'generic'` (other HTTP errors).
+ */
+function getInlineErrorMessage(errorClass: LoginErrorClass): string | undefined {
+  if (errorClass === 'wrong_credentials') {
     return 'Email hoặc mật khẩu không đúng. Vui lòng thử lại.';
   }
-  return 'Đã xảy ra lỗi. Vui lòng thử lại sau.';
+  if (errorClass === 'generic') {
+    return 'Đã xảy ra lỗi. Vui lòng thử lại sau.';
+  }
+  return undefined;
 }
 
 export default function LoginPage() {
   const loginMutation = useLogin();
 
+  // D-26: Trace ID stored in component state — generated FE-side at error
+  // capture (8-char hex stub per C-09). Persists across re-renders so "Báo lỗi"
+  // copies the SAME ID user saw on screen. Reset on `Thử lại` (mutation.reset).
+  const [traceId, setTraceId] = React.useState<string | null>(null);
+
+  // Classify error each render (D-26): branches state machine A/B/C/D/E.
+  const errorClass = classifyLoginError(loginMutation.error);
+
+  // Generate trace ID lazily when network error first surfaces (one-time per
+  // error instance). Effect avoids generating during render.
+  React.useEffect(() => {
+    if (errorClass === 'network' && traceId === null) {
+      // crypto.randomUUID() available in modern browsers + Node 19+.
+      const id =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID().slice(0, 8)
+          : Math.random().toString(16).slice(2, 10);
+      setTraceId(id);
+    }
+    if (errorClass !== 'network' && traceId !== null) {
+      // Clear stale trace when error class changes away from network
+      // (e.g. user typed new credentials → submit again → 401 → state-C).
+      setTraceId(null);
+    }
+  }, [errorClass, traceId]);
+
   const handleSubmit = async (data: LoginFormData) => {
     loginMutation.mutate(toLoginDto(data));
   };
+
+  const handleRetry = React.useCallback(() => {
+    // Reset mutation → errorClass becomes 'none' → state machine returns to A.
+    // Trace cleanup handled by useEffect above on next render.
+    loginMutation.reset();
+  }, [loginMutation]);
+
+  const handleReportError = React.useCallback(() => {
+    if (traceId) {
+      // Fire-and-forget — emits event + copies trace to clipboard.
+      // Result ignored per mockup (no toast UI).
+      void reportError(traceId, 'E_NETWORK_TIMEOUT');
+    }
+  }, [traceId]);
+
+  // ─────────────────────────────────────────────────────────────────────
+  // State-E: Success transition — full-replace phone-frame content
+  // per D-25 (LoginSuccessTransition organism owns 2s setTimeout cleanup-aware).
+  // Avoids useMe race per STOP-T05-5 by reading displayName directly from
+  // mutation.data.user (LoginResponseDto has the field).
+  // ─────────────────────────────────────────────────────────────────────
+  if (loginMutation.isSuccess && loginMutation.data) {
+    return (
+      <LoginSuccessTransition displayName={loginMutation.data.user.display_name} />
+    );
+  }
+
+  // Inline banner message for state-C / state-C-fallback (state-D uses
+  // ErrorState replace, not banner).
+  const inlineErrorMessage = getInlineErrorMessage(errorClass);
 
   return (
     <div className="fixed inset-0 overflow-y-auto flex items-start justify-center bg-[#FDF2F4] px-[14px] py-6 lg:p-8 text-[#831447]">
@@ -201,22 +300,107 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {/* LOGIN FORM CARD (mockup line 149: white bg + radius 20 + shadow + mb 16) */}
-          <div
-            className="bg-white border-[0.5px] border-[#FBCFE8] rounded-[20px] px-5 py-[22px] mb-4"
-            style={{
-              boxShadow: '0 12px 32px rgba(233,30,99,0.1)',
-              animation: 'splash-pop 0.6s ease-out backwards',
-            }}
-          >
-            <LoginForm
-              onSubmit={handleSubmit}
-              loading={loginMutation.isPending}
-              error={formatLoginError(loginMutation.error)}
-            />
-          </div>
+          {/* CONDITIONAL: State-D ErrorState replace OR state-A/B/C LoginForm */}
+          {errorClass === 'network' ? (
+            // ─────────────────────────────────────────────────────────────
+            // State-D — Network error: ErrorState REPLACES form per D-26.
+            // Mockup ref: intent-08-state-D-network-error.html lines 148-175.
+            // ─────────────────────────────────────────────────────────────
+            <div
+              className="bg-gradient-to-br from-white to-[#FEF3F8] border-[0.5px] border-[#FECACA]
+                         border-l-[3px] border-l-[#DC2626] rounded-[18px] px-[18px] py-5 mb-4"
+              style={{
+                boxShadow: '0 12px 28px rgba(220,38,38,0.12)',
+                animation: 'splash-slideUp 0.5s ease-out 0.15s backwards',
+              }}
+            >
+              <ErrorState
+                density="centered"
+                errorOrb={
+                  // Custom wifi-off circle red-gradient + pulse-ring overlay
+                  // (NOT generic OrbPulse — distinct semantic per M14 LAYER_MATRIX:
+                  // "lost connection" wifi-off icon vs gray-maroon shake orb).
+                  <div className="relative w-[60px] h-[60px]">
+                    <div className="absolute inset-0 rounded-full bg-[rgba(220,38,38,0.18)] animate-pulse-ring" />
+                    <div
+                      className="relative w-[60px] h-[60px] rounded-full flex items-center justify-center
+                                 bg-gradient-to-br from-[#FEE2E2] to-[#FCA5A5]
+                                 shadow-[0_6px_16px_rgba(220,38,38,0.18)]"
+                    >
+                      <Icon name="wifi-off" size={28} className="text-[#DC2626]" />
+                    </div>
+                  </div>
+                }
+                errorCode="E_NETWORK_TIMEOUT"
+                title="Mất kết nối"
+                subtitle="Em chưa kết nối được tới máy chủ. Anh kiểm tra Wi-Fi hoặc 4G rồi thử lại nhé."
+                actions={
+                  <div className="flex gap-2 w-full">
+                    <Button
+                      variant="pink-grad"
+                      size="md"
+                      onClick={handleRetry}
+                      leftIcon="refresh"
+                      className="flex-1"
+                    >
+                      Thử lại
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="md"
+                      onClick={handleReportError}
+                      className="px-4"
+                    >
+                      Báo lỗi
+                    </Button>
+                  </div>
+                }
+              />
+              {/* Trace stub line per mockup line 163-166 — small mono row with
+                  trace_id display. Rendered inside the ErrorState card padding. */}
+              {traceId && (
+                <div
+                  className="bg-white border-[0.5px] border-[#FCE7F3] rounded-[10px]
+                             px-3 py-2 mt-3 font-mono text-[10px] text-[#9F1239]
+                             flex items-center justify-between"
+                >
+                  <span>
+                    Mã lỗi: <b className="text-[#BE123C]">E_NETWORK_TIMEOUT</b>
+                  </span>
+                  <span className="text-[#9CA3AF]">trace: {traceId}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            // ─────────────────────────────────────────────────────────────
+            // State-A idle / State-B isPending (LoginForm loading=true) /
+            // State-C wrong_credentials (LoginForm error — shake handled internally) /
+            // State-C-fallback generic (LoginForm error — no shake when error empty)
+            //
+            // Shake animation owned INSIDE LoginForm now (T05 patch — internal
+            // `shakeKey` state bumps on error transition; `<form>` wrapper inside
+            // gets `key={shakeKey}` + `animate-shake` class one-shot). This page
+            // wrapper DIV no longer needs `key=...` remount, which would have
+            // reset react-hook-form state. State preserved across shake animations.
+            // ─────────────────────────────────────────────────────────────
+            <div
+              className="bg-white border-[0.5px] border-[#FBCFE8] rounded-[20px] px-5 py-[22px] mb-4"
+              style={{
+                boxShadow: '0 12px 32px rgba(233,30,99,0.1)',
+                animation: 'splash-pop 0.6s ease-out backwards',
+              }}
+            >
+              <LoginForm
+                onSubmit={handleSubmit}
+                loading={loginMutation.isPending}
+                error={inlineErrorMessage}
+              />
+            </div>
+          )}
 
-          {/* DEMO HINT CARD (C-28 RESOLVED — BE seed credentials) */}
+          {/* DEMO HINT CARD (C-28 RESOLVED — BE seed credentials).
+              Rendered in state-A only; state-D/C continue showing it too per
+              mockup state-D line 178-189 (demo hint still visible below error). */}
           <div
             className="border-[0.5px] border-dashed border-[#FBCFE8] rounded-[14px] px-3.5 py-3"
             style={{

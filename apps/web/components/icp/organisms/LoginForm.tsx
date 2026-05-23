@@ -40,6 +40,24 @@
  *   field via Controller (Checkbox is non-native, NOT register). Default `false`.
  *   Mockup ref: lines 172-178.
  *
+ * S-03 T05 PATCH decisions (Phiên N+2):
+ * - **D-26 + AC-33.shake** — Internal shake key: when `error` prop transitions
+ *   undefined → string (new wrong-credentials surface), `<form>` wrapper applies
+ *   `animate-shake` for one-shot CSS animation (400ms ease-in-out per T01
+ *   tailwind.config keyframe). Restart pattern: bump `shakeKey` state on error
+ *   transition → `key={shakeKey}` on `<form>` forces React inner-tree remount of
+ *   the form element ONLY (NOT the outer Form provider) so animation runs again
+ *   for each new error. **react-hook-form state preserved** — `useForm()` hook
+ *   lives on parent Form context; remounting the inner <form> DOM element
+ *   doesn't reset hook state. Email/password fields keep user-typed values.
+ *
+ * **Why NOT page-level shake key remount?**
+ *   Earlier draft applied `key={errorClass}` to login page's outer card DIV
+ *   containing LoginForm. Problem: that remounts LoginForm itself → useForm
+ *   re-initializes from defaultValues → user-typed fields lost. Moving key
+ *   onto the `<form>` element WITHIN LoginForm (after useForm hook) keeps
+ *   form state intact across shake animations.
+ *
  * Pre-classification per C-24: SINGLE-INTENT ≤300 LOC (I08 only single V-SLICE)
  *
  * Validation:
@@ -109,6 +127,22 @@ export interface LoginFormProps {
 export function LoginForm({ onSubmit, loading = false, error, defaultValues, className }: LoginFormProps) {
   const [showPassword, setShowPassword] = React.useState<boolean>(false);
 
+  // S-03 T05 — Internal shake key restart. Bumped each time `error` transitions
+  // from undefined → string (new error surfaces). Applied as `key={shakeKey}`
+  // on inner <form> element so CSS animation `animate-shake` runs one-shot on
+  // each new error WITHOUT resetting react-hook-form state (hook lives on
+  // parent Form provider, untouched by inner <form> remount).
+  const [shakeKey, setShakeKey] = React.useState<number>(0);
+  const prevErrorRef = React.useRef<string | undefined>(error);
+  React.useEffect(() => {
+    const prev = prevErrorRef.current;
+    if (typeof error === 'string' && error !== prev) {
+      // New error surfaced (transition undefined → string OR string A → string B)
+      setShakeKey((k) => k + 1);
+    }
+    prevErrorRef.current = error;
+  }, [error]);
+
   const form = useForm<LoginFormData>({
     defaultValues: {
       email: defaultValues?.email ?? '',
@@ -125,8 +159,9 @@ export function LoginForm({ onSubmit, loading = false, error, defaultValues, cla
   return (
     <Form {...form}>
       <form
+        key={shakeKey}
         onSubmit={form.handleSubmit(onSubmit)}
-        className={cn('w-full flex flex-col gap-4', className)}
+        className={cn('w-full flex flex-col gap-4', error && 'animate-shake', className)}
         noValidate
       >
         {/* External error banner (server-side rejection) */}

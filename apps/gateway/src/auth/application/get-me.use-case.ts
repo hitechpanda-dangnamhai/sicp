@@ -42,7 +42,13 @@ export class GetMeUseCase {
       // User row gone but Guard accepted JWT — treat as session not found.
       throw new TokenInvalidError('session_not_found');
     }
-    const lastLoginAt = await this.sessions.lastLoginAt(cmd.userId);
+    // S-03 T05 — D-24 + C-33 RESOLVED-INLINE: parallel MAX queries on sessions
+    // (issued_at + expires_at). Each does a full sequential scan today; Phase 6
+    // adds composite index `idx_sessions_user_id` to elide both scans at once.
+    const [lastLoginAt, sessionExpiresAt] = await Promise.all([
+      this.sessions.lastLoginAt(cmd.userId),
+      this.sessions.latestExpiresAt(cmd.userId),
+    ]);
     return {
       id: user.id,
       email: user.email,
@@ -50,6 +56,7 @@ export class GetMeUseCase {
       display_name: user.display_name,
       avatar_initials: computeAvatarInitials(user.display_name),
       last_login_at: lastLoginAt ? lastLoginAt.toISOString() : null,
+      session_expires_at: sessionExpiresAt ? sessionExpiresAt.toISOString() : null,
     };
   }
 }

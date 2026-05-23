@@ -97,3 +97,32 @@ export {
 export { DashboardHeader, type DashboardHeaderProps } from './DashboardHeader';
 export { HeroInsightCard, type HeroInsightCardProps } from './HeroInsightCard';
 export { HomeInputBar, type HomeInputBarProps } from './HomeInputBar';
+
+// ─── T04 Splash hub (1 organism — S-03 Phiên N+1, missed barrel fix) ─────────
+//
+// Per S-03 C-CONFLICT-05 RESOLVED-INLINE Phiên N+2 (T04 emit Phiên N+1 forgot
+// to append barrel row for SplashContent — only direct path import worked).
+// T05 batch 3 bundles the barrel patch alongside its own 3 NEW organism exports.
+
+export { SplashContent } from './SplashContent';
+
+// ─── T05 Auth state machine + Profile (3 organisms — S-03 Phiên N+2) ─────────
+//
+// State machine consumers: app/auth/login/page.tsx (LoginSuccessTransition for
+// state-E per D-25) + app/me/page.tsx (MeSettingsMenu + LogoutConfirmCard for
+// state-F per D-27 mockup composition).
+
+export {
+  LoginSuccessTransition,
+  type LoginSuccessTransitionProps,
+} from './LoginSuccessTransition';
+
+export {
+  MeSettingsMenu,
+  type MeSettingsMenuProps,
+} from './MeSettingsMenu';
+
+export {
+  LogoutConfirmCard,
+  type LogoutConfirmCardProps,
+} from './LogoutConfirmCard';

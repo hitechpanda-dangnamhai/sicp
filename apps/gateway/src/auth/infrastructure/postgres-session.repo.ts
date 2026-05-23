@@ -148,4 +148,27 @@ export class PostgresSessionRepository {
     );
     return result.rows[0]?.last_login_at ?? null;
   }
+
+  /**
+   * /auth/me `session_expires_at` = MAX(expires_at) of any non-revoked session
+   * for the user (S-03 T05 — D-24 + C-33 RESOLVED-INLINE Phiên N+2). Returns
+   * null if user has no active session.
+   *
+   * Consumed by FE state-F profile page to render "Phiên: Còn Xh" countdown
+   * computed-on-render (no setInterval — BRIEF non-goal). Pattern LOCKED
+   * V-SLICE forward as **D-24 BE additive extension**.
+   *
+   * Same scan profile as `lastLoginAt` (full sequential scan; Phase 6 add
+   * `CREATE INDEX idx_sessions_user_id ON sessions(user_id)`).
+   */
+  async latestExpiresAt(userId: string): Promise<Date | null> {
+    const result = await this.pg.query<{ session_expires_at: Date | null }>(
+      `SELECT MAX(expires_at) AS session_expires_at
+         FROM sessions
+        WHERE user_id = $1
+          AND revoked_at IS NULL`,
+      [userId],
+    );
+    return result.rows[0]?.session_expires_at ?? null;
+  }
 }

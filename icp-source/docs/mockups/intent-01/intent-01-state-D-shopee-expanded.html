@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Intent 01 — State D — Shopee Expanded</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+    background: #FDF2F4;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 14px;
+    color: #831447;
+  }
+  .phone-frame {
+    width: 100%;
+    max-width: 414px;
+    height: 844px;
+    max-height: calc(100vh - 48px);
+    background: linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%);
+    border-radius: 24px;
+    overflow: hidden;
+    border: 0.5px solid #F9D8E4;
+    box-shadow: 0 20px 60px rgba(233,30,99,0.18);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+  }
+  @media (min-width: 1024px) {
+    body { padding: 32px; }
+    .phone-frame { box-shadow: 0 32px 80px rgba(233,30,99,0.24); max-height: calc(100vh - 64px); }
+  }
+  button { font-family: inherit; cursor: pointer; border: none; }
+  input, textarea { font-family: inherit; outline: none; }
+
+  @keyframes pop { 0%{transform:scale(0.96); opacity:0} 100%{transform:scale(1); opacity:1} }
+  @keyframes drift { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+  @keyframes glow { 0%,100%{opacity:0.7; transform:scale(1)} 50%{opacity:1; transform:scale(1.05)} }
+  @keyframes pulseRing { 0%{transform:scale(1); opacity:0.5} 100%{transform:scale(1.6); opacity:0} }
+  @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  @keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+  @keyframes elastic-pop { 0%{transform:scale(0); opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1); opacity:1} }
+  @keyframes slideUp { 0%{transform:translateY(20px); opacity:0} 100%{transform:translateY(0); opacity:1} }
+  .orb { animation: drift 4s ease-in-out infinite; }
+  .pulse-dot { animation: glow 1.6s ease-in-out infinite; }
+  .pulse-ring { animation: pulseRing 2.4s ease-out infinite; }
+  .spinner { animation: spin 1s linear infinite; }
+  .tile { animation: pop 0.5s ease-out backwards; }
+
+  .status-bar {
+    height: 44px;
+    padding: 0 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #831447;
+    font-weight: 600;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .status-bar .right { display: flex; gap: 6px; align-items: center; }
+
+
+  .main-scroll { flex: 1; overflow-y: auto; padding: 8px 18px 24px; }
+
+  .market-hero {
+    background: linear-gradient(135deg, #FFEDD5 0%, #FED7AA 50%, #FB923C 100%);
+    border-radius: 20px;
+    padding: 18px;
+    margin-bottom: 18px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 22px rgba(251,146,60,0.25);
+  }
+  .market-hero::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 140px; height: 140px;
+    background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .mh-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    position: relative;
+    z-index: 1;
+  }
+  .mh-icon {
+    width: 38px; height: 38px;
+    background: rgba(255,255,255,0.95);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(154,52,18,0.2);
+  }
+  .mh-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #7C2D12;
+    letter-spacing: -0.3px;
+  }
+  .mh-sub {
+    font-size: 11px;
+    color: #9A3412;
+    font-weight: 600;
+    margin-top: 1px;
+  }
+  .mh-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    position: relative;
+    z-index: 1;
+  }
+  .mh-stat {
+    background: rgba(255,255,255,0.85);
+    border-radius: 12px;
+    padding: 10px;
+    text-align: center;
+  }
+  .mh-stat-label {
+    font-size: 9px;
+    color: #9A3412;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .mh-stat-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #C2410C;
+  }
+  .mh-stat-value.your {
+    background: linear-gradient(135deg, #E91E63, #FB923C);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Price range bar bigger */
+  .market-range {
+    margin-top: 14px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 14px;
+    padding: 14px;
+    position: relative;
+    z-index: 1;
+  }
+  .mr-track {
+    height: 14px;
+    background: linear-gradient(90deg, #FED7AA 0%, #FB923C 50%, #FED7AA 100%);
+    border-radius: 7px;
+    position: relative;
+    margin-top: 18px;
+  }
+  .mr-marker {
+    position: absolute;
+    left: 60%;
+    top: -5px;
+    width: 24px; height: 24px;
+    background: #fff;
+    border: 3px solid #E91E63;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(233,30,99,0.5);
+    transform: translateX(-50%);
+  }
+  .mr-marker::after {
+    content: 'Bạn 25K';
+    position: absolute;
+    top: -28px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #E91E63, #BE185D);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 6px;
+    white-space: nowrap;
+    box-shadow: 0 3px 8px rgba(233,30,99,0.4);
+  }
+  .mr-avg {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    height: 100%;
+    width: 2px;
+    background: #9A3412;
+    transform: translateX(-50%);
+  }
+  .mr-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: #9A3412;
+    font-weight: 700;
+  }
+
+  /* Section header */
+  .section-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0 0 12px;
+  }
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #BE185D;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filter-pill {
+    background: rgba(255,255,255,0.7);
+    border: 0.5px solid #FBCFE8;
+    color: #BE185D;
+    padding: 4px 10px;
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Similar product cards */
+  .similar-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .sim-card {
+    background: #FFFFFF;
+    border-radius: 14px;
+    padding: 12px;
+    border: 0.5px solid #FED7AA;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    box-shadow: 0 4px 12px rgba(251,146,60,0.1);
+  }
+  .sim-thumb {
+    width: 64px; height: 64px;
+    background: linear-gradient(135deg, #FFEDD5, #FED7AA);
+    border-radius: 12px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sim-info { flex: 1; min-width: 0; }
+  .sim-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #831447;
+    line-height: 1.3;
+    margin-bottom: 4px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .sim-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 500;
+    color: #BE185D;
+  }
+  .sim-rating {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    color: #C2410C;
+  }
+  .sim-shop {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(251,146,60,0.12);
+    color: #C2410C;
+    padding: 2px 6px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .sim-right { text-align: right; flex-shrink: 0; }
+  .sim-price {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #C2410C;
+  }
+  .sim-sold {
+    font-size: 9px;
+    color: #BE185D;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+  .sim-card.highlighted {
+    border-color: #E91E63;
+    border-width: 1.5px;
+    background: linear-gradient(135deg, #FFFFFF 0%, #FFF1F5 100%);
+    box-shadow: 0 6px 14px rgba(233,30,99,0.15);
+  }
+  .sim-badge-yours {
+    background: linear-gradient(135deg, #E91E63, #FB923C);
+    color: #fff;
+    padding: 3px 7px;
+    border-radius: 7px;
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    display: inline-block;
+    margin-bottom: 4px;
+  }
+
+  /* Insight strip */
+  .insight-strip {
+    background: linear-gradient(135deg, #FFE4E6 0%, #FED7AA 100%);
+    border: 0.5px solid rgba(190,24,93,0.2);
+    border-radius: 14px;
+    padding: 12px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    margin-top: 8px;
+  }
+  .insight-icon {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, #E91E63, #FB923C);
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .insight-text {
+    font-size: 12px;
+    color: #831447;
+    font-weight: 500;
+    line-height: 1.5;
+    flex: 1;
+  }
+  .insight-text strong { color: #BE185D; font-weight: 700; }
+
+</style>
+</head>
+<body>
+<div class="phone-frame">
+
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="right">
+      <svg width="18" height="11" viewBox="0 0 18 11" fill="none">
+        <rect x="0" y="6" width="3" height="5" rx="1" fill="#831447"/>
+        <rect x="5" y="4" width="3" height="7" rx="1" fill="#831447"/>
+        <rect x="10" y="2" width="3" height="9" rx="1" fill="#831447"/>
+        <rect x="15" y="0" width="3" height="11" rx="1" fill="#831447"/>
+      </svg>
+      <svg width="15" height="11" viewBox="0 0 15 11" fill="none">
+        <path d="M7.5 10.5C8.05 10.5 8.5 10.05 8.5 9.5C8.5 8.95 8.05 8.5 7.5 8.5C6.95 8.5 6.5 8.95 6.5 9.5C6.5 10.05 6.95 10.5 7.5 10.5ZM4 6.5L5 7.5C6.4 6.1 8.6 6.1 10 7.5L11 6.5C9 4.5 6 4.5 4 6.5ZM1 3.5L2 4.5C5.05 1.45 9.95 1.45 13 4.5L14 3.5C10.4 -0.1 4.6 -0.1 1 3.5Z" fill="#831447"/>
+      </svg>
+      <div style="width:24px; height:11px; border:1px solid #831447; border-radius:3px; padding:1px; position:relative;">
+        <div style="width:75%; height:100%; background:#831447; border-radius:1px;"></div>
+        <div style="position:absolute; right:-3px; top:3px; width:2px; height:5px; background:#831447; border-radius:0 1px 1px 0;"></div>
+      </div>
+    </div>
+  </div>
+
+
+    <div style="padding: 4px 18px 12px; flex-shrink: 0;">
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:0;">
+        <button style="width:36px; height:36px; background:#FFFFFF; border:0.5px solid #FBCFE8; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(233,30,99,0.1);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 18l-6-6 6-6"/>
+          </svg>
+        </button>
+        <div style="flex:1;">
+          <div style="font-size:16px; font-weight:700; color:#831447; letter-spacing:-0.3px;">So sánh thị trường</div>
+          <div style="font-size:11px; color:#BE185D; font-weight:500; margin-top:1px;">Maggi nước tương 200ml</div>
+        </div>
+        
+      </div>
+      
+    </div>
+    
+  <div class="main-scroll">
+
+    <!-- Market hero card -->
+    <div class="market-hero">
+      <div class="mh-header">
+        <div class="mh-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9h18l-2 10H5L3 9z"/>
+            <path d="M8 9V5a4 4 0 0 1 8 0v4"/>
+          </svg>
+        </div>
+        <div>
+          <div class="mh-title">Shopee · 5 cửa hàng tương tự</div>
+          <div class="mh-sub">Cập nhật 15 phút trước · 1.247 đánh giá</div>
+        </div>
+      </div>
+
+      <div class="mh-stats">
+        <div class="mh-stat">
+          <div class="mh-stat-label">Thấp nhất</div>
+          <div class="mh-stat-value">22.000₫</div>
+        </div>
+        <div class="mh-stat">
+          <div class="mh-stat-label">Trung bình</div>
+          <div class="mh-stat-value">24.500₫</div>
+        </div>
+        <div class="mh-stat">
+          <div class="mh-stat-label">Cao nhất</div>
+          <div class="mh-stat-value">28.000₫</div>
+        </div>
+      </div>
+
+      <div class="market-range">
+        <div style="font-size:10px; font-weight:700; color:#9A3412; letter-spacing:0.5px; text-transform:uppercase;">Vị trí giá của bạn</div>
+        <div class="mr-track">
+          <div class="mr-avg"></div>
+          <div class="mr-marker"></div>
+        </div>
+        <div class="mr-labels">
+          <span>22K</span>
+          <span style="color:#7C2D12;">TB 24.5K</span>
+          <span>28K</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Similar list -->
+    <div class="section-label">
+      <span class="section-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#BE185D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6"/>
+          <line x1="8" y1="12" x2="21" y2="12"/>
+          <line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/>
+          <line x1="3" y1="12" x2="3.01" y2="12"/>
+          <line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+        5 sản phẩm tương tự
+      </span>
+      <div class="filter-pill">
+        Sắp xếp: Giá
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 12 15 18 9"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="similar-grid">
+
+      <div class="sim-card">
+        <div class="sim-thumb">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2v6.343c0 .53.21 1.04.586 1.414L18.414 13.586c.375.375.586.884.586 1.414V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5c0-.53.21-1.04.586-1.414L9.414 9.757A2 2 0 0 0 10 8.343V2"/>
+          </svg>
+        </div>
+        <div class="sim-info">
+          <div class="sim-name">Nước tương Maggi đậu nành nguyên chất 200ml</div>
+          <div class="sim-meta">
+            <span class="sim-rating">★ 4.9</span>
+            <span class="sim-shop">Maggi Official</span>
+          </div>
+        </div>
+        <div class="sim-right">
+          <div class="sim-price">22.000₫</div>
+          <div class="sim-sold">Đã bán 8.5k</div>
+        </div>
+      </div>
+
+      <div class="sim-card">
+        <div class="sim-thumb">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2v6.343c0 .53.21 1.04.586 1.414L18.414 13.586c.375.375.586.884.586 1.414V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5c0-.53.21-1.04.586-1.414L9.414 9.757A2 2 0 0 0 10 8.343V2"/>
+          </svg>
+        </div>
+        <div class="sim-info">
+          <div class="sim-name">Maggi nước tương đậu nành chai 200ml</div>
+          <div class="sim-meta">
+            <span class="sim-rating">★ 4.7</span>
+            <span class="sim-shop">SiêuThị Online</span>
+          </div>
+        </div>
+        <div class="sim-right">
+          <div class="sim-price">24.000₫</div>
+          <div class="sim-sold">Đã bán 3.2k</div>
+        </div>
+      </div>
+
+      <div class="sim-card highlighted">
+        <div class="sim-thumb">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2v6.343c0 .53.21 1.04.586 1.414L18.414 13.586c.375.375.586.884.586 1.414V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5c0-.53.21-1.04.586-1.414L9.414 9.757A2 2 0 0 0 10 8.343V2"/>
+          </svg>
+        </div>
+        <div class="sim-info">
+          <span class="sim-badge-yours">Giá của bạn</span>
+          <div class="sim-name" style="color:#BE185D;">Maggi nước tương đậu nành 200ml (sản phẩm bạn nhập)</div>
+          <div class="sim-meta">
+            <span class="sim-rating">★ — </span>
+            <span class="sim-shop" style="background:linear-gradient(135deg,#E91E63,#FB923C); color:#fff;">Cửa hàng của bạn</span>
+          </div>
+        </div>
+        <div class="sim-right">
+          <div class="sim-price" style="background:linear-gradient(135deg,#E91E63,#FB923C);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">25.000₫</div>
+          <div class="sim-sold">Chưa bán</div>
+        </div>
+      </div>
+
+      <div class="sim-card">
+        <div class="sim-thumb">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2v6.343c0 .53.21 1.04.586 1.414L18.414 13.586c.375.375.586.884.586 1.414V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5c0-.53.21-1.04.586-1.414L9.414 9.757A2 2 0 0 0 10 8.343V2"/>
+          </svg>
+        </div>
+        <div class="sim-info">
+          <div class="sim-name">Nước tương Maggi cao cấp 200ml + tặng kèm</div>
+          <div class="sim-meta">
+            <span class="sim-rating">★ 4.8</span>
+            <span class="sim-shop">Premium Store</span>
+          </div>
+        </div>
+        <div class="sim-right">
+          <div class="sim-price">26.000₫</div>
+          <div class="sim-sold">Đã bán 1.5k</div>
+        </div>
+      </div>
+
+      <div class="sim-card">
+        <div class="sim-thumb">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#C2410C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2v6.343c0 .53.21 1.04.586 1.414L18.414 13.586c.375.375.586.884.586 1.414V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5c0-.53.21-1.04.586-1.414L9.414 9.757A2 2 0 0 0 10 8.343V2"/>
+          </svg>
+        </div>
+        <div class="sim-info">
+          <div class="sim-name">Maggi nước tương đậu nành 200ml combo 3 chai</div>
+          <div class="sim-meta">
+            <span class="sim-rating">★ 5.0</span>
+            <span class="sim-shop">Vinmart+</span>
+          </div>
+        </div>
+        <div class="sim-right">
+          <div class="sim-price">28.000₫</div>
+          <div class="sim-sold">Đã bán 920</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- AI reasoning -->
+    <div class="insight-strip">
+      <div class="insight-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2L9.5 8.5 2 9 7 14 5.5 22 12 18 18.5 22 17 14 22 9 14.5 8.5z"/>
+        </svg>
+      </div>
+      <div class="insight-text">
+        Giá <strong>25.000₫</strong> đặt bạn ở vị trí <strong>top 3/5</strong>. Cân nhắc đặt <strong>26.500₫</strong> để bằng top 2 nhưng vẫn cạnh tranh.
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</body>
+</html>

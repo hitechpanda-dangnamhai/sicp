@@ -68,8 +68,12 @@ export default function HomeDashboardPage() {
   return (
     <div className={styles.pageWrap}>
       <div className={styles.phoneFrame}>
-        {/* 1. Header */}
-        <DashboardHeader initials={initials} />
+        {/* 1. Header — avatar onProfileClick → /me per D-28 NEW T05 Phiên N+3
+            (C-NN-T05-NEW-3 entry-point gap RESOLVED-INLINE Option A). */}
+        <DashboardHeader
+          initials={initials}
+          onProfileClick={() => router.push('/me')}
+        />
 
         {/* 2. Hero AI Insight */}
         <HeroInsightCard />

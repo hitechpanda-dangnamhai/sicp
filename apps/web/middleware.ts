@@ -51,13 +51,19 @@ export function middleware(req: NextRequest) {
 }
 
 /**
- * Matcher config — runs middleware on `/home` + 6 placeholder intent routes only.
+ * Matcher config — runs middleware on `/home` + 6 placeholder intent routes
+ * + 4 `/me*` profile routes (T05).
  * Excludes public routes (/, /auth/*) + framework (/_next/*) + same-origin API
  * proxy (/api/*).
  *
  * Per S-03 D-11 + C-23 R1: 6 placeholder routes mapping mockup tile semantic →
  * 04_INTENT_SPECS Intent IDs. NO `/intent-06` (Payment via Cart sub-flow) +
  * NO `/intent-08` (Auth via /auth/*).
+ *
+ * S-03 T05 (Phiên N+2) — `/me` profile + 3 stub settings routes per AC-37.
+ * Plain-string matchers chosen over glob `'/me/:path*'` to satisfy STOP-T05-4
+ * fallback (zero risk of Next.js matcher syntax regression on existing
+ * /home + /intent-* routes).
  */
 export const config = {
   matcher: [
@@ -68,5 +74,9 @@ export const config = {
     '/intent-04',
     '/intent-05',
     '/intent-07',
+    '/me',
+    '/me/notifications',
+    '/me/security',
+    '/me/help',
   ],
 };

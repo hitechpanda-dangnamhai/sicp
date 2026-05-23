@@ -1,0 +1,278 @@
+# =============================================================================
+# ICP — App Stack docker-compose
+# =============================================================================
+# Slice:    S-00b Foundation Scaffold (Phiên 11 T08) + S-02 T01 (Phiên 22 C-07)
+# Purpose:  Define 8 application services (postgres/redis/redpanda/vespa +
+#           gateway/ai/mcp/web) on shared external network `icp`.
+#           Orchestrated together với `infra/docker-compose.observability.yml`
+#           (T07) qua `make up` (T07-patched Makefile merges both files).
+#
+# Locked decisions per S-00b decisions-log:
+# - D-02 LOCKED    — healthcheck: stateless (gateway/ai/mcp = 10s start_period);
+#                    stateful (postgres/vespa/redpanda + web = 30s start_period);
+#                    redis lighter footprint (10s). Web 30s exception: Next.js
+#                    standalone production cold-start ~10-15s + first-route
+#                    compile buffer → align stateful tier (Skeleton line 2261).
+#                    **C-07 (Phiên 22):** gateway moved to 30s start_period
+#                    matching web pattern — NestJS bootstrap + OTel SDK init
+#                    + module resolution adds ~15-25s cold-start vs T03 stub.
+# - D-03 LOCKED    — image pins: postgres:16-alpine, redis:7-alpine,
+#                    redpanda:v23.3.10, vespa:8.350.0, node:20-alpine (built
+#                    via Dockerfile FROM lines in apps/<svc>/Dockerfile).
+# - C10 applied    — modern `shadcn` package (NOT legacy `shadcn-ui`) in
+#                    apps/web/components.json — surfaced T07 N/A; T08 active.
+# - C11 LOCKED     — Grafana port 3002 owned by T07 obs compose; T08 KHÔNG
+#                    declare grafana service. No port collision with gateway
+#                    (3001) nor web (3000).
+# - C12 LOCKED B   — Postgres image stays plain `postgres:16-alpine` (NO
+#                    pgvector); embeddings live ONLY in Vespa (T06 product.sd).
+# - C22.b parity   — T07 Makefile patches `up`/`obs-up` to idempotently
+#                    create external network `icp`; T08 compose simply
+#                    declares `networks.icp.external: true name: icp` to join.
+# - C22.c parity   — Long-form `depends_on` with `condition: service_healthy`
+#                    for the 4 build-from-source services (gateway/ai/mcp/web).
+#                    All upstream dependencies (postgres/redis/redpanda/vespa)
+#                    expose verified healthchecks; clean cold-start ordering.
+# - C-07 (Phiên 22, S-02 T01 surface) — gateway service block patched:
+#                    (a) build.context `../apps/gateway` → `..` (project root)
+#                        — T01 NestJS multi-stage Dockerfile COPYs workspace
+#                        files (pnpm-workspace.yaml, packages/shared-types/);
+#                        identical to web Q-3 A pattern.
+#                    (b) build.dockerfile → `apps/gateway/Dockerfile`.
+#                    (c) healthcheck path `/health` → `/api/v1/health` matching
+#                        NestJS controller prefix.
+#                    (d) healthcheck.start_period 10s → 30s (NestJS cold start).
+#                    Other 7 service blocks UNTOUCHED.
+#
+# Path decisions ack'd by human (Bước 1 review, Phiên 11):
+# - Q-1 A — `web` service healthcheck targets `/api/health` (Next.js Route
+#           Handler). See `apps/web/app/api/health/route.ts`.
+# - Q-3 A — `web.build.context: ..` (repo root) + `dockerfile: apps/web/Dockerfile`
+#           because Next.js multi-stage build COPYs workspace files
+#           (pnpm-workspace.yaml, packages/shared-types/) from monorepo root.
+#           **C-07 (Phiên 22): gateway extends Q-3 A pattern** for the same
+#           reason now that T01 implements real NestJS build. ai/mcp keep
+#           `../apps/<svc>` (still T03 stubs flat single-file COPY).
+# - Q-5 A — `container_name: icp-<service>` parity with T07 obs stack.
+# - Q-6 A — `version: '3.9'` parity with T07 obs compose (modern Compose v2
+#           treats this as informational; explicit version document intent).
+#
+# Source skeleton: slices/S-00b_EXECUTION_GUIDE.md Section 4.8 lines 2112-2272.
+# C-07 patch source: slices/S-02_decisions-log.md Section 3 entry C-07.
+# =============================================================================
+
+version: '3.9'
+
+services:
+
+  # --- Data layer ------------------------------------------------------------
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: icp-postgres
+    environment:
+      POSTGRES_USER: icp
+      POSTGRES_PASSWORD: icp_dev_password
+      POSTGRES_DB: icp
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks: [icp]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U icp"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    container_name: icp-redis
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks: [icp]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  redpanda:
+    image: redpandadata/redpanda:v23.3.10
+    container_name: icp-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+    ports:
+      - "9092:9092"     # Kafka API
+      - "9644:9644"     # Admin API
+    networks: [icp]
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  vespa:
+    image: vespaengine/vespa:8
+    container_name: icp-vespa
+    ports:
+      - "8080:8080"     # Query + document API
+      - "19071:19071"   # Config server (used by `make vespa-deploy` from T06)
+    volumes:
+      - vespa_data:/opt/vespa/var
+    networks: [icp]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:19071/state/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s   # Vespa slow boot — explicit 60s per Skeleton line 2178
+
+  # --- Application services --------------------------------------------------
+
+  gateway:
+    # C-07 (Phiên 22, S-02 T01): build.context = monorepo root (not apps/gateway/)
+    # because T01 NestJS multi-stage Dockerfile COPYs workspace files
+    # (pnpm-workspace.yaml, pnpm-lock.yaml, tsconfig.base.json, root package.json,
+    # packages/shared-types/) for pnpm workspace install. Identical pattern to
+    # web Q-3 A. See `.dockerignore` at repo root to keep build context clean.
+    build:
+      context: ..
+      dockerfile: apps/gateway/Dockerfile
+    image: icp/gateway:dev
+    container_name: icp-gateway
+    env_file: ../.env
+    environment:
+      OTEL_SERVICE_NAME: gateway
+    ports:
+      - "3001:3001"
+    networks: [icp]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+    # C-07: healthcheck path `/api/v1/health` matching NestJS controller prefix
+    # (T01 HealthController @Controller('api/v1/health')). Previously `/health`
+    # for T03 stub. start_period 30s for NestJS bootstrap + OTel SDK init.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3001/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  ai:
+    build:
+      context: ../apps/ai           # T03 stub: single-file COPY context
+      dockerfile: Dockerfile
+    image: icp/ai:dev
+    container_name: icp-ai
+    env_file: ../.env
+    environment:
+      OTEL_SERVICE_NAME: ai
+    ports:
+      - "5001:5001"
+    networks: [icp]
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      mcp:
+        condition: service_started   # MCP stub không có healthcheck phức tạp
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:5001/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  mcp:
+    build:
+      context: ../apps/mcp          # T03 stub: single-file COPY context
+      dockerfile: Dockerfile
+    image: icp/mcp:dev
+    container_name: icp-mcp
+    env_file: ../.env
+    environment:
+      OTEL_SERVICE_NAME: mcp
+    ports:
+      - "5050:5050"
+    networks: [icp]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      vespa:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:5050/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  web:
+    # Q-3 A LOCKED — build.context = monorepo root (not apps/web/) because the
+    # T08 Next.js multi-stage Dockerfile COPYs pnpm-workspace.yaml + root
+    # package.json + packages/shared-types/package.json for workspace install.
+    # See `.dockerignore` (Q-7) to skip node_modules/.next/.git/docs in scan.
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    image: icp/web:dev
+    container_name: icp-web
+    env_file: ../.env
+    environment:
+      OTEL_SERVICE_NAME: web
+    ports:
+      - "3000:3000"
+    networks: [icp]
+    depends_on:
+      gateway:
+        condition: service_healthy
+    # Q-1 A — healthcheck targets Next.js Route Handler GET /api/health
+    # (apps/web/app/api/health/route.ts). NOT /health (no root route emitted).
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+# --- Network ----------------------------------------------------------------
+# External network `icp` is shared with `docker-compose.observability.yml` (T07)
+# so cross-stack DNS works (e.g., gateway → otel-collector:4317). Network is
+# auto-created by `make up` / `make obs-up` per C22.b (T07 Makefile patch).
+
+networks:
+  icp:
+    external: true
+    name: icp
+
+# --- Volumes ---------------------------------------------------------------
+# Named volumes survive `docker compose down` (use `docker compose down -v`
+# to remove). Postgres/Vespa/Redis state persists across stack restarts.
+
+volumes:
+  pg_data:
+  vespa_data:
+  redis_data:

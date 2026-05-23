@@ -301,6 +301,37 @@
           "auth"
         ]
       }
+    },
+    "/api/v1/dashboard/stats": {
+      "get": {
+        "operationId": "DashboardController_getStats",
+        "summary": "Get dashboard KPI stats — stub per S-03 D-10",
+        "description": "Returns 200 with hardcoded JSON `{orders_today, revenue_today, inventory_count, currency: \"VND\"}` matching mockup StatBar text values. Requires icp_session cookie. Real DB aggregations defer to future slice when S-05 Cart/Order ships data. Per S-03 D-10 MAR-1 Q5 RESOLVED + DM-14.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardStatsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid icp_session cookie"
+          }
+        },
+        "tags": [
+          "dashboard"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
     }
   },
   "info": {
@@ -1241,6 +1272,137 @@
                     "event_type",
                     "properties"
                   ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "nav.tile_clicked"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "tile_id": {
+                          "type": "string",
+                          "enum": [
+                            "nhap_hang",
+                            "phan_tich",
+                            "tim_san_pham",
+                            "mua_hang",
+                            "goi_y_san_pham",
+                            "gio_hang"
+                          ]
+                        },
+                        "intent_id": {
+                          "type": "string",
+                          "enum": [
+                            "intent-01",
+                            "intent-02",
+                            "intent-03",
+                            "intent-04",
+                            "intent-05",
+                            "intent-07"
+                          ]
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "hero_tile",
+                            "list_tile"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "tile_id",
+                        "intent_id",
+                        "source"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
                 }
               ]
             }
@@ -1382,6 +1544,11 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          },
+          "session_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "required": [
@@ -1390,7 +1557,8 @@
           "role",
           "display_name",
           "avatar_initials",
-          "last_login_at"
+          "last_login_at",
+          "session_expires_at"
         ]
       },
       "ForgotPasswordDto": {
@@ -1415,6 +1583,38 @@
         },
         "required": [
           "sent"
+        ]
+      },
+      "DashboardStatsDto": {
+        "type": "object",
+        "properties": {
+          "orders_today": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": false
+          },
+          "revenue_today": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": false
+          },
+          "inventory_count": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": false
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "VND"
+            ]
+          }
+        },
+        "required": [
+          "orders_today",
+          "revenue_today",
+          "inventory_count",
+          "currency"
         ]
       }
     }

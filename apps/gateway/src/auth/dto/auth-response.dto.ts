@@ -34,6 +34,23 @@ export const LoginResponseSchema = z.object({
 
 export const MeResponseSchema = PublicUserSchema.extend({
   last_login_at: z.string().datetime().nullable(),
+  /**
+   * S-03 T05 — D-24 + C-33 RESOLVED-INLINE (Phiên N+2).
+   *
+   * ISO8601 UTC timestamp of the latest non-revoked session expiry
+   * (`MAX(sessions.expires_at) WHERE user_id = ? AND revoked_at IS NULL`),
+   * or `null` if user has no active session.
+   *
+   * Consumed by FE state-F profile page `/me` to render "Phiên: Còn Xh"
+   * countdown computed at render time:
+   *   `Math.max(0, Math.ceil((Date.parse(session_expires_at) - Date.now()) / 3600000))`.
+   * Computed-on-render only (no setInterval — BRIEF non-goal).
+   *
+   * Pattern LOCKED V-SLICE forward as **D-24 BE additive extension**:
+   * extend `MeResponseDto` for session/user metadata vs separate endpoint
+   * (minimizes BE delta + reuses `/auth/me` cache).
+   */
+  session_expires_at: z.string().datetime().nullable(),
 });
 
 export type PublicUserType = z.infer<typeof PublicUserSchema>;
