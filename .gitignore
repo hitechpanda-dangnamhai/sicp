@@ -83,3 +83,9 @@ packages/shared-types/src/api/
 *.tmp
 *.bak
 .cache/
+
+# --- S-04 T01 Vespa CLIP-multilingual binary model files (D-S04-10 LAW) ------
+# Generated via `infra/vespa/models/clip_multilingual/EXPORT.md` (optimum-cli);
+# distributed by re-export per team member (~3 min one-time), NOT git LFS.
+infra/vespa/models/clip_multilingual/model.onnx
+infra/vespa/models/clip_multilingual/tokenizer.json

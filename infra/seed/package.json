@@ -1,11 +1,12 @@
 {
   "name": "@icp/seed",
   "version": "0.0.1",
-  "description": "ICP development seed runner — load users/products/policies into Postgres",
+  "description": "ICP development seed runner — load users/products/policies into Postgres + Vespa bulk feed (S-04 T01)",
   "type": "module",
   "private": true,
   "scripts": {
     "seed": "tsx seed.ts",
+    "vespa-feed": "tsx vespa-feed.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

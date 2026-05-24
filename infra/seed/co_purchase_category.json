@@ -1,0 +1,20 @@
+[
+  {
+    "_comment": "Entry 1 — nuoc_tuong → tuong_ot. Mockup intent-03B-state-E-cart.html lines 226-243 ground truth: 'Khách mua nước tương Maggi thường lấy kèm tương ớt. 68% khách mua kèm' + suggested product 'Tương ớt Chin-su 250g' 17.000₫. D-S04-03 LAW + §X.2 fixture spec.",
+    "anchor_category": "nuoc_tuong",
+    "anchor_brand_filter": null,
+    "suggested_category": "tuong_ot",
+    "suggested_product_id_seed": "205e8061-b5b7-44b0-a5f0-f7ef552b49ff",
+    "co_purchase_rate_pct": 68,
+    "reason_template": "Khách mua {anchor_category_vi} thường lấy kèm {suggested_category_vi}"
+  },
+  {
+    "_comment": "Entry 2 — mi_tom → trung. Per §X.2 example fixture; NOTE: 'trung' category NOT in S-04 11-category scope (gia_vi/sua/banh_keo/etc only). Entry retained for fixture format coverage + S-10 V006 mat view forward-compat. At runtime, co_purchase_lookup node should detect missing category gracefully (return null co_purchase_hint).",
+    "anchor_category": "mi_tom",
+    "anchor_brand_filter": null,
+    "suggested_category": "trung",
+    "suggested_product_id_seed": "REPLACE_AT_SEED_RUNTIME:trung:top1_trend_score",
+    "co_purchase_rate_pct": 54,
+    "reason_template": "Khách mua {anchor_category_vi} thường lấy kèm {suggested_category_vi}"
+  }
+]

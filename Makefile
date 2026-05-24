@@ -26,7 +26,7 @@
 # =============================================================================
 
 .DEFAULT_GOAL := help
-.PHONY: help up down migrate seed vespa-deploy obs-up obs-down logs clean lint test typecheck contract-check
+.PHONY: help up down migrate seed seed-vespa vespa-deploy obs-up obs-down logs clean lint test typecheck contract-check
 
 # Note: target name `vespa:deploy` dùng dấu hai chấm sẽ break parse của make.
 # Convention: dùng `vespa-deploy` (tên target) — script được gọi vẫn là
@@ -43,6 +43,7 @@ help:
 	@echo "  make migrate        — Run pending Postgres migrations (V*.sql)"
 	@echo "  make seed           — Migrate + load seed data (users/products/policies)"
 	@echo "  make vespa-deploy   — Deploy Vespa application package"
+	@echo "  make seed-vespa     — Deploy Vespa schema + bulk-feed 55 products (S-04 T01)"
 	@echo "  make obs-up         — Boot only observability stack (otel/loki/tempo/prom/grafana)"
 	@echo "  make obs-down       — Tear down only observability stack"
 	@echo "  make logs           — Tail logs across all services"
@@ -85,6 +86,27 @@ seed: migrate
 # `deploy.sh` được T06 tạo. Zip schemas/services.xml + POST tới Vespa config server.
 vespa-deploy:
 	bash infra/vespa/deploy.sh
+
+# `seed-vespa` (S-04 T01 Phiên Sx04-2, D-S04-10 + D-S04-11 LAW): chains
+# vespa-deploy → wait readiness → vespa-feed bulk-feed. Depends `seed` so
+# Postgres has 55 products with V002 columns before the feed runs.
+#
+# Vespa readiness probe: query config server /state/v1/health up to 60×2s
+# (parity với deploy.sh internal wait pattern). Without this wait, the feed
+# can race with embedder model load (~5-10s loading ~150MB ONNX into Vespa
+# container memory) and fail with "embedder not ready" 503 responses.
+#
+# Idempotent: vespa-deploy uses session-id (Vespa internal versioning);
+# vespa-feed POSTs upsert by docid. Safe to re-run.
+seed-vespa: seed vespa-deploy
+	@echo "Waiting for Vespa query endpoint at :8080 ..."
+	@for i in $$(seq 1 60); do \
+	  if curl -sf http://localhost:8080/state/v1/health >/dev/null 2>&1; then \
+	    echo "Vespa query endpoint ready."; break; \
+	  fi; \
+	  sleep 2; \
+	done
+	pnpm --filter @icp/seed run vespa-feed
 
 # --- Observability escape hatch ---------------------------------------------
 obs-up:

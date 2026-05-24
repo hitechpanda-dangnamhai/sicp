@@ -1,9 +1,0 @@
-# Placeholder để giữ thư mục apps/web/public/ trong git.
-#
-# Next.js serve static assets từ apps/web/public/ tại URL root (/).
-# T08 scaffold tier chưa có asset nào (favicon, robots.txt, images, og-image, etc).
-# S-01 H-UI hoặc later sẽ populate (theo PHASE_01_INFRA + PHASE_00_DESIGN_SYSTEM).
-#
-# Dockerfile multi-stage runner stage COPY thư mục này vào image:
-#   COPY --from=builder /app/apps/web/public ./apps/web/public
-# .gitkeep đảm bảo thư mục được commit (git không track empty dirs).

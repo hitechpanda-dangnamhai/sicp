@@ -1,702 +1,1229 @@
 [
   {
-    "title": "Nước tương Maggi 200ml",
-    "description": "Nước tương đậm đà truyền thống Maggi.",
+    "title": "Nước tương Maggi đậm đặc 700ml",
+    "description": "Nước tương đậm đặc Maggi 700ml, vị đậm đà phù hợp chấm phở, kho thịt và ướp món Việt.",
     "category": "nuoc_tuong",
     "attributes": {
       "brand": "Maggi",
-      "size": "200ml"
+      "size": "700ml",
+      "type": "dam_dac"
     },
-    "price": 25000,
+    "price": 25500,
     "stock": 120,
     "image_url": "",
-    "trend_score": 0.75,
-    "merchant_email": "merchant1@demo.icp"
+    "trend_score": 0.95,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "MAGGI",
+    "original_price": 30000,
+    "rating_avg": 4.8,
+    "rating_count": 1100,
+    "sold_count": 1200,
+    "image_gradient": "#7C2D12,#A16207",
+    "icon_hint": "ti-bottle"
   },
   {
-    "title": "Nước tương Chinsu Nam Ngư 500ml",
-    "description": "Nước mắm pha sẵn Chinsu Nam Ngư đậm vị.",
+    "title": "Nước tương Tam Thái Tử nâu 500ml",
+    "description": "Nước tương Tam Thái Tử nâu Chinsu lên men tự nhiên 500ml, vị đậm thơm ngon chấm phở chấm bún.",
     "category": "nuoc_tuong",
     "attributes": {
       "brand": "Chinsu",
-      "size": "500ml"
-    },
-    "price": 38000,
-    "stock": 80,
-    "image_url": "",
-    "trend_score": 0.82,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Nước tương Tam Thái Tử 250ml",
-    "description": "Nước tương lên men tự nhiên Tam Thái Tử.",
-    "category": "nuoc_tuong",
-    "attributes": {
-      "brand": "Tam Thái Tử",
-      "size": "250ml"
-    },
-    "price": 22000,
-    "stock": 90,
-    "image_url": "",
-    "trend_score": 0.55,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Nước tương Knorr 200ml",
-    "description": "Nước tương Knorr vị Nhật Bản.",
-    "category": "nuoc_tuong",
-    "attributes": {
-      "brand": "Knorr",
-      "size": "200ml"
-    },
-    "price": 28000,
-    "stock": 65,
-    "image_url": "",
-    "trend_score": 0.6,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Nước tương Lee Kum Kee 150ml",
-    "description": "Nước tương Lee Kum Kee nhập khẩu Hong Kong.",
-    "category": "nuoc_tuong",
-    "attributes": {
-      "brand": "Lee Kum Kee",
-      "size": "150ml"
-    },
-    "price": 55000,
-    "stock": 40,
-    "image_url": "",
-    "trend_score": 0.45,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Dầu ăn Tường An Cooking Oil 1L",
-    "description": "Dầu ăn Tường An tinh luyện 1 lít.",
-    "category": "dau_an",
-    "attributes": {
-      "brand": "Tường An",
-      "size": "1L"
-    },
-    "price": 52000,
-    "stock": 100,
-    "image_url": "",
-    "trend_score": 0.85,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Dầu ăn Neptune Gold 1L",
-    "description": "Dầu ăn Neptune Gold giàu vitamin A.",
-    "category": "dau_an",
-    "attributes": {
-      "brand": "Neptune",
-      "size": "1L"
-    },
-    "price": 58000,
-    "stock": 75,
-    "image_url": "",
-    "trend_score": 0.78,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Dầu Olive Extra Virgin 500ml",
-    "description": "Dầu olive nguyên chất nhập khẩu Ý.",
-    "category": "dau_an",
-    "attributes": {
-      "brand": "Bertolli",
-      "size": "500ml"
-    },
-    "price": 185000,
-    "stock": 30,
-    "image_url": "",
-    "trend_score": 0.5,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Dầu ăn Simply 2L",
-    "description": "Dầu đậu nành Simply tốt cho tim mạch.",
-    "category": "dau_an",
-    "attributes": {
-      "brand": "Simply",
-      "size": "2L"
-    },
-    "price": 98000,
-    "stock": 60,
-    "image_url": "",
-    "trend_score": 0.65,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Dầu mè Ottogi 320ml",
-    "description": "Dầu mè rang Ottogi vị Hàn Quốc.",
-    "category": "dau_an",
-    "attributes": {
-      "brand": "Ottogi",
-      "size": "320ml"
-    },
-    "price": 78000,
-    "stock": 25,
-    "image_url": "",
-    "trend_score": 0.42,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Mì Hảo Hảo tôm chua cay (gói)",
-    "description": "Mì tôm Hảo Hảo vị tôm chua cay truyền thống.",
-    "category": "mi_tom",
-    "attributes": {
-      "brand": "Hảo Hảo",
-      "size": "75g"
-    },
-    "price": 4000,
-    "stock": 200,
-    "image_url": "",
-    "trend_score": 0.92,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Mì Omachi sườn hầm ngũ quả",
-    "description": "Mì Omachi sợi khoai tây dẻo dai.",
-    "category": "mi_tom",
-    "attributes": {
-      "brand": "Omachi",
-      "size": "80g"
-    },
-    "price": 7500,
-    "stock": 150,
-    "image_url": "",
-    "trend_score": 0.85,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Mì Kokomi đại tôm chua cay",
-    "description": "Mì Kokomi đại gói lớn giá rẻ.",
-    "category": "mi_tom",
-    "attributes": {
-      "brand": "Kokomi",
-      "size": "90g"
-    },
-    "price": 4500,
-    "stock": 180,
-    "image_url": "",
-    "trend_score": 0.7,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Mì Cung Đình lẩu Thái tôm",
-    "description": "Mì Cung Đình vị lẩu Thái cao cấp.",
-    "category": "mi_tom",
-    "attributes": {
-      "brand": "Cung Đình",
-      "size": "85g"
-    },
-    "price": 8000,
-    "stock": 70,
-    "image_url": "",
-    "trend_score": 0.62,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Mì 3 Miền gà sợi phở",
-    "description": "Mì 3 Miền sợi phở vị gà.",
-    "category": "mi_tom",
-    "attributes": {
-      "brand": "3 Miền",
-      "size": "65g"
-    },
-    "price": 3500,
-    "stock": 220,
-    "image_url": "",
-    "trend_score": 0.58,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Sữa tươi Vinamilk có đường 1L",
-    "description": "Sữa tươi tiệt trùng Vinamilk có đường.",
-    "category": "sua",
-    "attributes": {
-      "brand": "Vinamilk",
-      "size": "1L"
+      "size": "500ml",
+      "color": "nau"
     },
     "price": 32000,
     "stock": 95,
     "image_url": "",
     "trend_score": 0.88,
-    "merchant_email": "merchant2@demo.icp"
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "CHIN-SU",
+    "original_price": null,
+    "rating_avg": 4.7,
+    "rating_count": 720,
+    "sold_count": 987,
+    "image_gradient": "#7C2D12,#A16207",
+    "icon_hint": "ti-bottle"
   },
   {
-    "title": "Sữa đặc Ông Thọ nhãn đỏ 380g",
-    "description": "Sữa đặc Ông Thọ pha cà phê truyền thống.",
-    "category": "sua",
+    "title": "Nước tương Nàng Dâu 450ml",
+    "description": "Nước tương Nàng Dâu Nam Dương 450ml truyền thống, lên men đậu nành, vị ngọt thanh chấm món Việt.",
+    "category": "nuoc_tuong",
     "attributes": {
-      "brand": "Ông Thọ",
-      "size": "380g"
+      "brand": "Nam Duong",
+      "size": "450ml"
     },
-    "price": 26000,
+    "price": 21000,
+    "stock": 85,
+    "image_url": "",
+    "trend_score": 0.78,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "NAM DƯƠNG",
+    "original_price": 25000,
+    "rating_avg": 4.5,
+    "rating_count": 480,
+    "sold_count": 654,
+    "image_gradient": "#7C2D12,#A16207",
+    "icon_hint": "ti-bottle"
+  },
+  {
+    "title": "Nước tương Maggi tỏi ớt 300ml",
+    "description": "Nước tương Maggi tỏi ớt 300ml, có sẵn tỏi và ớt — tiện chấm bún chấm phở không cần pha thêm.",
+    "category": "nuoc_tuong",
+    "attributes": {
+      "brand": "Maggi",
+      "size": "300ml",
+      "flavor": "toi_ot"
+    },
+    "price": 18000,
     "stock": 110,
     "image_url": "",
-    "trend_score": 0.8,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Sữa chua Vinamilk có đường vỉ 4",
-    "description": "Sữa chua Vinamilk vỉ 4 hộp 100g.",
-    "category": "sua",
-    "attributes": {
-      "brand": "Vinamilk",
-      "size": "4x100g"
-    },
-    "price": 22000,
-    "stock": 60,
-    "image_url": "",
     "trend_score": 0.72,
-    "merchant_email": "merchant2@demo.icp"
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "MAGGI",
+    "original_price": 22500,
+    "rating_avg": 4.6,
+    "rating_count": 610,
+    "sold_count": 856,
+    "image_gradient": "#7C2D12,#A16207",
+    "icon_hint": "ti-bottle"
   },
   {
-    "title": "Sữa Milo lon 240ml",
-    "description": "Sữa lúa mạch Milo lon nhỏ.",
-    "category": "sua",
+    "title": "Nước tương Lee Kum Kee Premium 150ml",
+    "description": "Nước tương Lee Kum Kee Premium nhập khẩu Hong Kong 150ml, vị cao cấp dùng cho món Á cao cấp.",
+    "category": "nuoc_tuong",
     "attributes": {
-      "brand": "Milo",
-      "size": "240ml"
+      "brand": "Lee Kum Kee",
+      "size": "150ml",
+      "origin": "Hong Kong"
     },
-    "price": 12000,
-    "stock": 130,
-    "image_url": "",
-    "trend_score": 0.68,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Sữa hạt TH True Nut 1L",
-    "description": "Sữa hạt óc chó hạnh nhân TH True Nut.",
-    "category": "sua",
-    "attributes": {
-      "brand": "TH True Milk",
-      "size": "1L"
-    },
-    "price": 52000,
+    "price": 55000,
     "stock": 35,
     "image_url": "",
-    "trend_score": 0.55,
-    "merchant_email": "merchant2@demo.icp"
+    "trend_score": 0.42,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "LEE KUM KEE",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 45,
+    "sold_count": 95,
+    "image_gradient": "#7C2D12,#A16207",
+    "icon_hint": "ti-bottle"
   },
   {
-    "title": "Bánh Chocopie Orion hộp 12",
-    "description": "Bánh Chocopie Orion hộp 12 cái.",
-    "category": "banh_keo",
+    "title": "Tương ớt Chin-su 250g",
+    "description": "Tương ớt Chin-su 250g vị cay vừa chua ngọt cân bằng, phù hợp chấm phở chấm bún ăn kèm món chiên.",
+    "category": "tuong_ot",
     "attributes": {
-      "brand": "Orion",
-      "size": "12 cái"
+      "brand": "Chinsu",
+      "size": "250g",
+      "spicy_level": "medium"
+    },
+    "price": 17000,
+    "stock": 200,
+    "image_url": "",
+    "trend_score": 0.92,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "CHIN-SU",
+    "original_price": null,
+    "rating_avg": 4.8,
+    "rating_count": 1800,
+    "sold_count": 2100,
+    "image_gradient": "#7F1D1D,#DC2626",
+    "icon_hint": "ti-flame"
+  },
+  {
+    "title": "Tương ớt Cholimex 270g",
+    "description": "Tương ớt Cholimex 270g truyền thống miền Nam, vị cay đậm đà ăn kèm phở bún hủ tiếu.",
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Cholimex",
+      "size": "270g",
+      "spicy_level": "medium"
+    },
+    "price": 13000,
+    "stock": 150,
+    "image_url": "",
+    "trend_score": 0.65,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "CHOLIMEX",
+    "original_price": 15000,
+    "rating_avg": 4.4,
+    "rating_count": 240,
+    "sold_count": 350,
+    "image_gradient": "#7F1D1D,#DC2626",
+    "icon_hint": "ti-flame"
+  },
+  {
+    "title": "Sriracha Huy Fong 482g",
+    "description": "Tương ớt Sriracha Huy Fong nhập khẩu Mỹ 482g, cay nồng đặc trưng, ăn kèm món Á và đồ chiên.",
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Huy Fong",
+      "size": "482g",
+      "spicy_level": "hot",
+      "origin": "USA"
+    },
+    "price": 65000,
+    "stock": 60,
+    "image_url": "",
+    "trend_score": 0.58,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "HUY FONG",
+    "original_price": null,
+    "rating_avg": 4.6,
+    "rating_count": 160,
+    "sold_count": 230,
+    "image_gradient": "#7F1D1D,#DC2626",
+    "icon_hint": "ti-flame"
+  },
+  {
+    "title": "Tương ớt Trung Thành 300g",
+    "description": "Tương ớt Trung Thành 300g vị cay nhẹ chua ngọt, phù hợp khẩu vị gia đình ăn kèm bún chả.",
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Trung Thanh",
+      "size": "300g",
+      "spicy_level": "mild"
+    },
+    "price": 14500,
+    "stock": 75,
+    "image_url": "",
+    "trend_score": 0.38,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "TRUNG THANH",
+    "original_price": null,
+    "rating_avg": 4.2,
+    "rating_count": 95,
+    "sold_count": 145,
+    "image_gradient": "#7F1D1D,#DC2626",
+    "icon_hint": "ti-flame"
+  },
+  {
+    "title": "Tương ớt sốt cay Ottogi 250g",
+    "description": "Tương ớt sốt cay Ottogi nhập khẩu Hàn Quốc 250g, vị cay đặc Hàn ăn kèm mì Đại Hàn và topokki.",
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Ottogi",
+      "size": "250g",
+      "spicy_level": "hot",
+      "origin": "Korea"
+    },
+    "price": 22000,
+    "stock": 40,
+    "image_url": "",
+    "trend_score": 0.32,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "OTTOGI",
+    "original_price": 26000,
+    "rating_avg": 4.3,
+    "rating_count": 40,
+    "sold_count": 75,
+    "image_gradient": "#7F1D1D,#DC2626",
+    "icon_hint": "ti-flame"
+  },
+  {
+    "title": "Dầu ăn Tường An Cooking Oil 1L",
+    "description": "Dầu ăn Tường An tinh luyện 1 lít, tốt cho gia đình, chiên xào ổn định không bốc khói.",
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Tuong An",
+      "size": "1L",
+      "type": "cooking"
+    },
+    "price": 52000,
+    "stock": 90,
+    "image_url": "",
+    "trend_score": 0.92,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "TUONG AN",
+    "original_price": 58000,
+    "rating_avg": 4.6,
+    "rating_count": 1800,
+    "sold_count": 2200,
+    "image_gradient": "#FCD34D,#F59E0B",
+    "icon_hint": "ti-droplet"
+  },
+  {
+    "title": "Dầu ăn Neptune Gold 1L",
+    "description": "Dầu ăn Neptune Gold blend 1 lít, kết hợp dầu hướng dương và đậu nành, ít cholesterol.",
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Neptune",
+      "size": "1L",
+      "type": "blend"
+    },
+    "price": 58000,
+    "stock": 70,
+    "image_url": "",
+    "trend_score": 0.86,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "NEPTUNE",
+    "original_price": null,
+    "rating_avg": 4.5,
+    "rating_count": 1300,
+    "sold_count": 1650,
+    "image_gradient": "#FCD34D,#F59E0B",
+    "icon_hint": "ti-droplet"
+  },
+  {
+    "title": "Dầu ăn Simply hướng dương 1L",
+    "description": "Dầu ăn Simply hướng dương nguyên chất 1 lít, lành mạnh, thích hợp salad và chiên ở nhiệt độ vừa.",
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Simply",
+      "size": "1L",
+      "type": "sunflower"
     },
     "price": 65000,
     "stock": 50,
     "image_url": "",
-    "trend_score": 0.78,
-    "merchant_email": "merchant1@demo.icp"
+    "trend_score": 0.55,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "SIMPLY",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 220,
+    "sold_count": 340,
+    "image_gradient": "#FCD34D,#F59E0B",
+    "icon_hint": "ti-droplet"
   },
   {
-    "title": "Bánh quy Cosy hạt hướng dương",
-    "description": "Bánh quy Cosy nhân hạt hướng dương.",
-    "category": "banh_keo",
+    "title": "Dầu ăn Cái Lân Cooking 1L",
+    "description": "Dầu ăn Cái Lân tinh luyện 1 lít, giá rẻ phổ thông, dùng cho chiên xào hàng ngày.",
+    "category": "dau_an",
     "attributes": {
-      "brand": "Cosy",
-      "size": "144g"
+      "brand": "Cai Lan",
+      "size": "1L",
+      "type": "cooking"
     },
-    "price": 18000,
-    "stock": 85,
+    "price": 48000,
+    "stock": 60,
+    "image_url": "",
+    "trend_score": 0.48,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "CAI LAN",
+    "original_price": 52000,
+    "rating_avg": 4.3,
+    "rating_count": 180,
+    "sold_count": 250,
+    "image_gradient": "#FCD34D,#F59E0B",
+    "icon_hint": "ti-droplet"
+  },
+  {
+    "title": "Dầu olive Bertolli Extra Virgin 500ml",
+    "description": "Dầu olive Bertolli Extra Virgin nhập khẩu Ý 500ml, thơm hậu, dùng trộn salad và rưới món Tây.",
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Bertolli",
+      "size": "500ml",
+      "type": "olive_extra_virgin",
+      "origin": "Italy"
+    },
+    "price": 185000,
+    "stock": 25,
+    "image_url": "",
+    "trend_score": 0.4,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "BERTOLLI",
+    "original_price": 220000,
+    "rating_avg": 4.7,
+    "rating_count": 70,
+    "sold_count": 130,
+    "image_gradient": "#FCD34D,#F59E0B",
+    "icon_hint": "ti-droplet"
+  },
+  {
+    "title": "Mì tôm Hảo Hảo tôm chua cay 75g",
+    "description": "Mì tôm Hảo Hảo tôm chua cay 75g, vị quốc dân, sợi mì dai, nước dùng đậm vị.",
+    "category": "mi_tom",
+    "attributes": {
+      "brand": "Hao Hao",
+      "size": "75g",
+      "flavor": "tom_chua_cay"
+    },
+    "price": 4500,
+    "stock": 500,
+    "image_url": "",
+    "trend_score": 0.96,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "HAO HAO",
+    "original_price": null,
+    "rating_avg": 4.7,
+    "rating_count": 2500,
+    "sold_count": 2900,
+    "image_gradient": "#EA580C,#FB923C",
+    "icon_hint": "ti-bowl"
+  },
+  {
+    "title": "Mì Phở Bò Acecook Đệ Nhất 65g",
+    "description": "Mì Phở Bò Acecook Đệ Nhất 65g, sợi mì gạo dai, nước phở đậm thơm vị bò hầm.",
+    "category": "mi_tom",
+    "attributes": {
+      "brand": "Acecook",
+      "size": "65g",
+      "flavor": "pho_bo"
+    },
+    "price": 6800,
+    "stock": 280,
+    "image_url": "",
+    "trend_score": 0.88,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "ACECOOK",
+    "original_price": null,
+    "rating_avg": 4.5,
+    "rating_count": 1450,
+    "sold_count": 1850,
+    "image_gradient": "#EA580C,#FB923C",
+    "icon_hint": "ti-bowl"
+  },
+  {
+    "title": "Mì Omachi sườn hầm ngũ quả 80g",
+    "description": "Mì Omachi sườn hầm ngũ quả 80g, sợi khoai tây không sợ nóng, nước hầm sườn đậm đà.",
+    "category": "mi_tom",
+    "attributes": {
+      "brand": "Omachi",
+      "size": "80g",
+      "flavor": "suon_ham"
+    },
+    "price": 9500,
+    "stock": 180,
     "image_url": "",
     "trend_score": 0.62,
-    "merchant_email": "merchant2@demo.icp"
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "OMACHI",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 270,
+    "sold_count": 380,
+    "image_gradient": "#EA580C,#FB923C",
+    "icon_hint": "ti-bowl"
   },
   {
-    "title": "Kẹo dẻo Haribo Gold Bears 100g",
-    "description": "Kẹo dẻo gấu Haribo nhập khẩu Đức.",
-    "category": "banh_keo",
+    "title": "Mì Cung Đình lẩu thái tôm 80g",
+    "description": "Mì Cung Đình lẩu Thái tôm 80g, vị chua cay kiểu Thái, có sa tế và tôm nguyên con.",
+    "category": "mi_tom",
     "attributes": {
-      "brand": "Haribo",
-      "size": "100g"
+      "brand": "Cung Dinh",
+      "size": "80g",
+      "flavor": "lau_thai"
     },
-    "price": 35000,
-    "stock": 40,
+    "price": 6200,
+    "stock": 120,
     "image_url": "",
     "trend_score": 0.5,
-    "merchant_email": "merchant1@demo.icp"
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "CUNG DINH",
+    "original_price": null,
+    "rating_avg": 4.2,
+    "rating_count": 155,
+    "sold_count": 235,
+    "image_gradient": "#EA580C,#FB923C",
+    "icon_hint": "ti-bowl"
   },
   {
-    "title": "Bánh Oreo gói 137g",
-    "description": "Bánh quy Oreo nhân kem vani.",
-    "category": "banh_keo",
+    "title": "Mì Shin Ramyun Hàn Quốc 120g",
+    "description": "Mì Shin Ramyun Nongshim Hàn Quốc 120g, cay nồng đặc trưng, sợi mì dày dai.",
+    "category": "mi_tom",
     "attributes": {
-      "brand": "Oreo",
-      "size": "137g"
+      "brand": "Nongshim",
+      "size": "120g",
+      "flavor": "shin_spicy",
+      "origin": "Korea"
     },
-    "price": 16000,
-    "stock": 95,
-    "image_url": "",
-    "trend_score": 0.85,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Kẹo Alpenliebe vị sữa",
-    "description": "Kẹo cứng Alpenliebe vị sữa caramen.",
-    "category": "banh_keo",
-    "attributes": {
-      "brand": "Alpenliebe",
-      "size": "100g"
-    },
-    "price": 14000,
-    "stock": 70,
+    "price": 18000,
+    "stock": 45,
     "image_url": "",
     "trend_score": 0.45,
-    "merchant_email": "merchant1@demo.icp"
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "SHIN",
+    "original_price": 22000,
+    "rating_avg": 4.6,
+    "rating_count": 85,
+    "sold_count": 145,
+    "image_gradient": "#EA580C,#FB923C",
+    "icon_hint": "ti-bowl"
   },
   {
-    "title": "Bột ngọt Ajinomoto 454g",
-    "description": "Bột ngọt Ajinomoto chính hãng Nhật Bản.",
-    "category": "gia_vi",
-    "attributes": {
-      "brand": "Ajinomoto",
-      "size": "454g"
-    },
-    "price": 42000,
-    "stock": 80,
-    "image_url": "",
-    "trend_score": 0.65,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Hạt nêm Knorr thịt thăn 900g",
-    "description": "Hạt nêm Knorr vị thịt thăn xương ống.",
+    "title": "Hạt nêm Knorr Hảo Vị 900g",
+    "description": "Hạt nêm Knorr Hảo Vị 900g từ xương ống và thịt thăn, dùng cho canh, kho và xào.",
     "category": "gia_vi",
     "attributes": {
       "brand": "Knorr",
-      "size": "900g"
+      "size": "900g",
+      "type": "seasoning_powder"
     },
-    "price": 88000,
-    "stock": 55,
-    "image_url": "",
-    "trend_score": 0.82,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Tiêu đen Phú Quốc 100g",
-    "description": "Tiêu đen nguyên hạt Phú Quốc.",
-    "category": "gia_vi",
-    "attributes": {
-      "brand": "Phú Quốc",
-      "size": "100g"
-    },
-    "price": 38000,
-    "stock": 45,
-    "image_url": "",
-    "trend_score": 0.4,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Muối hồng Himalaya 500g",
-    "description": "Muối hồng tự nhiên Himalaya nhập khẩu.",
-    "category": "gia_vi",
-    "attributes": {
-      "brand": "Himalaya",
-      "size": "500g"
-    },
-    "price": 65000,
-    "stock": 30,
-    "image_url": "",
-    "trend_score": 0.35,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Bột canh Hải Châu 200g",
-    "description": "Bột canh Hải Châu i-ốt truyền thống.",
-    "category": "gia_vi",
-    "attributes": {
-      "brand": "Hải Châu",
-      "size": "200g"
-    },
-    "price": 8000,
-    "stock": 150,
+    "price": 58000,
+    "stock": 80,
     "image_url": "",
     "trend_score": 0.72,
-    "merchant_email": "merchant2@demo.icp"
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "KNORR",
+    "original_price": 65000,
+    "rating_avg": 4.5,
+    "rating_count": 380,
+    "sold_count": 540,
+    "image_gradient": "#92400E,#D97706",
+    "icon_hint": "ti-salt"
   },
   {
-    "title": "Coca-Cola lon 330ml",
-    "description": "Nước ngọt có ga Coca-Cola lon.",
+    "title": "Bột ngọt Ajinomoto 454g",
+    "description": "Bột ngọt Ajinomoto 454g, monosodium glutamate tinh khiết, nêm canh nêm xào.",
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Ajinomoto",
+      "size": "454g",
+      "type": "msg"
+    },
+    "price": 32000,
+    "stock": 100,
+    "image_url": "",
+    "trend_score": 0.55,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "AJINOMOTO",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 250,
+    "sold_count": 360,
+    "image_gradient": "#92400E,#D97706",
+    "icon_hint": "ti-salt"
+  },
+  {
+    "title": "Tiêu đen xay Phú Quốc 50g",
+    "description": "Tiêu đen xay Phú Quốc 50g, thơm nồng đặc trưng, ướp thịt và rắc lên món xào.",
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Phu Quoc",
+      "size": "50g",
+      "type": "black_pepper",
+      "origin": "Phu Quoc"
+    },
+    "price": 28000,
+    "stock": 60,
+    "image_url": "",
+    "trend_score": 0.42,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "PHU QUOC",
+    "original_price": null,
+    "rating_avg": 4.6,
+    "rating_count": 120,
+    "sold_count": 185,
+    "image_gradient": "#92400E,#D97706",
+    "icon_hint": "ti-salt"
+  },
+  {
+    "title": "Muối tinh I-ốt Bạc Liêu 1kg",
+    "description": "Muối tinh I-ốt Bạc Liêu 1kg, độ mặn vừa, dùng nấu ăn và muối dưa.",
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Bac Lieu",
+      "size": "1kg",
+      "type": "iodized_salt"
+    },
+    "price": 8500,
+    "stock": 200,
+    "image_url": "",
+    "trend_score": 0.35,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "BAC LIEU",
+    "original_price": null,
+    "rating_avg": 4.3,
+    "rating_count": 160,
+    "sold_count": 240,
+    "image_gradient": "#92400E,#D97706",
+    "icon_hint": "ti-salt"
+  },
+  {
+    "title": "Bột canh Knorr xương heo 170g",
+    "description": "Bột canh Knorr xương heo 170g, vị đậm thay nước hầm xương, nhanh tiện cho canh và lẩu.",
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Knorr",
+      "size": "170g",
+      "type": "bouillon_powder"
+    },
+    "price": 15000,
+    "stock": 90,
+    "image_url": "",
+    "trend_score": 0.48,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "KNORR",
+    "original_price": 18000,
+    "rating_avg": 4.4,
+    "rating_count": 210,
+    "sold_count": 320,
+    "image_gradient": "#92400E,#D97706",
+    "icon_hint": "ti-salt"
+  },
+  {
+    "title": "Sữa tươi Vinamilk 100% không đường 1L",
+    "description": "Sữa tươi Vinamilk 100% không đường 1 lít, giàu canxi, dùng pha cà phê và uống trực tiếp.",
+    "category": "sua",
+    "attributes": {
+      "brand": "Vinamilk",
+      "size": "1L",
+      "type": "fresh_milk",
+      "sugar": "none"
+    },
+    "price": 32000,
+    "stock": 250,
+    "image_url": "",
+    "trend_score": 0.94,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "VINAMILK",
+    "original_price": null,
+    "rating_avg": 4.6,
+    "rating_count": 2200,
+    "sold_count": 2700,
+    "image_gradient": "#DBEAFE,#3B82F6",
+    "icon_hint": "ti-milk"
+  },
+  {
+    "title": "Sữa tươi TH True Milk có đường 1L",
+    "description": "Sữa tươi TH True Milk có đường 1 lít, đậu nành Việt Nam, hương vị thơm ngon tự nhiên.",
+    "category": "sua",
+    "attributes": {
+      "brand": "TH True Milk",
+      "size": "1L",
+      "type": "fresh_milk",
+      "sugar": "yes"
+    },
+    "price": 34000,
+    "stock": 220,
+    "image_url": "",
+    "trend_score": 0.9,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "TH TRUE MILK",
+    "original_price": 38000,
+    "rating_avg": 4.7,
+    "rating_count": 1700,
+    "sold_count": 2150,
+    "image_gradient": "#DBEAFE,#3B82F6",
+    "icon_hint": "ti-milk"
+  },
+  {
+    "title": "Sữa chua Vinamilk Probi nha đam 65ml × 4",
+    "description": "Sữa chua uống Vinamilk Probi nha đam 65ml × 4 hộp, men probiotic tốt cho tiêu hóa.",
+    "category": "sua",
+    "attributes": {
+      "brand": "Vinamilk",
+      "size": "65ml x4",
+      "type": "yogurt_drink",
+      "flavor": "aloe"
+    },
+    "price": 22000,
+    "stock": 150,
+    "image_url": "",
+    "trend_score": 0.62,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "VINAMILK",
+    "original_price": null,
+    "rating_avg": 4.5,
+    "rating_count": 320,
+    "sold_count": 470,
+    "image_gradient": "#DBEAFE,#3B82F6",
+    "icon_hint": "ti-milk"
+  },
+  {
+    "title": "Sữa đặc Ông Thọ trắng nhãn xanh 380g",
+    "description": "Sữa đặc Ông Thọ trắng nhãn xanh 380g, ngọt vừa, dùng pha cà phê sữa và nướng bánh.",
+    "category": "sua",
+    "attributes": {
+      "brand": "Ong Tho",
+      "size": "380g",
+      "type": "condensed_milk"
+    },
+    "price": 24000,
+    "stock": 100,
+    "image_url": "",
+    "trend_score": 0.55,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "ONG THO",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 230,
+    "sold_count": 350,
+    "image_gradient": "#DBEAFE,#3B82F6",
+    "icon_hint": "ti-milk"
+  },
+  {
+    "title": "Sữa hạt Vinasoy nguyên chất 1L",
+    "description": "Sữa hạt Vinasoy nguyên chất 1 lít, đậu nành non-GMO, không đường, lành mạnh.",
+    "category": "sua",
+    "attributes": {
+      "brand": "Vinasoy",
+      "size": "1L",
+      "type": "soy_milk"
+    },
+    "price": 28000,
+    "stock": 80,
+    "image_url": "",
+    "trend_score": 0.42,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "VINASOY",
+    "original_price": 32000,
+    "rating_avg": 4.3,
+    "rating_count": 95,
+    "sold_count": 165,
+    "image_gradient": "#DBEAFE,#3B82F6",
+    "icon_hint": "ti-milk"
+  },
+  {
+    "title": "Bánh trung thu Bibica đậu xanh 200g",
+    "description": "Bánh trung thu Bibica đậu xanh 200g, vị truyền thống, vỏ mềm nhân mịn.",
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Bibica",
+      "size": "200g",
+      "type": "mooncake",
+      "filling": "mung_bean"
+    },
+    "price": 38000,
+    "stock": 80,
+    "image_url": "",
+    "trend_score": 0.86,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "BIBICA",
+    "original_price": 45000,
+    "rating_avg": 4.4,
+    "rating_count": 950,
+    "sold_count": 1250,
+    "image_gradient": "#FCE7F3,#EC4899",
+    "icon_hint": "ti-candy"
+  },
+  {
+    "title": "Bánh quy Cosy Marie 240g",
+    "description": "Bánh quy Cosy Marie 240g, vị bơ thơm nhẹ, ăn kèm trà sữa.",
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Cosy",
+      "size": "240g",
+      "type": "biscuit"
+    },
+    "price": 22000,
+    "stock": 130,
+    "image_url": "",
+    "trend_score": 0.55,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "COSY",
+    "original_price": null,
+    "rating_avg": 4.3,
+    "rating_count": 240,
+    "sold_count": 360,
+    "image_gradient": "#FCE7F3,#EC4899",
+    "icon_hint": "ti-candy"
+  },
+  {
+    "title": "Kẹo dẻo Haribo Goldbears 200g",
+    "description": "Kẹo dẻo Haribo Goldbears nhập khẩu Đức 200g, vị trái cây tự nhiên, thiếu nhi yêu thích.",
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Haribo",
+      "size": "200g",
+      "type": "gummy",
+      "origin": "Germany"
+    },
+    "price": 65000,
+    "stock": 50,
+    "image_url": "",
+    "trend_score": 0.48,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "HARIBO",
+    "original_price": 75000,
+    "rating_avg": 4.7,
+    "rating_count": 150,
+    "sold_count": 240,
+    "image_gradient": "#FCE7F3,#EC4899",
+    "icon_hint": "ti-candy"
+  },
+  {
+    "title": "Bánh chocopie Orion 360g hộp 12 cái",
+    "description": "Bánh Chocopie Orion 360g hộp 12 cái, vỏ bánh bông xốp, nhân marshmallow phủ chocolate.",
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Orion",
+      "size": "360g",
+      "type": "choco_pie"
+    },
+    "price": 58000,
+    "stock": 90,
+    "image_url": "",
+    "trend_score": 0.65,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "ORION",
+    "original_price": null,
+    "rating_avg": 4.5,
+    "rating_count": 350,
+    "sold_count": 510,
+    "image_gradient": "#FCE7F3,#EC4899",
+    "icon_hint": "ti-candy"
+  },
+  {
+    "title": "Snack khoai tây Lay's vị muối 95g",
+    "description": "Snack khoai tây Lay's vị muối tự nhiên 95g, giòn tan, ăn vặt và mồi nhậu.",
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Lays",
+      "size": "95g",
+      "type": "potato_chips",
+      "flavor": "salt"
+    },
+    "price": 18000,
+    "stock": 110,
+    "image_url": "",
+    "trend_score": 0.52,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "LAYS",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 200,
+    "sold_count": 310,
+    "image_gradient": "#FCE7F3,#EC4899",
+    "icon_hint": "ti-candy"
+  },
+  {
+    "title": "Coca-Cola lon 330ml lốc 24 lon",
+    "description": "Coca-Cola lon 330ml lốc 24 lon, gas mạnh ngọt vừa, gia đình và liên hoan.",
     "category": "nuoc_giai_khat",
     "attributes": {
       "brand": "Coca-Cola",
-      "size": "330ml"
+      "size": "330ml x24",
+      "type": "soda"
     },
-    "price": 10000,
-    "stock": 200,
+    "price": 220000,
+    "stock": 50,
     "image_url": "",
-    "trend_score": 0.9,
-    "merchant_email": "merchant1@demo.icp"
+    "trend_score": 0.93,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "COCA-COLA",
+    "original_price": 240000,
+    "rating_avg": 4.6,
+    "rating_count": 2000,
+    "sold_count": 2550,
+    "image_gradient": "#DBEAFE,#06B6D4",
+    "icon_hint": "ti-glass-full"
   },
   {
-    "title": "Pepsi chai 1.5L",
-    "description": "Nước ngọt Pepsi chai gia đình.",
+    "title": "Trà xanh không độ chai 500ml lốc 24",
+    "description": "Trà xanh không độ chai 500ml lốc 24 chai, ít đường, EGCG cao, giải khát tự nhiên.",
+    "category": "nuoc_giai_khat",
+    "attributes": {
+      "brand": "Khong Do",
+      "size": "500ml x24",
+      "type": "green_tea"
+    },
+    "price": 145000,
+    "stock": 80,
+    "image_url": "",
+    "trend_score": 0.72,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "KHONG DO",
+    "original_price": 165000,
+    "rating_avg": 4.4,
+    "rating_count": 430,
+    "sold_count": 620,
+    "image_gradient": "#DBEAFE,#06B6D4",
+    "icon_hint": "ti-glass-full"
+  },
+  {
+    "title": "Pepsi lon 330ml lốc 6 lon",
+    "description": "Pepsi lon 330ml lốc 6 lon, vị ngọt sảng khoái, gas đầy đặn.",
     "category": "nuoc_giai_khat",
     "attributes": {
       "brand": "Pepsi",
-      "size": "1.5L"
+      "size": "330ml x6",
+      "type": "soda"
     },
-    "price": 22000,
-    "stock": 90,
+    "price": 65000,
+    "stock": 100,
     "image_url": "",
-    "trend_score": 0.85,
-    "merchant_email": "merchant2@demo.icp"
+    "trend_score": 0.62,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "PEPSI",
+    "original_price": null,
+    "rating_avg": 4.5,
+    "rating_count": 320,
+    "sold_count": 460,
+    "image_gradient": "#DBEAFE,#06B6D4",
+    "icon_hint": "ti-glass-full"
   },
   {
-    "title": "Trà xanh không độ chai 500ml",
-    "description": "Trà xanh đóng chai không độ Tân Hiệp Phát.",
+    "title": "Nước suối Lavie chai 500ml lốc 24",
+    "description": "Nước suối Lavie chai 500ml lốc 24 chai, khoáng tự nhiên, tinh khiết.",
     "category": "nuoc_giai_khat",
     "attributes": {
-      "brand": "Tân Hiệp Phát",
-      "size": "500ml"
+      "brand": "Lavie",
+      "size": "500ml x24",
+      "type": "mineral_water"
     },
-    "price": 11000,
-    "stock": 140,
+    "price": 95000,
+    "stock": 150,
     "image_url": "",
-    "trend_score": 0.75,
-    "merchant_email": "merchant1@demo.icp"
+    "trend_score": 0.55,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "LAVIE",
+    "original_price": null,
+    "rating_avg": 4.5,
+    "rating_count": 260,
+    "sold_count": 390,
+    "image_gradient": "#DBEAFE,#06B6D4",
+    "icon_hint": "ti-glass-full"
   },
   {
-    "title": "Sting dâu lon 330ml",
-    "description": "Nước tăng lực Sting vị dâu.",
+    "title": "Sting nước tăng lực vị dâu lốc 6 lon",
+    "description": "Sting nước tăng lực vị dâu lốc 6 lon 330ml, caffeine + vitamin B, tỉnh táo nhanh.",
     "category": "nuoc_giai_khat",
     "attributes": {
       "brand": "Sting",
-      "size": "330ml"
+      "size": "330ml x6",
+      "type": "energy_drink",
+      "flavor": "strawberry"
     },
-    "price": 11000,
-    "stock": 110,
+    "price": 58000,
+    "stock": 90,
     "image_url": "",
-    "trend_score": 0.68,
-    "merchant_email": "merchant2@demo.icp"
+    "trend_score": 0.48,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "STING",
+    "original_price": null,
+    "rating_avg": 4.3,
+    "rating_count": 160,
+    "sold_count": 240,
+    "image_gradient": "#DBEAFE,#06B6D4",
+    "icon_hint": "ti-glass-full"
   },
   {
-    "title": "Bia Tiger lon 330ml",
-    "description": "Bia Tiger lon truyền thống.",
-    "category": "nuoc_giai_khat",
-    "attributes": {
-      "brand": "Tiger",
-      "size": "330ml"
-    },
-    "price": 18000,
-    "stock": 180,
-    "image_url": "",
-    "trend_score": 0.78,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Cá ngừ Three Lady hộp 185g",
-    "description": "Cá ngừ ngâm dầu Three Lady đóng hộp.",
+    "title": "Cá ngừ đóng hộp Three Lady ngâm dầu 185g",
+    "description": "Cá ngừ đóng hộp Three Lady ngâm dầu 185g, thịt cá săn chắc, ăn kèm cơm và mì.",
     "category": "do_dong_hop",
     "attributes": {
       "brand": "Three Lady",
-      "size": "185g"
+      "size": "185g",
+      "type": "tuna_oil"
     },
-    "price": 28000,
-    "stock": 70,
+    "price": 32000,
+    "stock": 100,
     "image_url": "",
-    "trend_score": 0.55,
-    "merchant_email": "merchant2@demo.icp"
+    "trend_score": 0.58,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "THREE LADY",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 230,
+    "sold_count": 340,
+    "image_gradient": "#E5E7EB,#6B7280",
+    "icon_hint": "ti-tin"
   },
   {
-    "title": "Pate Hạ Long hộp 170g",
-    "description": "Pate gan heo Hạ Long truyền thống.",
+    "title": "Pate gan Hạ Long 170g",
+    "description": "Pate gan Hạ Long 170g vị truyền thống, mịn dẻo, ăn với bánh mì sáng.",
     "category": "do_dong_hop",
     "attributes": {
-      "brand": "Hạ Long",
-      "size": "170g"
+      "brand": "Ha Long",
+      "size": "170g",
+      "type": "pate"
     },
-    "price": 25000,
-    "stock": 90,
+    "price": 28000,
+    "stock": 80,
     "image_url": "",
-    "trend_score": 0.72,
-    "merchant_email": "merchant1@demo.icp"
+    "trend_score": 0.5,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "HA LONG",
+    "original_price": 32000,
+    "rating_avg": 4.3,
+    "rating_count": 175,
+    "sold_count": 270,
+    "image_gradient": "#E5E7EB,#6B7280",
+    "icon_hint": "ti-tin"
   },
   {
-    "title": "Cá nục sốt cà Vissan hộp 155g",
-    "description": "Cá nục sốt cà chua Vissan đóng hộp.",
+    "title": "Xúc xích Vissan Heo 175g",
+    "description": "Xúc xích Vissan heo 175g, ăn nhanh và tiện, có thể chiên hoặc nướng.",
     "category": "do_dong_hop",
     "attributes": {
       "brand": "Vissan",
-      "size": "155g"
+      "size": "175g",
+      "type": "sausage"
     },
-    "price": 22000,
-    "stock": 75,
+    "price": 35000,
+    "stock": 110,
     "image_url": "",
-    "trend_score": 0.6,
-    "merchant_email": "merchant2@demo.icp"
+    "trend_score": 0.55,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "VISSAN",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 205,
+    "sold_count": 320,
+    "image_gradient": "#E5E7EB,#6B7280",
+    "icon_hint": "ti-tin"
   },
   {
-    "title": "Đậu Hà Lan Bonduelle 200g",
-    "description": "Đậu Hà Lan ngâm muối Bonduelle nhập khẩu.",
+    "title": "Đậu hộp Heinz Beans 415g",
+    "description": "Đậu hộp Heinz Beans nhập khẩu Anh 415g, ăn sáng kiểu Tây với bánh mì và trứng.",
     "category": "do_dong_hop",
     "attributes": {
-      "brand": "Bonduelle",
-      "size": "200g"
+      "brand": "Heinz",
+      "size": "415g",
+      "type": "baked_beans",
+      "origin": "UK"
     },
-    "price": 32000,
-    "stock": 40,
-    "image_url": "",
-    "trend_score": 0.3,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Thịt heo hai lát Spam 340g",
-    "description": "Thịt heo nguyên miếng Spam đóng hộp Mỹ.",
-    "category": "do_dong_hop",
-    "attributes": {
-      "brand": "Spam",
-      "size": "340g"
-    },
-    "price": 95000,
-    "stock": 25,
+    "price": 48000,
+    "stock": 60,
     "image_url": "",
     "trend_score": 0.42,
-    "merchant_email": "merchant2@demo.icp"
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "HEINZ",
+    "original_price": null,
+    "rating_avg": 4.5,
+    "rating_count": 95,
+    "sold_count": 155,
+    "image_gradient": "#E5E7EB,#6B7280",
+    "icon_hint": "ti-tin"
   },
   {
-    "title": "Gạo ST25 túi 5kg",
-    "description": "Gạo ST25 thơm dẻo đặc sản Sóc Trăng.",
+    "title": "Cá hồi đóng hộp John West tự nhiên 213g",
+    "description": "Cá hồi đóng hộp John West tự nhiên nhập khẩu Anh 213g, omega-3 cao, salad và mì pasta.",
+    "category": "do_dong_hop",
+    "attributes": {
+      "brand": "John West",
+      "size": "213g",
+      "type": "salmon",
+      "origin": "UK"
+    },
+    "price": 85000,
+    "stock": 40,
+    "image_url": "",
+    "trend_score": 0.38,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "JOHN WEST",
+    "original_price": 95000,
+    "rating_avg": 4.6,
+    "rating_count": 55,
+    "sold_count": 105,
+    "image_gradient": "#E5E7EB,#6B7280",
+    "icon_hint": "ti-tin"
+  },
+  {
+    "title": "Gạo ST25 Sóc Trăng 5kg",
+    "description": "Gạo ST25 Sóc Trăng 5kg, gạo ngon nhất thế giới, thơm mềm, hạt dài bóng.",
     "category": "gao",
     "attributes": {
       "brand": "ST25",
-      "size": "5kg"
-    },
-    "price": 185000,
-    "stock": 50,
-    "image_url": "",
-    "trend_score": 0.95,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Gạo Bắc Hương túi 5kg",
-    "description": "Gạo Bắc Hương thơm nhẹ.",
-    "category": "gao",
-    "attributes": {
-      "brand": "Bắc Hương",
-      "size": "5kg"
+      "size": "5kg",
+      "type": "fragrant_rice",
+      "origin": "Soc Trang"
     },
     "price": 145000,
     "stock": 60,
     "image_url": "",
-    "trend_score": 0.7,
-    "merchant_email": "merchant2@demo.icp"
+    "trend_score": 0.78,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "ST25",
+    "original_price": 160000,
+    "rating_avg": 4.7,
+    "rating_count": 380,
+    "sold_count": 540,
+    "image_gradient": "#F5F5DC,#A8A29E",
+    "icon_hint": "ti-grain"
   },
   {
-    "title": "Gạo Tài Nguyên Chợ Đào 10kg",
-    "description": "Gạo Tài Nguyên Chợ Đào dẻo thơm.",
+    "title": "Gạo Jasmine Vinaseed 5kg",
+    "description": "Gạo Jasmine Vinaseed 5kg, thơm dịu, dẻo vừa, dùng cho cơm hàng ngày.",
     "category": "gao",
     "attributes": {
-      "brand": "Chợ Đào",
-      "size": "10kg"
+      "brand": "Vinaseed",
+      "size": "5kg",
+      "type": "jasmine_rice"
     },
-    "price": 220000,
-    "stock": 30,
-    "image_url": "",
-    "trend_score": 0.65,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Gạo nếp cái hoa vàng 2kg",
-    "description": "Gạo nếp cái hoa vàng dẻo thơm gói nhỏ.",
-    "category": "gao",
-    "attributes": {
-      "brand": "Hoa Vàng",
-      "size": "2kg"
-    },
-    "price": 78000,
-    "stock": 45,
-    "image_url": "",
-    "trend_score": 0.58,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Gạo lứt huyết rồng 1kg",
-    "description": "Gạo lứt huyết rồng giàu dinh dưỡng.",
-    "category": "gao",
-    "attributes": {
-      "brand": "Sài Gòn Coop",
-      "size": "1kg"
-    },
-    "price": 58000,
-    "stock": 40,
-    "image_url": "",
-    "trend_score": 0.45,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Bánh mì sandwich Kinh Đô gói 6",
-    "description": "Bánh mì sandwich mềm Kinh Đô.",
-    "category": "banh_mi",
-    "attributes": {
-      "brand": "Kinh Đô",
-      "size": "6 lát"
-    },
-    "price": 22000,
+    "price": 115000,
     "stock": 80,
     "image_url": "",
-    "trend_score": 0.72,
-    "merchant_email": "merchant2@demo.icp"
+    "trend_score": 0.62,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "VINASEED",
+    "original_price": 125000,
+    "rating_avg": 4.5,
+    "rating_count": 260,
+    "sold_count": 390,
+    "image_gradient": "#F5F5DC,#A8A29E",
+    "icon_hint": "ti-grain"
   },
   {
-    "title": "Bánh mì ngọt Otto vị bơ sữa",
-    "description": "Bánh mì ngọt Otto nhân bơ sữa.",
-    "category": "banh_mi",
+    "title": "Gạo lứt huyết rồng Long An 2kg",
+    "description": "Gạo lứt huyết rồng Long An 2kg, giàu chất xơ và sắt, phù hợp chế độ ăn lành mạnh.",
+    "category": "gao",
     "attributes": {
-      "brand": "Otto",
-      "size": "200g"
+      "brand": "Long An",
+      "size": "2kg",
+      "type": "brown_rice_red"
     },
-    "price": 18000,
-    "stock": 95,
-    "image_url": "",
-    "trend_score": 0.65,
-    "merchant_email": "merchant1@demo.icp"
-  },
-  {
-    "title": "Bánh mì gối Staff",
-    "description": "Bánh mì gối trắng Staff bữa sáng.",
-    "category": "banh_mi",
-    "attributes": {
-      "brand": "Staff",
-      "size": "400g"
-    },
-    "price": 25000,
-    "stock": 60,
-    "image_url": "",
-    "trend_score": 0.58,
-    "merchant_email": "merchant2@demo.icp"
-  },
-  {
-    "title": "Bánh mì burger Ottogi gói 4",
-    "description": "Bánh mì burger tròn Ottogi.",
-    "category": "banh_mi",
-    "attributes": {
-      "brand": "Ottogi",
-      "size": "4 cái"
-    },
-    "price": 28000,
+    "price": 68000,
     "stock": 50,
     "image_url": "",
     "trend_score": 0.5,
-    "merchant_email": "merchant1@demo.icp"
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "LONG AN",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 120,
+    "sold_count": 195,
+    "image_gradient": "#F5F5DC,#A8A29E",
+    "icon_hint": "ti-grain"
   },
   {
-    "title": "Bánh mì Hokkaido bơ phô mai",
-    "description": "Bánh mì Hokkaido nhân bơ phô mai.",
-    "category": "banh_mi",
+    "title": "Gạo nếp cái hoa vàng 2kg",
+    "description": "Gạo nếp cái hoa vàng 2kg, dùng nấu xôi và bánh chưng, dẻo thơm tự nhiên.",
+    "category": "gao",
     "attributes": {
-      "brand": "Hokkaido",
-      "size": "180g"
+      "brand": "Hoa Vang",
+      "size": "2kg",
+      "type": "sticky_rice"
     },
-    "price": 32000,
-    "stock": 35,
+    "price": 58000,
+    "stock": 70,
     "image_url": "",
     "trend_score": 0.42,
-    "merchant_email": "merchant2@demo.icp"
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "HOA VANG",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 155,
+    "sold_count": 240,
+    "image_gradient": "#F5F5DC,#A8A29E",
+    "icon_hint": "ti-grain"
+  },
+  {
+    "title": "Gạo Japonica Niigata 2kg",
+    "description": "Gạo Japonica Niigata nhập khẩu Nhật 2kg, hạt tròn dẻo, dùng cho sushi và onigiri.",
+    "category": "gao",
+    "attributes": {
+      "brand": "Niigata",
+      "size": "2kg",
+      "type": "sushi_rice",
+      "origin": "Japan"
+    },
+    "price": 185000,
+    "stock": 30,
+    "image_url": "",
+    "trend_score": 0.38,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "NIIGATA",
+    "original_price": 210000,
+    "rating_avg": 4.7,
+    "rating_count": 45,
+    "sold_count": 90,
+    "image_gradient": "#F5F5DC,#A8A29E",
+    "icon_hint": "ti-grain"
+  },
+  {
+    "title": "Bánh mì sandwich Kinh Đô 350g",
+    "description": "Bánh mì sandwich Kinh Đô 350g, mềm xốp, dùng cho điểm tâm sáng và sandwich nhanh.",
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Kinh Do",
+      "size": "350g",
+      "type": "sandwich_bread"
+    },
+    "price": 22000,
+    "stock": 100,
+    "image_url": "",
+    "trend_score": 0.65,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "KINH DO",
+    "original_price": null,
+    "rating_avg": 4.4,
+    "rating_count": 240,
+    "sold_count": 380,
+    "image_gradient": "#FED7AA,#FB923C",
+    "icon_hint": "ti-bread"
+  },
+  {
+    "title": "Bánh mì lạt Đức Phát 5 ổ 250g",
+    "description": "Bánh mì lạt Đức Phát 5 ổ 250g, vỏ giòn ruột mềm, ăn kèm chả lụa và pate.",
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Duc Phat",
+      "size": "250g x5",
+      "type": "baguette"
+    },
+    "price": 18000,
+    "stock": 80,
+    "image_url": "",
+    "trend_score": 0.55,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "DUC PHAT",
+    "original_price": null,
+    "rating_avg": 4.3,
+    "rating_count": 195,
+    "sold_count": 310,
+    "image_gradient": "#FED7AA,#FB923C",
+    "icon_hint": "ti-bread"
+  },
+  {
+    "title": "Bánh mì ngọt nhân kem Bibica 90g x6",
+    "description": "Bánh mì ngọt nhân kem Bibica 90g × 6 cái, nhân kem béo ngậy, ăn vặt cho trẻ em.",
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Bibica",
+      "size": "90g x6",
+      "type": "sweet_bread",
+      "filling": "cream"
+    },
+    "price": 35000,
+    "stock": 60,
+    "image_url": "",
+    "trend_score": 0.48,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "BIBICA",
+    "original_price": 40000,
+    "rating_avg": 4.4,
+    "rating_count": 130,
+    "sold_count": 200,
+    "image_gradient": "#FED7AA,#FB923C",
+    "icon_hint": "ti-bread"
+  },
+  {
+    "title": "Bánh mì bơ sữa Brioche 4 ổ 200g",
+    "description": "Bánh mì Brioche bơ sữa 4 ổ 200g, vị béo nhẹ thơm bơ Pháp, ăn sáng cao cấp.",
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Brioche",
+      "size": "200g x4",
+      "type": "brioche"
+    },
+    "price": 42000,
+    "stock": 50,
+    "image_url": "",
+    "trend_score": 0.42,
+    "merchant_email": "merchant2@demo.icp",
+    "brand": "BRIOCHE",
+    "original_price": null,
+    "rating_avg": 4.5,
+    "rating_count": 90,
+    "sold_count": 165,
+    "image_gradient": "#FED7AA,#FB923C",
+    "icon_hint": "ti-bread"
+  },
+  {
+    "title": "Bánh mì nguyên cám Hovis 400g",
+    "description": "Bánh mì nguyên cám Hovis nhập khẩu Anh 400g, giàu chất xơ, ăn sáng lành mạnh.",
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Hovis",
+      "size": "400g",
+      "type": "whole_wheat",
+      "origin": "UK"
+    },
+    "price": 55000,
+    "stock": 35,
+    "image_url": "",
+    "trend_score": 0.38,
+    "merchant_email": "merchant1@demo.icp",
+    "brand": "HOVIS",
+    "original_price": 65000,
+    "rating_avg": 4.6,
+    "rating_count": 55,
+    "sold_count": 110,
+    "image_gradient": "#FED7AA,#FB923C",
+    "icon_hint": "ti-bread"
   }
 ]

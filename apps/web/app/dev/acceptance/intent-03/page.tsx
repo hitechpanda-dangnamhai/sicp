@@ -6,7 +6,7 @@
  * Intent:  I03 — Search Products (Tìm hàng)
  * State:   state-0-happy variant A
  *
- * Reference: docs/mockups/intent-03-search-products/state-0-happy-A.html
+ * Reference: docs/mockups/intent-03/intent-03A-state-0-happy.html (corrected Phiên Sx04 per C-S04-A + D-29 LAW Mockup filename is LAW)
  *
  * Components composed:
  *   - Layout: PhoneFrame (mode="app"), StatusBar, AppHeader

@@ -84,6 +84,19 @@ interface ProductSeed {
   image_url: string;
   trend_score: number;
   merchant_email: string;
+  // S-04 T01 (Phiên Sx04-2) D-S04-11 LAW — V002 display columns extension.
+  // Optional fields: 50 legacy products.json (pre-S-04) won't have them;
+  // 55 curated products.json (post-S-04) populates all. Backfill on INSERT
+  // uses NULL fallback for missing values (V002 columns nullable per
+  // V002__product_enrichment.sql). brand mirrors attributes.brand for query
+  // perf per ADR-024 denormalization. status defaults 'active' per V001.
+  brand?: string;
+  original_price?: number | null;
+  rating_avg?: number;
+  rating_count?: number;
+  sold_count?: number;
+  image_gradient?: string;
+  icon_hint?: string;
 }
 
 interface PolicySeed {
@@ -161,8 +174,11 @@ async function main(): Promise<void> {
       const insRes = await client.query(
         `INSERT INTO products
            (merchant_id, title, description, category, attributes,
-            price, stock, image_url, trend_score)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            price, stock, image_url, trend_score,
+            brand, original_price, rating_avg, rating_count, sold_count,
+            image_gradient, icon_hint, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+                 $10, $11, $12, $13, $14, $15, $16, $17)
          RETURNING id`,
         [
           merchantId,
@@ -174,6 +190,17 @@ async function main(): Promise<void> {
           p.stock,
           p.image_url || null,
           p.trend_score || 0,
+          // S-04 T01 (Phiên Sx04-2) D-S04-11 LAW — V002 columns. Curated 55
+          // products populate all; legacy 50 (pre-S-04) backfill NULL/default
+          // via ?? operator. status always 'active' per V001 CHECK constraint.
+          p.brand ?? null,
+          p.original_price ?? null,
+          p.rating_avg ?? 0,
+          p.rating_count ?? 0,
+          p.sold_count ?? 0,
+          p.image_gradient ?? null,
+          p.icon_hint ?? null,
+          'active',
         ],
       );
       if (insRes.rowCount === 1) productsInserted++;

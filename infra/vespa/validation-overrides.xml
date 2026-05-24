@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  ============================================================================
+  Vespa application package — validation overrides
+  ============================================================================
+  Slice: S-04 First Product Discovery, Task T01 (Phiên Sx04-2)
+  Created: 2026-05-23T18:16Z (Vespa UTC time at attempt #5 deploy)
+  Expiry: 2026-06-21 (29 days — Vespa max 30 days from current UTC time;
+                     2026-06-21 parses to 2026-06-22T00:00:00Z which is
+                     ~6 hours before 2026-05-23T18:16Z + 30 days =
+                     2026-06-22T18:16Z. Safe margin for clock skew.)
+  Purpose: Allow `indexing-change` validation override when switching
+  `text_embedding` field from plain tensor field (T06 S-00b initial schema)
+  to synthetic field with `embed clip_multilingual` indexing expression
+  (S-04 T01 D-S04-10 LAW). Vespa rejects the change by default because
+  changing indexing expressions on existing fields can corrupt indices
+  with stale token data. For dev/staging this is safe (no production data
+  to preserve) — override explicit + time-bounded.
+
+  Triggered by: Phiên Sx04-2 Bước 4 deploy attempt #5 INVALID_APPLICATION_PACKAGE
+  error: "Changing what tokens are expected and stored in field indexes:
+  Document type 'product': Field 'text_embedding' changed: indexing script:
+  '{ input text_embedding | attribute text_embedding | index text_embedding; }'
+  -> '{ input title . " " . input description | embed clip_multilingual | ... }'.
+  To allow this add <allow until='yyyy-mm-dd'>indexing-change</allow> to
+  validation-overrides.xml".
+
+  Reference: https://docs.vespa.ai/en/reference/applications/validation-overrides.html
+  ============================================================================
+-->
+<validation-overrides>
+  <allow until="2026-06-21">indexing-change</allow>
+</validation-overrides>

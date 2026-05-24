@@ -105,23 +105,19 @@ schema product {
       indexing: attribute
     }
 
-    # === Embeddings (CLIP ViT-B/32 512 dim per ADR-036) ====================
-    # C8 resolution: ADR-036 overrides 02_DATA_MODEL.md (768 → 512 per C19).
-    # C12 Option B: embeddings Vespa-only — V001 Postgres no VECTOR columns.
+    # === Embeddings — text_embedding is OUTSIDE document block (synthetic) ==
+    # text_embedding moved out of document block per Vespa schema validation
+    # (Phiên Sx04-2 Bước 4 mid-smoke reality finding): "Indexing expression
+    # 'embed clip_multilingual' attempts to modify the value of the document
+    # field 'text_embedding'. Use a field outside the document block instead."
+    # See synthetic-field declaration AFTER document closing brace below.
+    #
+    # image_embedding stays IN document block (no embed expression at S-04;
+    # fed empty/absent via vespa-feed.ts; S-07 will refactor to synthetic
+    # field with image-input embed expression). Kept now as 512-dim
+    # placeholder maintaining ADR-036 symmetric HNSW configuration.
     # C20: HNSW symmetric between text_embedding + image_embedding for ANN
     # performance parity (image search = Intent 01 primary use case).
-    field text_embedding type tensor<float>(x[512]) {
-      indexing: attribute | index
-      attribute {
-        distance-metric: angular
-      }
-      index {
-        hnsw {
-          max-links-per-node: 16
-          neighbors-to-explore-at-insert: 200
-        }
-      }
-    }
     field image_embedding type tensor<float>(x[512]) {
       indexing: attribute | index
       attribute {
@@ -182,14 +178,67 @@ schema product {
     }
   }
 
-  # === Rank profiles =======================================================
-  # Two profiles cover S-00b discovery + image search use cases. Future
-  # rank-profile `hybrid_with_behavior` (07_BEHAVIOR_LOGS Section 6.1 line
-  # 219) deferred to S-04 ranking work.
+  # === Synthetic embedding fields (OUTSIDE document block per Vespa pattern) ==
+  # C8 resolution: ADR-036 overrides 02_DATA_MODEL.md (768 → 512 per C19).
+  # C12 Option B: embeddings Vespa-only — V001 Postgres no VECTOR columns.
+  # C20: HNSW symmetric between text_embedding + image_embedding for ANN
+  # performance parity (image search = Intent 01 primary use case).
+  # D-S04-10 LAW (Phiên Sx04-1): text_embedding auto-generated at feed-time
+  # by Vespa native `hugging-face-embedder` component `clip_multilingual`
+  # (CLIP-ViT-B-32-multilingual-v1, Vietnamese-capable). Indexing expression
+  # combines title + description → embed → store. Query-time: YQL
+  # `embed(@query, clip_multilingual)` produces 512-dim query vector inside
+  # Vespa container (saves 1 RTT — no Python embedding code). Component
+  # configured in services.xml. See 02_DATA_MODEL.md §2.1.
+  #
+  # Vespa pattern (Phiên Sx04-2 Bước 4 mid-smoke reality finding): fields
+  # with `embed` indexing expression MUST be declared OUTSIDE document block
+  # — they are "synthetic fields" derived from document field inputs; cannot
+  # be feed directly (vespa-feed.ts already omits these per D-S04-10 LAW).
+  # See https://docs.vespa.ai/en/embedding.html and schemas reference.
+  field text_embedding type tensor<float>(x[512]) {
+    indexing: input title . " " . input description | embed clip_multilingual | attribute | index
+    attribute {
+      distance-metric: angular
+    }
+    index {
+      hnsw {
+        max-links-per-node: 16
+        neighbors-to-explore-at-insert: 200
+      }
+    }
+  }
 
-  rank-profile hybrid {
+  # === Rank profiles =======================================================
+  # S-04 D-S04-03 LAW (Phiên Sx04): Dual rank profiles for Adaptive Single
+  # Endpoint + Graceful Degradation architecture. Variant A baseline (BM25
+  # only, used when LLM unavailable / mode=basic_fallback) + Variant B
+  # ai_augmented (BM25 + vector + trend + match_score summary feature, used
+  # when mode=ai_augmented default tier). Hybrid kept as backward-compat
+  # alias inheriting ai_augmented (deprecation path; grep verify post-S-04
+  # ship before removal).
+  # D-S04-10 LAW (Phiên Sx04-1): ai_augmented inputs `query(query_embedding)`
+  # — Vespa native embedder produces 512-dim vector via YQL
+  # `embed(@query, clip_multilingual)`. See 02_DATA_MODEL.md §2 + §2.1.
+
+  # rank-profile baseline — Variant A fallback (BM25 only, no vector, no trend)
+  # Used when LLM unavailable; basic textual relevance.
+  rank-profile baseline {
+    first-phase {
+      expression: bm25(title) + bm25(description)
+    }
+    summary-features { bm25(title) bm25(description) }
+  }
+
+  # rank-profile ai_augmented — Variant B default tier
+  # BM25 + closeness(text_embedding) + trend_score; exposes match_score
+  # composite via secondPhase summary feature for FE color-coded badge
+  # (xanh ≥90% / cam 80-89% / vàng <80% per mockup intent-03B-state-0-happy).
+  # `reason` field LLM-generated per-product at LangGraph generate_reasons
+  # node — NOT stored in Vespa, emitted via SSE `understanding`/`products`.
+  rank-profile ai_augmented {
     inputs {
-      query(text_query) tensor<float>(x[512])
+      query(query_embedding) tensor<float>(x[512])
     }
     first-phase {
       expression: bm25(title) + bm25(description)
@@ -197,7 +246,12 @@ schema product {
     second-phase {
       expression: 0.5 * firstPhase + 0.3 * closeness(field, text_embedding) + 0.2 * attribute(trend_score)
     }
+    summary-features { secondPhase bm25(title) closeness(field, text_embedding) }
   }
+
+  # Backward-compat alias for legacy `rank_profile=hybrid` references.
+  # Behavior identical to ai_augmented; remove after S-04 ship + grep verify.
+  rank-profile hybrid inherits ai_augmented {}
 
   rank-profile image_similarity {
     inputs {

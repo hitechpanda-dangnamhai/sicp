@@ -3,22 +3,26 @@
   infra/vespa/services.xml
   ============================================================================
   ICP Vespa application — services configuration (cluster topology).
-
   Slice: S-00b Foundation Scaffold, Task T06 Vespa Schema (Phiên 9 LOCKED).
-
+  Amended S-04 T01 Phiên Sx04-2 per D-S04-10 LAW: added `clip_multilingual`
+  hugging-face-embedder component to `<container id="default">` block per
+  02_DATA_MODEL.md §2.1 exact spec. Model files at infra/vespa/models/
+  clip_multilingual/ (binary, generated via optimum-cli per EXPORT.md; NOT
+  committed to git per root .gitignore — packaged into app zip via deploy.sh).
   Layout: single-container dev cluster (1 container node + 1 content node +
   1 admin server, all aliased to `node0`). Single-node redundancy=1 is
   intentional for hackathon dev — production would use redundancy>=2 across
   multiple distribution keys.
-
   Components:
     - container `default`: search + document API endpoints (search query
       + document feed/get/update). Exposes :8080 (REST) by default.
+      Hosts `clip_multilingual` embedder (D-S04-10 LAW, Phiên Sx04-2) for
+      query-time `embed(@query, clip_multilingual)` YQL function + feed-time
+      `embed clip_multilingual` indexing expression on text_embedding field.
     - content `products`: distributed document storage for `product` type
       with HNSW + BM25 indexing per schemas/product.sd. Distribution-key 0
       is the only shard.
     - admin: cluster controller + config server colocated on node0.
-
   Hostalias `node0` resolves via hosts.xml (single host → localhost).
   REST API deploy path (deploy.sh) requires hosts.xml to be present in the
   application package because Vespa config server does not auto-generate
@@ -28,6 +32,41 @@
   <container id="default" version="1.0">
     <document-api/>
     <search/>
+
+    <!-- D-S04-10 LAW (Phiên Sx04-2): CLIP-ViT-B-32-multilingual-v1 (512-dim,
+         Vietnamese-capable). Shared image+text vector space — S-07 vision-buy
+         can reuse SAME model for cross-modal search. Binary model files
+         generated via infra/vespa/models/clip_multilingual/EXPORT.md
+         (optimum-cli). Files packaged into Vespa app zip by deploy.sh. -->
+    <component id="clip_multilingual" type="hugging-face-embedder">
+      <transformer-model path="models/clip_multilingual/model.onnx"/>
+      <tokenizer-model path="models/clip_multilingual/tokenizer.json"/>
+      <max-tokens>256</max-tokens>
+      <transformer-input-ids>input_ids</transformer-input-ids>
+      <transformer-attention-mask>attention_mask</transformer-attention-mask>
+      <!-- S-04 T01 Phiên Sx04-2 Bước 4 attempts #7-#8 reality findings:
+           ONNX model exported via `optimum-cli` with library-name sentence_transformers
+           has 2 outputs: `token_embeddings` (raw [batch, seq, 768]) + `sentence_embedding`
+           (full pipeline incl Dense projection [batch, 512]). Vespa HuggingFaceEmbedder
+           default expects output named `last_hidden_state`, missing in our model causes
+           "Model does not contain required output" error.
+
+           Two-part fix needed:
+           1. `transformer-output sentence_embedding` selects the pre-pooled 512-dim output
+              (instead of default `last_hidden_state` which our model doesn't expose).
+           2. `pooling-strategy none` is REQUIRED explicit for 2-dimension outputs.
+              Default `mean` only works with 3D `last_hidden_state` [batch, seq, hidden]
+              shape. Our `sentence_embedding` is already 2D [batch, embedding_dim] (Dense
+              layer inside ONNX graph applied pooling + projection). Without `none`,
+              Vespa throws: "Expected pooling-strategy 'none' with 2 output dimensions".
+
+           See https://docs.vespa.ai/en/rag/embedding.html `transformer-output` config.
+           See Vespa source `hugging-face-embedder.def`: `poolingStrategy enum {cls, mean, none}`. -->
+      <transformer-output>sentence_embedding</transformer-output>
+      <pooling-strategy>none</pooling-strategy>
+      <normalize>true</normalize>
+    </component>
+
     <nodes>
       <node hostalias="node0"/>
     </nodes>
