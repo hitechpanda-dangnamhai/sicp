@@ -246,26 +246,13 @@ async def _node_generate_understanding(
             rid,
             "variant_degraded",
             {
-                # SSE event payload per 03_API_CONTRACTS.md §3 lines 334-340.
-                # Field naming `from`/`to` matches spec (distinct from
-                # ops log `intent.degraded` which uses `from_mode`/`to_mode`
-                # per LOG_CATALOG.md line 44 — 2 separate contracts).
-                "from": "ai_augmented",
-                "to": "basic_fallback",
+                "from_mode": "ai_augmented",
+                "to_mode": "basic_fallback",
                 "reason": "llm_timeout",
                 "error_code": "E_LLM_TIMEOUT",
-                # Rule 6 MOCKUP IS LAW — `trace_id` field required per
-                # mockup intent-03B-state-C-error.html line 166 displays
-                # truncated trace "b7e1...d042". FE truncates client-side.
-                "trace_id": state.get("trace_id", ""),
                 # Mockup intent-03B-state-C-error.html lines 160-161 LOCKED strings.
-                # `title` field NEW per Rule 6 mockup line 160 — error card heading.
-                # `user_message` field per spec line 338 — error card body text.
                 "title": "Mô hình AI phản hồi chậm",
-                "user_message": "Em đang quá tải nên chưa viết được lý do gợi ý. Anh có thể dùng bản tìm kiếm cơ bản.",
-                # NOTE: `retry_actions` field per spec line 339 NOT emitted —
-                # mockup lines 171+173 hardcode button labels "Thử lại với AI"
-                # / "Dùng bản cơ bản" FE-side per Rule 6. Spec needs update.
+                "body": "Em đang quá tải nên chưa viết được lý do gợi ý. Anh có thể dùng bản tìm kiếm cơ bản.",
             },
         )
         await publisher.publish_sse(rid, "status", {"status": "awaiting_user_input"})
@@ -556,18 +543,12 @@ async def _node_generate_reasons(state: IcpState, publisher: RedisPublisher) -> 
             rid,
             "variant_degraded",
             {
-                # SSE event payload per 03_API_CONTRACTS.md §3 lines 334-340.
-                # Same shape as generate_understanding emit above — full
-                # per-product timeout treated same as understanding timeout.
-                "from": "ai_augmented",
-                "to": "basic_fallback",
+                "from_mode": "ai_augmented",
+                "to_mode": "basic_fallback",
                 "reason": "llm_timeout",
                 "error_code": "E_LLM_TIMEOUT",
-                # Rule 6 MOCKUP IS LAW — `trace_id` per mockup line 166.
-                "trace_id": state.get("trace_id", ""),
-                # Mockup intent-03B-state-C-error.html lines 160-161 LOCKED.
                 "title": "Mô hình AI phản hồi chậm",
-                "user_message": "Em đang quá tải nên chưa viết được lý do gợi ý. Anh có thể dùng bản tìm kiếm cơ bản.",
+                "body": "Em đang quá tải nên chưa viết được lý do gợi ý. Anh có thể dùng bản tìm kiếm cơ bản.",
             },
         )
         await publisher.publish_sse(rid, "status", {"status": "awaiting_user_input"})

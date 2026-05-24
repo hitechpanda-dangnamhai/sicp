@@ -2,26 +2,55 @@
  * apps/gateway/src/intent/intent.controller.ts
  *
  * S-02 T07 — Intent universal endpoint controller.
+ * S-04 T03 amendment (Phiên Sx04-8b per D-S04-13 LAW Option Z Redis pub/sub).
  *
  * Routes:
  *   POST /api/v1/intent           — accept payload, dispatch to AI, return 202 {request_id}
  *   GET  /api/v1/intent/stream    — SSE event stream for given request_id
  *
  * **Cookie auth (D-05 LOCK + ADR-019)**: `icp_session` cookie httpOnly required
- * for GET stream. Phase 1 stub: presence-check only (any non-empty value
- * accepted). JWT verify deferred S-03 First Auth Flow (BRIEF Non-Goals).
+ * for GET stream. Presence-check only (S-02 baseline) — full JWT verify still
+ * via JwtAuthGuard on /action endpoint. EventSource API cannot send custom
+ * Authorization headers, so /stream relies on cookie auto-send.
  *
  * **Cookie parse pattern (C-40)**: Express native does NOT parse cookies. We
  * parse `req.headers.cookie` inline (5 lines) instead of adding `cookie-parser`
- * dependency. Full middleware adoption deferred S-03 alongside JWT guard.
+ * dependency. S-03 T02 globally registered `cookie-parser` middleware in
+ * main.ts so `req.cookies` IS available — but we keep inline parser here as
+ * fallback for robustness + zero-dep S-02 pattern preservation.
  *
  * **Heartbeat (15s per TASKLIST)**: separate `setInterval` loop emits
  * `event: heartbeat\ndata: {"ts": <epoch_ms>}` to keep connection alive +
  * trigger EventSource auto-reconnect on disconnect. NOT in typed map (C-36
  * LOCK — transport keepalive, no client schema).
  *
+ * **S-04 T03 STREAM HANDLER REWRITE (per D-S04-13 LAW Option Z):**
+ *   Phase 1 (S-02 T07) stub fan-out via `IntentService.buildStubSequence()`
+ *   REPLACED with Redis pub/sub subscribe pattern:
+ *     1. Cookie auth + cache existence check unchanged (S-02 baseline)
+ *     2. SSE headers + heartbeat unchanged
+ *     3. Open Redis subscriber via `RedisClient.raw().duplicate()` (per
+ *        ioredis pattern — single subscriber per connection)
+ *     4. Subscribe channel `sse:pubsub:{request_id}`
+ *     5. On Redis message: forward raw message to SSE response (AI publishes
+ *        pre-formatted SSE blocks per `apps/ai/src/tools/redis_publisher.py`
+ *        — Gateway just writes verbatim)
+ *     6. 60s idle timeout for cart_action interrupt (Pattern P2 always-end
+ *        interrupt at rank_finalize) → emit implicit `Command(resume={
+ *        choice:'skip'})` to AI internal /resume + close SSE
+ *     7. Cleanup: unsubscribe + log `sse.pubsub.unsubscribed` with reason
+ *        enum (final_event | client_close | timeout)
+ *
+ * **Ops logs emitted** (per `LOG_CATALOG.md §A` + Phiên Sx04-8b T03 scope):
+ *   - `sse.pubsub.subscribed`   — once at /stream open
+ *   - `sse.pubsub.forwarded`    — debug-level per message forwarded
+ *   - `sse.pubsub.unsubscribed` — once at cleanup with reason
+ *
  * @see slices/S-02_decisions-log.md D-05 + C-28 + C-36/37/38/40
+ * @see slices/S-04_decisions-log.md D-S04-13 LAW Option Z (Redis pub/sub)
  * @see docs/03_API_CONTRACTS.md §1.2 + §3
+ * @see docs/02_DATA_MODEL.md §5 channel `sse:pubsub:{rid}` (ephemeral, no TTL)
+ * @see docs/LOG_CATALOG.md §A.Intent + §A.SSE PubSub
  */
 
 import {
@@ -41,25 +70,45 @@ import {
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import type { Request, Response } from 'express';
+import { AiClient } from '../clients/ai.client';
+import { RedisClient } from '../idempotency/redis.client';
 import { IntentRequestDto } from './dto/intent-request.dto';
-import { IntentService, type SseFrame } from './intent.service';
+import { IntentService } from './intent.service';
 
 /** Lazy tracer per C-28 LOCK. */
 function getTracer(): Tracer {
   return trace.getTracer('gateway.intent.controller');
 }
 
-/** Heartbeat interval per TASKLIST T07 row. */
+/** Heartbeat interval per TASKLIST T07 row (S-02 baseline). */
 const HEARTBEAT_INTERVAL_MS = 15_000;
 
-/** Inter-event delay for stub fan-out (Phase 1 UX simulation; remove V-SLICE). */
-const STUB_FRAME_DELAY_MS = 100;
+/**
+ * S-04 T03 NEW (Phiên Sx04-8b per D-S04-13 LAW Option α):
+ * Idle timeout for cart_action interrupt — graph paused at `rank_finalize`
+ * waits for user cart choice. If user does nothing for 60s, Gateway emits
+ * implicit `Command(resume={choice:'skip'})` to AI internal /resume so graph
+ * can emit terminal `final` event + clean up checkpoint.
+ *
+ * Reset on each Redis message forwarded — only fires after true idleness.
+ */
+const CART_IDLE_TIMEOUT_MS = 60_000;
+
+/** Redis pub/sub channel template per `02_DATA_MODEL.md §5`. */
+const SSE_PUBSUB_CHANNEL_PREFIX = 'sse:pubsub:';
 
 /**
  * Parse `req.headers.cookie` header for a specific cookie name.
- * Returns value (decoded) or null. Per C-40 (inline parse, no cookie-parser dep).
+ * Returns value (decoded) or null. Per C-40 (inline parse, no cookie-parser dep
+ * required — though S-03 T02 wired cookie-parser globally for /auth routes).
  */
 function readCookie(req: Request, name: string): string | null {
+  // Prefer req.cookies if cookie-parser middleware populated it (S-03+).
+  const fromParser = (req as Request & { cookies?: Record<string, string> }).cookies?.[name];
+  if (typeof fromParser === 'string' && fromParser.length > 0) {
+    return fromParser;
+  }
+  // Fallback: parse raw header (S-02 zero-dep pattern).
   const header = req.headers.cookie;
   if (!header) return null;
   const cookies = header.split(';').map((c) => c.trim());
@@ -78,14 +127,9 @@ function readCookie(req: Request, name: string): string | null {
   return null;
 }
 
-/** Sleep helper for stub fan-out timing. */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/** Format one SSE frame string per W3C spec: `event: <name>\ndata: <json>\n\n`. */
-function formatSse(frame: SseFrame): string {
-  return `event: ${frame.event}\ndata: ${JSON.stringify(frame.data)}\n\n`;
+/** Format heartbeat SSE frame string per W3C spec. */
+function formatHeartbeat(): string {
+  return `event: heartbeat\ndata: ${JSON.stringify({ ts: Date.now() })}\n\n`;
 }
 
 @ApiTags('intent')
@@ -93,23 +137,35 @@ function formatSse(frame: SseFrame): string {
 export class IntentController {
   private readonly nestLogger = new NestLogger(IntentController.name);
 
-  constructor(private readonly intentService: IntentService) {}
+  constructor(
+    private readonly intentService: IntentService,
+    private readonly aiClient: AiClient,
+    private readonly redis: RedisClient,
+  ) {}
 
   /**
    * POST /api/v1/intent — dispatch user input to AI service.
    *
-   * Idempotency-Key header gates dedup (T01 middleware). Body validates via
-   * `nestjs-zod` `IntentRequestDto` (Phase 1: JSON only; multipart for
-   * image/voice modality defer V-SLICE).
+   * Idempotency-Key header gated by S-02 base `IdempotencyMiddleware` (wired
+   * in `idempotency.module.ts` for this route). Body validates via
+   * `nestjs-zod` `IntentRequestDto` (S-04 T03 ADD `mode` field per D-S04-03
+   * LAW; default `'ai_augmented'`).
    *
    * Response 202 `{request_id, status: "accepted"}` — client then opens
    * `GET /api/v1/intent/stream?id=<request_id>` via EventSource.
+   *
+   * AI service returns SSE stream + X-Request-Id header; `AiClient.postIntent`
+   * reads header + aborts body (graph runs async at AI side, publishes events
+   * to Redis channel `sse:pubsub:{rid}`).
    */
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Dispatch intent to AI service',
-    description: 'Returns request_id for SSE stream pickup. See `GET /intent/stream`.',
+    description:
+      'Returns request_id for SSE stream pickup via GET /intent/stream?id=<rid>. ' +
+      'S-04 T03: mode field selects Variant B (ai_augmented) or Variant A ' +
+      '(basic_fallback) per D-S04-03 LAW Adaptive Single Endpoint.',
   })
   @ApiBody({ type: IntentRequestDto })
   async dispatch(
@@ -121,15 +177,24 @@ export class IntentController {
   /**
    * GET /api/v1/intent/stream?id=<request_id> — SSE event stream.
    *
-   * Auth: `icp_session` cookie httpOnly (D-05 LOCK; presence-check Phase 1).
-   * Heartbeat: 15s interval per TASKLIST T07.
-   * Stream end: after `final` event, server closes connection (`res.end()`).
+   * Auth: `icp_session` cookie httpOnly (D-05 LOCK; presence-check Phase 1;
+   * future S-XX may add JWT verify since cookie-parser global is ready).
+   *
+   * S-04 T03 BEHAVIOR (per D-S04-13 LAW Option Z Redis pub/sub):
+   *   - Subscribe Redis channel `sse:pubsub:{request_id}`
+   *   - Forward each raw Redis message verbatim to FE EventSource (AI service
+   *     publishes pre-formatted SSE blocks; no Gateway transformation)
+   *   - Heartbeat 15s interval (S-02 baseline)
+   *   - 60s idle timeout (resets on each message) → implicit /resume skip
+   *   - Cleanup unsubscribe on: final event detected / req.close / timeout
    */
   @Get('stream')
   @ApiOperation({
     summary: 'SSE stream of intent events',
     description:
-      'Emits 10 typed events (per 03_API §3) + heartbeat keepalive. Requires icp_session cookie.',
+      'Forwards Redis pub/sub channel `sse:pubsub:{rid}` to FE EventSource. ' +
+      'S-04 T03: 17 typed event types (10 S-02 + 7 S-04) per 03_API §3. ' +
+      'Requires icp_session cookie.',
   })
   @ApiCookieAuth('icp_session')
   async stream(
@@ -140,97 +205,225 @@ export class IntentController {
     const tracer = getTracer();
     const span = tracer.startSpan('gateway.intent.stream');
     await context.with(trace.setSpan(context.active(), span), async () => {
-      try {
-        span.setAttribute('intent.request_id', requestId ?? 'missing');
+      span.setAttribute('intent.request_id', requestId ?? 'missing');
 
-        // 1. Cookie auth check (D-05 + ADR-019).
-        const session = readCookie(req, 'icp_session');
-        if (!session || session.length === 0) {
+      // 1. Cookie auth check (D-05 + ADR-019).
+      const session = readCookie(req, 'icp_session');
+      if (!session || session.length === 0) {
+        this.nestLogger.warn(
+          JSON.stringify({
+            message: 'intent.sse_session_missing',
+            extras: { request_id: requestId },
+          }),
+        );
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'missing icp_session cookie' });
+        span.end();
+        throw new UnauthorizedException({
+          error: { code: 'UNAUTHORIZED', message: 'Missing icp_session cookie' },
+        });
+      }
+
+      // 2. Validate request_id + cache existence check.
+      if (!requestId) {
+        span.end();
+        throw new NotFoundException({
+          error: { code: 'INVALID_INTENT', message: 'Missing query param: id' },
+        });
+      }
+      const cached = await this.intentService.lookup(requestId);
+      if (!cached) {
+        span.end();
+        throw new NotFoundException({
+          error: {
+            code: 'INVALID_INTENT',
+            message: `request_id not found or expired: ${requestId}`,
+          },
+        });
+      }
+
+      // 3. Open SSE response.
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+      res.flushHeaders();
+
+      // Initial colon-prefix comment helps some proxies flush headers.
+      res.write(':connected\n\n');
+
+      this.nestLogger.log(
+        JSON.stringify({
+          message: 'intent.sse_opened',
+          extras: { request_id: requestId },
+        }),
+      );
+
+      // 4. Heartbeat interval — S-02 baseline 15s keep-alive.
+      const heartbeat = setInterval(() => {
+        if (res.writableEnded) return;
+        res.write(formatHeartbeat());
+      }, HEARTBEAT_INTERVAL_MS);
+
+      // 5. Open Redis subscriber via ioredis.duplicate() per D-S04-13 LAW
+      //    Option Z. duplicate() creates a NEW connection from same config;
+      //    required because a connection in subscriber mode cannot issue
+      //    other commands.
+      const subscriber = this.redis.raw().duplicate();
+      const channel = `${SSE_PUBSUB_CHANNEL_PREFIX}${requestId}`;
+      span.setAttribute('redis.channel', channel);
+
+      let cleanupReason: 'final_event' | 'client_close' | 'timeout' = 'client_close';
+      let idleTimeoutId: NodeJS.Timeout | null = null;
+      let cleanedUp = false;
+
+      // Reset idle timeout on each forwarded message. After 60s of no activity,
+      // assume graph is interrupt-paused (cart_action Pattern P2) → emit
+      // implicit /resume with choice='skip' so graph emits terminal events.
+      const resetIdleTimeout = (): void => {
+        if (idleTimeoutId) clearTimeout(idleTimeoutId);
+        idleTimeoutId = setTimeout(async () => {
+          if (cleanedUp || res.writableEnded) return;
+          cleanupReason = 'timeout';
           this.nestLogger.warn(
             JSON.stringify({
-              message: 'intent.sse_session_missing',
-              extras: { request_id: requestId },
+              message: 'intent.sse_idle_timeout',
+              extras: {
+                request_id: requestId,
+                channel,
+                timeout_ms: CART_IDLE_TIMEOUT_MS,
+              },
             }),
           );
-          span.setStatus({ code: SpanStatusCode.ERROR, message: 'missing icp_session cookie' });
-          throw new UnauthorizedException({
-            error: { code: 'UNAUTHORIZED', message: 'Missing icp_session cookie' },
-          });
-        }
+          try {
+            // Best-effort implicit skip resume. If AI graph already finished
+            // or no interrupt pending, AI returns 4xx/5xx — we swallow since
+            // we're closing anyway.
+            await this.aiClient.postIntentResume(requestId, {
+              choice: 'skip',
+              _meta: { attempt_n: 1 },
+            });
+          } catch (err) {
+            this.nestLogger.warn(
+              JSON.stringify({
+                message: 'intent.sse_idle_timeout_resume_failed',
+                error_message: err instanceof Error ? err.message : String(err),
+                extras: { request_id: requestId },
+              }),
+            );
+          }
+          if (!res.writableEnded) res.end();
+        }, CART_IDLE_TIMEOUT_MS);
+      };
 
-        // 2. Lookup cached AI response.
-        if (!requestId) {
-          throw new NotFoundException({
-            error: { code: 'INVALID_INTENT', message: 'Missing query param: id' },
-          });
+      const doCleanup = async (): Promise<void> => {
+        if (cleanedUp) return;
+        cleanedUp = true;
+        clearInterval(heartbeat);
+        if (idleTimeoutId) clearTimeout(idleTimeoutId);
+        try {
+          await subscriber.unsubscribe(channel);
+        } catch {
+          // ignore — subscriber may already be closing
         }
-        const ai = await this.intentService.lookup(requestId);
-        if (!ai) {
-          throw new NotFoundException({
-            error: {
-              code: 'INVALID_INTENT',
-              message: `request_id not found or expired: ${requestId}`,
-            },
-          });
+        try {
+          await subscriber.quit();
+        } catch {
+          // ignore
         }
-
-        // 3. Open SSE stream.
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
-        res.flushHeaders();
-
         this.nestLogger.log(
           JSON.stringify({
-            message: 'intent.sse_opened',
-            extras: { request_id: requestId, intent: ai.intent },
+            message: 'sse.pubsub.unsubscribed',
+            extras: { channel, request_id: requestId, reason: cleanupReason },
+          }),
+        );
+      };
+
+      // Subscribe + register message handler BEFORE awaiting subscribe call
+      // to avoid race where graph publishes before we're listening.
+      subscriber.on('message', (chan: string, raw: string) => {
+        if (chan !== channel) return;
+        if (res.writableEnded) return;
+
+        // Raw message from AI Python `redis.publish()` is pre-formatted SSE
+        // block: `event: <type>\ndata: <json>\n\n`. Write verbatim — Gateway
+        // is pure transport.
+        const block = raw.endsWith('\n\n') ? raw : raw + '\n\n';
+        res.write(block);
+
+        // Extract event_type for telemetry (parse first line `event: <name>`).
+        let eventType = 'unknown';
+        const firstNewline = raw.indexOf('\n');
+        if (firstNewline > 0) {
+          const firstLine = raw.slice(0, firstNewline);
+          if (firstLine.startsWith('event: ')) {
+            eventType = firstLine.slice(7).trim();
+          }
+        }
+        this.nestLogger.debug(
+          JSON.stringify({
+            message: 'sse.pubsub.forwarded',
+            extras: { channel, event_type: eventType, request_id: requestId },
           }),
         );
 
-        // 4. Heartbeat interval.
-        const heartbeat = setInterval(() => {
-          if (res.writableEnded) return;
-          res.write(formatSse({ event: 'heartbeat', data: { ts: Date.now() } }));
-          this.nestLogger.debug(
-            JSON.stringify({
-              message: 'intent.sse_heartbeat_sent',
-              extras: { request_id: requestId },
-            }),
-          );
-        }, HEARTBEAT_INTERVAL_MS);
-
-        // Cleanup on client disconnect.
-        req.on('close', () => {
-          clearInterval(heartbeat);
-          if (!res.writableEnded) res.end();
-        });
-
-        // 5. Emit fan-out sequence (Phase 1 stub) — 4 frames with delay.
-        try {
-          for (const frame of this.intentService.buildStubSequence(ai)) {
-            await sleep(STUB_FRAME_DELAY_MS);
-            if (res.writableEnded) break;
-            res.write(formatSse(frame));
-          }
-        } finally {
-          clearInterval(heartbeat);
-          if (!res.writableEnded) res.end();
-          this.nestLogger.log(
-            JSON.stringify({
-              message: 'intent.sse_closed',
-              extras: { request_id: requestId, intent: ai.intent },
-            }),
-          );
+        // Detect terminal `final` event → cleanup + close.
+        if (eventType === 'final') {
+          cleanupReason = 'final_event';
+          // Schedule cleanup async (don't block message handler).
+          setImmediate(async () => {
+            await doCleanup();
+            if (!res.writableEnded) res.end();
+          });
+          return;
         }
+
+        // Any non-final message resets the idle timer.
+        resetIdleTimeout();
+      });
+
+      try {
+        await subscriber.subscribe(channel);
+        this.nestLogger.log(
+          JSON.stringify({
+            message: 'sse.pubsub.subscribed',
+            extras: { channel, request_id: requestId },
+          }),
+        );
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         span.recordException(err instanceof Error ? err : new Error(msg));
         span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
-        throw err;
-      } finally {
+        this.nestLogger.error(
+          JSON.stringify({
+            message: 'sse.pubsub.subscribe_failed',
+            error_message: msg,
+            extras: { channel, request_id: requestId },
+          }),
+        );
+        clearInterval(heartbeat);
+        await doCleanup();
+        if (!res.writableEnded) res.end();
         span.end();
+        return;
       }
+
+      // Start idle timeout AFTER subscribe — covers entire SSE lifetime.
+      resetIdleTimeout();
+
+      // 6. Cleanup on client disconnect (browser tab close, FE EventSource.close()).
+      req.on('close', async () => {
+        if (cleanupReason === 'client_close') {
+          // Only set reason if not already set by final_event or timeout path.
+        }
+        await doCleanup();
+      });
+
+      // Note: span.end() called inside cleanup paths above OR here if we
+      // reach the end of the handler synchronously. Since SSE keeps the
+      // response open, we end the span at subscription complete (manual
+      // span scope is the SETUP work, not the entire stream lifetime —
+      // streaming spans would be high-cardinality and unhelpful).
+      span.end();
     });
   }
 }

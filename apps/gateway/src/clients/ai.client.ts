@@ -5,11 +5,36 @@
  *
  * S-02 T05 (Phiên 26) — Trace propagation E2E verify Gateway → AI → MCP.
  *
+ * **S-04 T03 amendment (Phiên Sx04-8b per D-S04-13 LAW Option Z + Pattern A):**
+ * `postIntent()` REFACTOR — AI service now returns SSE stream (text/event-stream)
+ * instead of JSON. Gateway pattern: read `X-Request-Id` response header, abort
+ * response body via `AbortController` (graph thread already spawned fire-and-forget
+ * at AI side per `apps/ai/src/main.py` line 450), return `{request_id}` only.
+ * AI side publishes SSE events to Redis pub/sub channel `sse:pubsub:{rid}` —
+ * Gateway `intent.controller.ts` /stream handler subscribes the channel to
+ * forward to FE EventSource (Option Z architecture).
+ *
+ * `postIntentResume()` NEW — Gateway forwards `POST /api/v1/intent/{rid}/action`
+ * body to AI internal `POST /intent/{rid}/resume` endpoint. AI calls
+ * `graph.astream(Command(resume=<choice>), config={'thread_id': rid})` resuming
+ * graph from interrupt checkpoint (Pattern A semantics per
+ * `03_API_CONTRACTS.md §1.2` line 95-96).
+ *
+ * **Why header-fetch + AbortController pattern:**
+ *   - Graph at AI side is fire-and-forget background thread; does NOT need
+ *     Gateway to consume SSE body to keep graph running.
+ *   - Gateway just needs `request_id` to (a) cache + (b) subscribe Redis
+ *     channel from /stream handler.
+ *   - Consuming SSE body in `postIntent()` would block Gateway dispatch
+ *     handler for entire intent duration (10s+ with Variant B LLM calls).
+ *   - AbortController.abort() releases socket back to fetch pool immediately
+ *     after headers received — clean resource handoff to Redis pub/sub.
+ *
  * Why this exists:
  *   - HealthService.readiness() needs to ping AI service (replaces T01 'unknown'
  *     placeholder; backfills the readiness report gap honestly).
- *   - T07 SSE wrapper will use AiClient.postIntent() to forward user intents
- *     to AI service. T05 provides the client; T07 wires the controller.
+ *   - T07 SSE wrapper uses AiClient.postIntent() to dispatch user intents
+ *     to AI service. S-04 T03 refactor matches SSE-streaming reality.
  *
  * Trace propagation pattern:
  *   - Native Node 20 `fetch()` is auto-instrumented by
@@ -27,13 +52,14 @@
  *   - docs/06_OBSERVABILITY.md §9.1 line 419 — "HTTP: traceparent header tự
  *     động (auto-instrumentation)"
  *   - docs/06_OBSERVABILITY.md §9.2 — span naming convention
- *   - docs/03_API_CONTRACTS.md §1.2 — POST /intent body shape (T07 will wire)
- *   - apps/ai/src/main.py — AI service endpoints (GET /health, POST /intent)
- *   - apps/ai/src/tools/mcp_client.py — Python sibling client pattern (T03)
+ *   - docs/03_API_CONTRACTS.md §1.2 — POST /intent body shape + /action endpoint
+ *   - apps/ai/src/main.py line 392-475 (POST /intent) + 477-530 (/resume)
  *
  * Decisions applied:
  *   - D-01 (S-02): OTLP gRPC for exporter — outgoing traces flow through
  *     Gateway's already-configured OTLP pipeline (no client-specific config).
+ *   - D-S04-13 LAW (S-04 T02 Phiên Sx04-3): Option Z Redis pub/sub + Pattern A
+ *     interrupt+resume → /intent SSE stream + /resume internal endpoint.
  */
 
 import { Injectable, Logger as NestLogger } from '@nestjs/common';
@@ -52,30 +78,64 @@ export interface AiHealthResponse {
 }
 
 /**
- * Shape of AI service `POST /intent` response (Phase 1 stub).
- * Per apps/ai/src/main.py intent() handler. T07 will replace with SSE stream.
+ * Shape of AI service `POST /intent` response — S-04 T03 SHRUNK.
+ *
+ * Previously (S-02 stub): `{request_id, modality, intent, confidence, stub}`.
+ * S-04 T03 (Phiên Sx04-8b per D-S04-13 LAW): AI service returns SSE stream;
+ * Gateway only reads `X-Request-Id` response header. Other fields no longer
+ * meaningful (intent classification now happens inside graph nodes that
+ * publish SSE events directly).
  */
 export interface AiIntentResponse {
   request_id: string;
-  modality: string;
-  intent: string; // 'unknown' in Phase 1 per D-03
-  confidence: number; // 0.0 in Phase 1
-  stub: true;
+}
+
+/**
+ * Shape of AI service `POST /intent/{rid}/resume` response (S-04 T03 NEW).
+ *
+ * Per `apps/ai/src/main.py` line 530: AI returns 202 JSON `{status, request_id}`
+ * immediately after spawning graph resume thread (fire-and-forget). Graph
+ * continues publishing SSE events to same `sse:pubsub:{rid}` channel that
+ * Gateway /stream handler is already subscribed to.
+ */
+export interface AiIntentResumeResponse {
+  request_id: string;
+  status: 'accepted';
 }
 
 export interface PostIntentBody {
   modality: 'text' | 'image' | 'voice';
   content?: string;
   hint?: 'import' | 'buy' | 'search' | 'recommend';
+  /** S-04 NEW per D-S04-03 LAW Adaptive Single Endpoint. */
+  mode?: 'ai_augmented' | 'basic_fallback';
+}
+
+/**
+ * Resume body forwarded from Gateway `intent-action.controller.ts` to AI
+ * internal `POST /intent/{rid}/resume`. Shape mirrors
+ * `apps/gateway/src/intent/dto/intent-action.dto.ts`.
+ */
+export interface PostIntentResumeBody {
+  choice:
+    | 'accept'
+    | 'reject'
+    | 'retry_ai'
+    | 'continue_basic'
+    | 'add_to_cart'
+    | 'skip';
+  value?: Record<string, unknown>;
+  _meta?: { attempt_n: number };
 }
 
 /**
  * Default request timeout. 5s for /health (should be fast); 10s for /intent
- * (LangGraph node execution + future LLM round-trip). T05 only uses /health
- * for readiness; /intent is exposed for T07.
+ * header read (graph spawn is sub-100ms at AI side, just network); 10s for
+ * /resume (AI returns 202 immediately after spawning background thread).
  */
 const HEALTH_TIMEOUT_MS = 5_000;
 const INTENT_TIMEOUT_MS = 10_000;
+const RESUME_TIMEOUT_MS = 10_000;
 
 /**
  * Lazy tracer resolution (S-02 T05 Phiên 26 mid-fix per C-28).
@@ -116,11 +176,7 @@ export class AiClient {
    * Used by HealthService.readiness() to populate `.deps.ai` field.
    * Returns `null` on any network/HTTP/parse error (caller maps to 'down').
    *
-   * Span: `gateway.client.ai.get_health` (manual) + auto child fetch span
-   * (when undici instrumentation patches native fetch — currently no-op in
-   * `@opentelemetry/instrumentation-undici@0.5.0` per debug log "No modules
-   * instrumentation has been defined", KI-T05-NEW; manual span is sole
-   * Tempo evidence for outgoing AI calls until SDK bump unblocks undici).
+   * Span: `gateway.client.ai.get_health` (manual) + auto child fetch span.
    */
   async getHealth(): Promise<AiHealthResponse | null> {
     const tracer = getTracer();
@@ -175,16 +231,25 @@ export class AiClient {
   }
 
   /**
-   * POST {AI_SERVICE_URL}/intent — Phase 1 JSON request/response. T07 will
-   * replace consumption with SSE streaming (AI side already SSE-ready per
-   * 03_API_CONTRACTS.md §1.2; Phase 1 stub returns plain JSON).
+   * POST {AI_SERVICE_URL}/intent — dispatch intent, read X-Request-Id, abort body.
    *
-   * NOT consumed by T05 readiness — exposed here so T07 controller can inject
-   * AiClient + call this. T05 just needs the method to exist for clean DI
-   * boundaries (avoid T07 having to patch AiClient mid-slice).
+   * S-04 T03 refactor (Phiên Sx04-8b per D-S04-13 LAW Option Z):
+   *   AI service returns `text/event-stream` SSE response. Gateway does NOT
+   *   consume the body — graph thread already spawned at AI side (fire-and-
+   *   forget per `apps/ai/src/main.py` line 450). Gateway just needs
+   *   `X-Request-Id` header value to:
+   *     1. Cache in Redis (`intent:cache:{rid}` TTL 60s) for /stream auth check
+   *     2. Return to FE so FE can open `GET /api/v1/intent/stream?id=<rid>`
    *
-   * Throws on non-2xx or network error (caller handles via NestJS exception
-   * filter when wired in T07).
+   * Pattern (verified Phiên Sx04-7 T02 smoke iter 7):
+   *   - `fetch()` returns immediately on headers received (response body
+   *     stream not consumed)
+   *   - Read `response.headers.get('x-request-id')` (lowercase per Fetch spec)
+   *   - `controller.abort()` releases socket immediately to fetch pool
+   *   - Graph continues async at AI side; events flow via Redis pub/sub
+   *     channel `sse:pubsub:{rid}` → Gateway /stream handler picks up
+   *
+   * Throws on non-2xx, missing X-Request-Id header, or network error.
    *
    * Span: `gateway.client.ai.post_intent` (manual) + auto child fetch span.
    */
@@ -196,27 +261,147 @@ export class AiClient {
       span.setAttribute('http.url', url);
       span.setAttribute('peer.service', 'ai');
       span.setAttribute('ai.modality', body.modality);
+      if (body.mode) {
+        span.setAttribute('ai.mode', body.mode);
+      }
       const startedAt = Date.now();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), INTENT_TIMEOUT_MS);
+
       try {
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(INTENT_TIMEOUT_MS),
+          signal: controller.signal,
         });
         span.setAttribute('http.status_code', response.status);
+
         if (!response.ok) {
           const errMsg = `AI /intent returned ${response.status}`;
           span.setStatus({ code: SpanStatusCode.ERROR, message: errMsg });
           throw new Error(errMsg);
         }
-        const parsed = (await response.json()) as AiIntentResponse;
-        span.setAttribute('ai.intent', parsed.intent);
-        span.setAttribute('ai.confidence', parsed.confidence);
+
+        // Read X-Request-Id BEFORE aborting body. Fetch headers normalize
+        // to lowercase per WHATWG spec.
+        const requestId = response.headers.get('x-request-id');
+        if (!requestId) {
+          throw new Error('AI /intent response missing X-Request-Id header');
+        }
+
+        span.setAttribute('ai.request_id', requestId);
+
+        // Abort body — we don't consume SSE stream; graph runs async at AI.
+        // Releases socket back to fetch connection pool immediately.
+        controller.abort();
+
         this.nestLogger.debug(
           JSON.stringify({
-            message: 'ai_client.intent_ok',
-            extras: { duration_ms: Date.now() - startedAt, intent: parsed.intent },
+            message: 'ai_client.intent_dispatched',
+            extras: { duration_ms: Date.now() - startedAt, request_id: requestId },
+          }),
+        );
+
+        return { request_id: requestId };
+      } catch (err) {
+        // AbortError from our own controller.abort() after reading header is
+        // NORMAL flow (not a failure). Detect via signal already aborted +
+        // requestId resolved path returning above.
+        const msg = err instanceof Error ? err.message : String(err);
+        // If abort was triggered by timeout (not our header-read success path),
+        // signal will be aborted but we never set requestId. The throw above
+        // for missing header catches that case explicitly. Other AbortError
+        // here = legitimate network/timeout failure.
+        if (err instanceof Error && err.name === 'AbortError') {
+          // Distinguish controller.abort() (post-header) from timeout abort:
+          // we only reach this catch if header read failed BEFORE we called
+          // controller.abort() ourselves. So AbortError here = timeout.
+          span.recordException(err);
+          span.setStatus({ code: SpanStatusCode.ERROR, message: 'AI /intent timeout' });
+          this.nestLogger.error(
+            JSON.stringify({
+              message: 'ai_client.intent_timeout',
+              extras: { duration_ms: Date.now() - startedAt, timeout_ms: INTENT_TIMEOUT_MS },
+            }),
+          );
+          throw new Error('AI /intent timeout');
+        }
+        span.recordException(err instanceof Error ? err : new Error(msg));
+        span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
+        this.nestLogger.error(
+          JSON.stringify({
+            message: 'ai_client.intent_failed',
+            error_message: msg,
+            extras: { duration_ms: Date.now() - startedAt },
+          }),
+        );
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+        span.end();
+      }
+    });
+  }
+
+  /**
+   * POST {AI_SERVICE_URL}/intent/{rid}/resume — forward action body to AI.
+   *
+   * S-04 T03 NEW (Phiên Sx04-8b per D-S04-13 LAW Pattern A interrupt+resume).
+   *
+   * Called by Gateway `intent-action.controller.ts` after Idempotency-Key
+   * middleware passes. Forwards request body verbatim to AI internal endpoint;
+   * AI calls `graph.astream(Command(resume=<choice>), thread_id=rid)` to
+   * resume graph from interrupt checkpoint.
+   *
+   * Returns 202 JSON immediately (AI spawns background resume thread); new
+   * SSE events flow to same `sse:pubsub:{rid}` channel Gateway /stream is
+   * already subscribed to. No FE reconnect required.
+   *
+   * Span: `gateway.client.ai.post_intent_resume` (manual) + auto child fetch.
+   */
+  async postIntentResume(
+    rid: string,
+    body: PostIntentResumeBody,
+  ): Promise<AiIntentResumeResponse> {
+    const tracer = getTracer();
+    const span = tracer.startSpan('gateway.client.ai.post_intent_resume');
+    return context.with(trace.setSpan(context.active(), span), async () => {
+      const url = `${this.baseUrl}/intent/${rid}/resume`;
+      span.setAttribute('http.url', url);
+      span.setAttribute('peer.service', 'ai');
+      span.setAttribute('ai.request_id', rid);
+      span.setAttribute('ai.resume.choice', body.choice);
+      if (body._meta?.attempt_n) {
+        span.setAttribute('ai.resume.attempt_n', body._meta.attempt_n);
+      }
+      const startedAt = Date.now();
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(RESUME_TIMEOUT_MS),
+        });
+        span.setAttribute('http.status_code', response.status);
+
+        if (!response.ok) {
+          const errMsg = `AI /intent/${rid}/resume returned ${response.status}`;
+          span.setStatus({ code: SpanStatusCode.ERROR, message: errMsg });
+          throw new Error(errMsg);
+        }
+
+        const parsed = (await response.json()) as AiIntentResumeResponse;
+        this.nestLogger.debug(
+          JSON.stringify({
+            message: 'ai_client.intent_resume_ok',
+            extras: {
+              duration_ms: Date.now() - startedAt,
+              request_id: rid,
+              choice: body.choice,
+            },
           }),
         );
         return parsed;
@@ -226,9 +411,9 @@ export class AiClient {
         span.setStatus({ code: SpanStatusCode.ERROR, message: msg });
         this.nestLogger.error(
           JSON.stringify({
-            message: 'ai_client.intent_failed',
+            message: 'ai_client.intent_resume_failed',
             error_message: msg,
-            extras: { duration_ms: Date.now() - startedAt },
+            extras: { duration_ms: Date.now() - startedAt, request_id: rid },
           }),
         );
         throw err;

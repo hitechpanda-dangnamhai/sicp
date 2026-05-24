@@ -10,13 +10,7 @@
  * Pattern: `nestjs-zod` `createZodDto()` per T01 + T06 convention (NOT
  * class-validator — global pipe absent per main.ts comment).
  *
- * **S-04 T03 amendment (Phiên Sx04-8b per D-S04-03 LAW):** ADD optional `mode`
- * field. `'ai_augmented'` (default) for Intent 03 Variant B full graph;
- * `'basic_fallback'` for Variant A baseline graceful degrade tier. Other
- * intents currently ignore this field (Intent 03 first-need).
- *
- * @see docs/03_API_CONTRACTS.md §1.2 (multipart for image/voice deferred V-SLICE;
- *      `mode` field S-04 NEW per D-S04-03 LAW)
+ * @see docs/03_API_CONTRACTS.md §1.2 (multipart for image/voice deferred V-SLICE)
  */
 
 import { createZodDto } from 'nestjs-zod';
@@ -26,13 +20,6 @@ export const IntentRequestSchema = z.object({
   modality: z.enum(['text', 'image', 'voice']),
   content: z.string().min(1).max(5000).optional(),
   hint: z.enum(['import', 'buy', 'search', 'recommend']).optional(),
-  /**
-   * S-04 NEW per D-S04-03 LAW (Phiên Sx04-8b T03).
-   * - `'ai_augmented'` (default) — Variant B full graph
-   * - `'basic_fallback'` — Variant A baseline (user-explicit degrade)
-   * Auto-degrade trigger (LLM timeout) handled server-side, NOT via this field.
-   */
-  mode: z.enum(['ai_augmented', 'basic_fallback']).optional().default('ai_augmented'),
 });
 
 export class IntentRequestDto extends createZodDto(IntentRequestSchema) {}

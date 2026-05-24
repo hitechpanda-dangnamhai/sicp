@@ -218,52 +218,23 @@ export const SseTypoSuggestionEvent = z.object({
  *
  * Mockup `intent-03B-state-C-error.html` lines 153-175.
  *
- * **Mockup-driven field requirements (Rule 6 MOCKUP IS LAW):**
- * - `title` (mockup line 160): error card heading "Mô hình AI phản hồi chậm"
- * - `user_message` (mockup line 161): error card body explanation
- * - `error_code` (mockup line 165): displayed as "E_LLM_TIMEOUT" in monospace
- * - `trace_id` (mockup line 166): displayed truncated as "b7e1...d042" — FE
- *   truncates client-side from full 32-char hex
- *
- * **`retry_actions` field NOT included** — mockup lines 171+173 hardcode
- * button labels "Thử lại với AI" / "Dùng bản cơ bản" FE-side per Rule 6.
- * Variant A error card (mockup intent-03A-state-C-error.html) uses
- * different labels ("Thử lại" / "Báo lỗi") confirming per-state hardcoded
- * pattern. FE T05 maps `choice` enum to button rendering, server doesn't
- * need to govern label strings.
- *
- * Pairs with AI ops log `intent.degraded` (LOG_CATALOG.md line 44 uses
- * `from_mode`/`to_mode` field naming — DISTINCT from this SSE event which
- * uses `from`/`to` per `03_API_CONTRACTS.md §3` line 335. Two separate
- * contracts for ops log vs SSE event by design.) + FE behavior event
+ * Pairs with AI ops log `intent.degraded` + FE behavior event
  * `search.variant_degraded` (correlated by `trace_id`).
  */
 export const SseVariantDegradedEvent = z.object({
-  /** Mode flip source per `03_API §3` line 335 (DISTINCT from ops log `from_mode`). */
   from: z.literal('ai_augmented'),
-  /** Mode flip destination per `03_API §3` line 335. */
   to: z.literal('basic_fallback'),
   reason: z.enum(['llm_timeout', 'llm_error', 'user_explicit']),
   /** S-04 NEW error codes per `03_API §4` + `LlmErrorCodeSchema`. */
-  error_code: z.string(),
-  /**
-   * W3C trace_id hex (32 chars) — Rule 6 mockup line 166 displays truncated
-   * "b7e1...d042". FE truncates client-side. Sourced from AI service OTel
-   * span context per `apps/ai/src/main.py` line 446.
-   */
-  trace_id: z.string(),
-  /**
-   * Error card title — Rule 6 mockup `intent-03B-state-C-error.html` line 160
-   * LOCKED string "Mô hình AI phản hồi chậm". Server-driven so future error
-   * types can vary heading per error_code.
-   */
-  title: z.string(),
-  /**
-   * Error card body — Rule 6 mockup line 161 LOCKED string explaining the
-   * degrade. Field renamed from `body` (AI Phiên Sx04-5 emit) to
-   * `user_message` per `03_API §3` line 338 spec.
-   */
+  error_code: z.string().optional(),
+  trace_id: z.string().optional(),
   user_message: z.string(),
+  retry_actions: z.array(
+    z.object({
+      label: z.string(),
+      value: z.enum(['retry_ai', 'continue_basic']),
+    }),
+  ),
 });
 
 /**
