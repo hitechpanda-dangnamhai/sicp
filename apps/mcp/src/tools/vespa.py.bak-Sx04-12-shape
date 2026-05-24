@@ -71,9 +71,7 @@ def _vespa_url() -> str:
 
 
 def _build_yql(
-    query: str, rank_profile: str, limit: int, category_filter: str | None,
-    price_min: int | None = None, price_max: int | None = None,
-    brand_filter: str | None = None
+    query: str, rank_profile: str, limit: int, category_filter: str | None
 ) -> str:
     """Build YQL string with embed(@query, clip_multilingual) per D-S04-10 LAW.
 
@@ -107,29 +105,12 @@ def _build_yql(
         # Inline string literal — category_filter is whitelisted enum elsewhere.
         where_parts.append(f'category contains "{category_filter}"')
 
-    # Phiên Sx04-12 fix — price filter clauses (LLM-extracted from query)
-    if price_min is not None:
-        where_parts.append(f'price >= {int(price_min)}')
-    if price_max is not None:
-        where_parts.append(f'price <= {int(price_max)}')
-
-    # Phiên Sx04-12 fix — brand filter clause (LLM-extracted)
-    # Vespa data stores brand UPPERCASE (e.g. "TUONG AN", "CAI LAN", "MAGGI")
-    # but LLM extracts mixed case ("Tuong An"). Vespa `contains` is case-
-    # SENSITIVE on string fields — must uppercase brand to match data.
-    # Escape double-quotes to prevent YQL injection.
-    if brand_filter:
-        safe_brand = brand_filter.upper().replace('"', '\\"')
-        where_parts.append(f'brand contains "{safe_brand}"')
-
     where_clause = " and ".join(where_parts)
     return f"select * from product where {where_clause} limit {int(limit)}"
 
 
 def _build_request_body(
-    query: str, rank_profile: str, limit: int, category_filter: str | None,
-    price_min: int | None = None, price_max: int | None = None,
-    brand_filter: str | None = None
+    query: str, rank_profile: str, limit: int, category_filter: str | None
 ) -> dict[str, Any]:
     """Build Vespa search request body per Vespa search REST API spec.
 
@@ -153,7 +134,7 @@ def _build_request_body(
     rank-profile (verified empirically Phiên Sx04-7 smoke test).
     """
     body: dict[str, Any] = {
-        "yql": _build_yql(query, rank_profile, limit, category_filter, price_min, price_max, brand_filter),
+        "yql": _build_yql(query, rank_profile, limit, category_filter),
         "query": query,
         "ranking.profile": rank_profile,
         # Phiên Sx04-7 fix: use default summary class to include all document
@@ -214,30 +195,15 @@ def _hit_to_product(hit: dict[str, Any], rank_profile: str) -> dict[str, Any]:
     fields = hit.get("fields", {})
     return {
         "id": fields.get("id") or fields.get("doc_id") or hit.get("id", ""),
-        # Phiên Sx04-12 fix — product_id alias for FE SearchProductItem.product_id field
-        "product_id": fields.get("id") or fields.get("doc_id") or hit.get("id", ""),
         "merchant_id": fields.get("merchant_id", ""),
         "title": fields.get("title", ""),
-        # Phiên Sx04-12 fix — `name` alias for FE SearchProductItem.name (FE field naming)
-        "name": fields.get("title", ""),
         "description": fields.get("description"),
         "category": fields.get("category", ""),
         "attributes": fields.get("attributes") or {},
-        # Phiên Sx04-12 fix — brand top-level for FE SearchProductItem.brand (was strip)
-        "brand": fields.get("brand", ""),
         "price": int(fields.get("price", 0)),
-        # Phiên Sx04-12 fix — original_price for FE strikethrough rendering
-        "original_price": int(fields.get("original_price", 0)) or None,
         "stock": int(fields.get("stock", 0)),
         "image_url": fields.get("image_url"),
-        # Phiên Sx04-12 fix — image_gradient + image_icon for FE card visual fields
-        "image_gradient": fields.get("image_gradient"),
-        "image_icon": fields.get("icon_hint"),
         "trend_score": float(fields.get("trend_score", 0.0)),
-        # Phiên Sx04-12 fix — rating + sold_count for FE optional rendering
-        "rating": float(fields.get("rating_avg", 0.0)) or None,
-        "rating_count": int(fields.get("rating_count", 0)) or None,
-        "sold_count": int(fields.get("sold_count", 0)) or None,
         "status": fields.get("status", "active"),
         # S-04 T02 NEW augmentation (D-S04-14 LAW Variant B exception):
         "match_score": _extract_match_score(hit, rank_profile),
@@ -295,30 +261,7 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
     if category_filter is not None and not isinstance(category_filter, str):
         raise ValueError("'category_filter' must be string or null")
 
-    # Phiên Sx04-12 fix — accept brand_filter param (LLM-extracted from query)
-    brand_filter = params.get("brand_filter")
-    if brand_filter is not None and not isinstance(brand_filter, str):
-        raise ValueError("'brand_filter' must be string or null")
-
-    # Phiên Sx04-12 fix — accept price_min / price_max for query-based filtering
-    price_min = params.get("price_min")
-    if price_min is not None:
-        try:
-            price_min = int(price_min)
-            if price_min < 0:
-                raise ValueError("'price_min' must be >= 0")
-        except (TypeError, ValueError) as e:
-            raise ValueError(f"'price_min' must be int or null; got {params.get('price_min')!r}") from e
-    price_max = params.get("price_max")
-    if price_max is not None:
-        try:
-            price_max = int(price_max)
-            if price_max < 0:
-                raise ValueError("'price_max' must be >= 0")
-        except (TypeError, ValueError) as e:
-            raise ValueError(f"'price_max' must be int or null; got {params.get('price_max')!r}") from e
-
-    body = _build_request_body(query, rank_profile, limit, category_filter, price_min, price_max, brand_filter)
+    body = _build_request_body(query, rank_profile, limit, category_filter)
     url = _vespa_url()
     headers = _build_headers()
 

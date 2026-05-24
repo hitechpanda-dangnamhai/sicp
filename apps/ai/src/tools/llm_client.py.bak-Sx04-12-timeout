@@ -70,7 +70,7 @@ _logger = structlog.get_logger()
 # 5s timeout per call (Phiên Sx04-7 amendment per D-S04-15; was 2s in D-S04-13
 # LAW + D-S04-14 LAW emit time, increased to accommodate VN→Google network
 # round-trip latency observed in smoke tests).
-DEFAULT_TIMEOUT_S = 15.0
+DEFAULT_TIMEOUT_S = 5.0
 
 
 class LLMError(Exception):

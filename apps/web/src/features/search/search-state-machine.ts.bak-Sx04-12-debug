@@ -245,10 +245,6 @@ export function filterProductsByTier(
  * batches via setState callback pattern in useSearchStream.
  */
 export function reduceState(state: SearchState, action: SearchAction): SearchState {
-  // ─── Sx04-12 DEBUG: trace SSE actions hitting reducer ───
-  if (typeof window !== 'undefined') {
-    console.log('[reduce]', action.type, 'kind_before=', state.kind, action);
-  }
   switch (action.type) {
     case 'submit':
       // Idle → streaming. Reset all SSE-derived fields. Preserve attemptN (caller mutates if retry).

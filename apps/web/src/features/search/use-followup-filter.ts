@@ -16,7 +16,7 @@
  *   Tap mutates filter overlay + re-triggers same-query search via submitQuery.
  *   S-04 stub: re-submit query with same content (BE-side filter mutation deferred S-XX).
  * - D-S04-03 LAW: Variant A only — page-level conditional render guards visibility.
- * - W3 LOCK: 5 search.* behavior events deferred T06 — // TODO T06 comments.
+ * - W3 LOCK: search.followup_filter_tapped wired T06 Phiên Sx04-12 (replaces TODO).
  * - C-15 'use client' for useCallback.
  *
  * Consumer (T05 /intent-03/page.tsx):
@@ -29,6 +29,7 @@
 import { useCallback, useMemo } from 'react';
 import type { FilterChipSpec, FilterPayload } from '@/components/icp/molecules';
 import type { SearchMode } from './search-state-machine';
+import { trackSearchFollowupFilterTapped } from './tracking-hooks';
 
 /**
  * 3 default Variant A followup filter chips per D-S04-08 LAW.
@@ -67,10 +68,15 @@ export function useFollowupFilter(
 
   const handleFilterTap = useCallback(
     (filter: FilterPayload, label: string) => {
-      // TODO T06: emit `search.followup_filter_tapped` {query, filter_label: label,
-      //                                                  filter_position: idx, filter_payload: filter}
+      // D-S04-08 LAW: emit search.followup_filter_tapped behavior event.
+      // T06 Phiên Sx04-12 — wire via tracking-hooks (replaces deferred stub).
+      const position = VARIANT_A_FOLLOWUP_CHIPS.findIndex((c) => c.label === label);
+      trackSearchFollowupFilterTapped({
+        query: currentQuery,
+        filter_label: label,
+        filter_position: position >= 0 ? position : 0,
+      });
       void filter;
-      void label;
       // S-04 stub: re-submit same query in basic_fallback mode.
       // S-XX (post-S-04) will add BE-side filter merge into query state via /action POST.
       void submitQuery(currentQuery, 'basic_fallback');

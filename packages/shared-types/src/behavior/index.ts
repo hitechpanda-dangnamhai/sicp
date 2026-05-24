@@ -29,6 +29,7 @@
  * S-02 T06 emit. Extended S-03 T03 Phiên 33 (+5 schema re-exports from
  * 3 new files: auth-events / nav-events / error-events). Extended S-03 T03b
  * Phiên 36 (+1 re-export NavTileClickedPropertiesSchema per D-11 + C-23 R1).
+ * Extended S-04 T06 Phiên Sx04-12 (+5 re-exports Search* per D-S04-07/08/13/14 LAW).
  */
 
 // Tracker contracts (canonical BehaviorEvent + batch request/response)
@@ -71,3 +72,12 @@ export {
 
 // S-03 T03 — Error subset (1 schema per 07_BEHAVIOR §3.8 — added Phiên 30 C-09)
 export { ErrorReportRequestedPropertiesSchema } from './error-events.js';
+
+// S-04 T06 (Phiên Sx04-12) — Discovery subset (5 schemas per 07_BEHAVIOR §3.2 LOCKED Phiên Sx04-4)
+export {
+  SearchSuggestedChipTappedPropertiesSchema,
+  SearchFollowupFilterTappedPropertiesSchema,
+  SearchTypoCorrectedPropertiesSchema,
+  SearchVariantDegradedPropertiesSchema,
+  SearchFirstCardRenderedPropertiesSchema,
+} from './search-events.js';

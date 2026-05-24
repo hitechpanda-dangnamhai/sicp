@@ -153,7 +153,7 @@ async def _node_detect_typo(state: IcpState, publisher: RedisPublisher) -> IcpSt
     llm = get_llm_client()
     prompt = load_prompt("detect_typo").format(query=state["content"])
     try:
-        result = await llm.generate_json(prompt, timeout_s=15.0)
+        result = await llm.generate_json(prompt, timeout_s=5.0)
     except LLMTimeout:
         # Variant B detect_typo timeout = NOT critical → skip (no interrupt);
         # continue to generate_understanding with original query.
@@ -229,7 +229,7 @@ async def _node_generate_understanding(
     prompt = load_prompt("generate_understanding").format(query=state["content"])
     t0 = time.monotonic()
     try:
-        result = await llm.generate_json(prompt, timeout_s=15.0)
+        result = await llm.generate_json(prompt, timeout_s=5.0)
     except LLMTimeout:
         # Flip mode + degrade interrupt.
         elapsed_ms = int((time.monotonic() - t0) * 1000)
@@ -335,7 +335,7 @@ async def _node_parse_filters(state: IcpState, publisher: RedisPublisher) -> Icp
     llm = get_llm_client()
     prompt = load_prompt("parse_filters").format(query=query)
     try:
-        result = await llm.generate_json(prompt, timeout_s=15.0)
+        result = await llm.generate_json(prompt, timeout_s=5.0)
         category = result.get("category")
         filters = result.get("filters", {})
         _logger.info(
@@ -344,8 +344,6 @@ async def _node_parse_filters(state: IcpState, publisher: RedisPublisher) -> Icp
             node="parse_filters",
             category=category,
             filter_count=len(filters),
-            # Phiên Sx04-12 debug — dump full filter content for filter-pass diagnosis
-            filters_dump=filters,
         )
         return {"_filters": {"category": category, "extra": filters}}  # type: ignore[typeddict-unknown-key]
     except LLMTimeout:
@@ -389,16 +387,6 @@ async def _node_hybrid_search(state: IcpState, publisher: RedisPublisher) -> dic
     cat = filters.get("category") if isinstance(filters, dict) else None
     if cat:
         params["category_filter"] = cat
-    # Phiên Sx04-12 fix — propagate LLM-extracted price filters (D-S04 spec)
-    extra = filters.get("extra") if isinstance(filters, dict) else None
-    if isinstance(extra, dict):
-        if "price_min" in extra and extra["price_min"] is not None:
-            params["price_min"] = extra["price_min"]
-        if "price_max" in extra and extra["price_max"] is not None:
-            params["price_max"] = extra["price_max"]
-        # Phiên Sx04-12 fix — brand filter propagation
-        if "brand" in extra and extra["brand"]:
-            params["brand_filter"] = extra["brand"]
 
     mcp = McpClient(_mcp_url())
     t0 = time.monotonic()
@@ -433,26 +421,11 @@ async def _node_hybrid_search(state: IcpState, publisher: RedisPublisher) -> dic
     )
 
     # Empty state handling per Intent 03 spec lines 541-548.
-    # Phiên Sx04-12 fix — payload must match SseEmptyStateEvent contract:
-    # {message: str, fallback_actions: list, suggested_queries: list[str]}
     if total == 0:
-        query_text = state["content"]
         await publisher.publish_sse(
             rid,
             "empty_state",
-            {
-                "message": f"Em không tìm thấy sản phẩm nào khớp với \"{query_text}\". Anh/chị thử mở rộng tìm kiếm hoặc chụp ảnh sản phẩm nhé.",
-                "fallback_actions": [
-                    {"type": "widen_query", "label": "Tìm rộng hơn", "value": query_text},
-                    {"type": "capture_image", "label": "Chụp ảnh sản phẩm"},
-                    {"type": "create_product", "label": "Tạo sản phẩm mới"},
-                ],
-                "suggested_queries": [
-                    "Sản phẩm phổ biến",
-                    "Sản phẩm mới",
-                    "Khuyến mãi hôm nay",
-                ],
-            },
+            {"query": state["content"], "category": cat, "mode": mode},
         )
 
     return {"_search_items": items, "_search_total": total}  # type: ignore[typeddict-unknown-key]
@@ -469,7 +442,7 @@ async def _per_product_reason(
     item = dict(product)  # shallow copy so we can augment
     try:
         prompt = prompt_template.format(query=query, product=json.dumps(product, ensure_ascii=False))
-        result = await llm.generate_json(prompt, timeout_s=15.0)
+        result = await llm.generate_json(prompt, timeout_s=5.0)
         item["reason"] = result.get("reason", "")
         return {"item": item, "success": True}
     except LLMTimeout:

@@ -38,14 +38,6 @@ INSTRUCTIONS:
      ranking context (NOT a hard filter on Vespa)
    - price_max: integer VND ceiling if user mentioned (e.g. "dưới 20k" →
      20000)
-   - price_min: integer VND floor if user mentioned (e.g. "trên 50k" → 50000)
-   - brand: brand name string if user mentioned EXPLICITLY a brand
-     (e.g. "Maggi", "Cai Lan", "Tuong An", "Chin-Su", "Lee Kum Kee", "Nam
-     Duong", "Neptune", "Simply", "Hao Hao"). Match case-insensitively but
-     preserve user's spelling (Latin script preferred). Examples:
-       "dau an hieu cai lan"     → brand="Cai Lan"
-       "nước tương Maggi đậm đặc" → brand="Maggi"
-       "mì Hảo Hảo cay"          → brand="Hao Hao"
    - attrs: small dict of explicit attribute hints (e.g. {{"flavor": "cay"}})
 3. Be CONSERVATIVE with filters — only extract what's clearly stated.
 

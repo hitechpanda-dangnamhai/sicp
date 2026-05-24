@@ -22,7 +22,10 @@
  *   (DM-7 + DM-8 + C-07 + C-09).
  * - **T03b (S-03 Phiên 36):** +1 type — `nav.tile_clicked` — per V-SLICE S-03
  *   Home Dashboard hub scope (DM-16 + D-11 + C-23 R1 mapping LOCKED).
- * - **Total T03b end:** 9 types. Full catalog (~25 per `07_BEHAVIOR §3`) populated
+ * - **T06 (S-04 Phiên Sx04-12):** +5 types — `search.suggested_chip_tapped`,
+ *   `search.followup_filter_tapped`, `search.typo_corrected`, `search.variant_degraded`,
+ *   `search.first_card_rendered` — per D-S04-07/08/13/14 LAW. Total: 14 types.
+ * - **Total T06 end:** 14 types. Full catalog (~25 per `07_BEHAVIOR §3`) populated
  *   incrementally per V-SLICE first-need.
  *
  * @see docs/07_BEHAVIOR_LOGS.md §3 (event catalog) + §8 (type safety)
@@ -30,6 +33,7 @@
  *
  * S-02 T06 emit. Extended S-03 T03 Phiên 33 (+5 schemas per C-07 + C-09 + DM-7).
  * Extended S-03 T03b Phiên 36 (+1 schema `nav.tile_clicked` per D-11 + C-23).
+ * Extended S-04 T06 Phiên Sx04-12 (+5 schemas Search* per D-S04-07/08/13/14 LAW).
  */
 
 import { z } from 'zod';
@@ -43,6 +47,13 @@ import {
   NavTileClickedPropertiesSchema,
 } from './nav-events.js';
 import { ErrorReportRequestedPropertiesSchema } from './error-events.js';
+import {
+  SearchSuggestedChipTappedPropertiesSchema,
+  SearchFollowupFilterTappedPropertiesSchema,
+  SearchTypoCorrectedPropertiesSchema,
+  SearchVariantDegradedPropertiesSchema,
+  SearchFirstCardRenderedPropertiesSchema,
+} from './search-events.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Properties schemas (Zod runtime validation per event type)
@@ -89,7 +100,7 @@ export const CartItemAddedPropertiesSchema = z
  *
  * **Discriminated union note:** `BehaviorEventSchema` in `./tracker.ts`
  * auto-extends as this map grows — Zod 3.x `discriminatedUnion` requires
- * ≥2 variants; 9 variants for T03b fully supported.
+ * ≥2 variants; 14 variants for T06 fully supported.
  */
 export const PROPERTIES_SCHEMA_MAP = {
   // S-02 T06 — baseline 3 types
@@ -104,11 +115,18 @@ export const PROPERTIES_SCHEMA_MAP = {
   'error.report_requested': ErrorReportRequestedPropertiesSchema,
   // S-03 T03b — +1 type (Dashboard tile click — Navigation subset per D-11 + C-23 R1)
   'nav.tile_clicked': NavTileClickedPropertiesSchema,
+  // S-04 T06 — +5 types (Discovery subset per D-S04-07/08/13/14 LAW; Phiên Sx04-12)
+  'search.suggested_chip_tapped': SearchSuggestedChipTappedPropertiesSchema,
+  'search.followup_filter_tapped': SearchFollowupFilterTappedPropertiesSchema,
+  'search.typo_corrected': SearchTypoCorrectedPropertiesSchema,
+  'search.variant_degraded': SearchVariantDegradedPropertiesSchema,
+  'search.first_card_rendered': SearchFirstCardRenderedPropertiesSchema,
 } as const;
 
 /**
  * Union of all registered behavior event types — keys of
- * `PROPERTIES_SCHEMA_MAP`. T06 = 3 types; T03 = 8 types; T03b = 9 types; expands per V-SLICE.
+ * `PROPERTIES_SCHEMA_MAP`. T06 = 3 types; T03 = 8 types; T03b = 9 types;
+ * S-04 T06 = 14 types; expands per V-SLICE.
  */
 export type BehaviorEventType = keyof typeof PROPERTIES_SCHEMA_MAP;
 

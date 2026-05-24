@@ -740,7 +740,7 @@ export default function Intent03Page() {
                   {state.emptyState.message}
                 </div>
                 <div className="flex flex-col gap-2">
-                  {(state.emptyState.fallback_actions ?? []).map((action, idx) => {
+                  {state.emptyState.fallback_actions.map((action, idx) => {
                     const isWiden = action.type === 'widen_query';
                     return (
                       <button
@@ -775,9 +775,9 @@ export default function Intent03Page() {
                   })}
                 </div>
               </div>
-              {(state.emptyState.suggested_queries ?? []).length > 0 && (
+              {state.emptyState.suggested_queries.length > 0 && (
                 <div className="mt-3.5 flex flex-wrap gap-1.5">
-                  {(state.emptyState.suggested_queries ?? []).map((q, idx) => (
+                  {state.emptyState.suggested_queries.map((q, idx) => (
                     <ChipPill
                       key={`sq-${idx}`}
                       variant="tag"

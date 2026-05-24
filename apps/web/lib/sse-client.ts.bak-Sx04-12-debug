@@ -63,9 +63,6 @@ export function streamIntent(
   options: StreamIntentOptions = {},
 ): () => void {
   const es = new EventSource(url, { withCredentials: true });
-  console.log('[sse-client] EventSource created for', url, 'readyState=', es.readyState);
-  es.addEventListener('open', () => console.log('[sse-client] open fired, readyState=', es.readyState));
-  es.addEventListener('message', (e) => console.log('[sse-client] GENERIC message received', (e as MessageEvent).data?.slice(0,80)));
 
   if (options.onOpen) es.onopen = options.onOpen;
   if (options.onError) es.onerror = options.onError;
@@ -75,7 +72,6 @@ export function streamIntent(
     if (!handler) return;
     es.addEventListener(eventName, (e) => {
       const messageEvent = e as MessageEvent<string>;
-      console.log('[sse-client] NAMED event received:', eventName, messageEvent.data?.slice(0,100));
       try {
         const parsed = JSON.parse(messageEvent.data) as IntentStreamEventMap[typeof eventName];
         // `as never` cast required because TS narrows handler signature per key

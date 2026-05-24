@@ -83,13 +83,6 @@ export function useSearchStream(): UseSearchStreamReturn {
   const firstCardEmittedRef = useRef<boolean>(false);
 
   const dispatch = useCallback((action: SearchAction) => {
-    // Phiên Sx04-12 fix — D-S04-14 LAW timing semantics: reset timing refs on
-    // retry_ai/continue_basic so time_to_first_card_ms measures from CURRENT
-    // user-action (not from first submit), matching AI ops log semantics.
-    if (action.type === 'retry_ai' || action.type === 'continue_basic') {
-      submitStartedAtRef.current = performance.now();
-      firstCardEmittedRef.current = false;
-    }
     setState((s) => reduceState(s, action));
   }, []);
 
@@ -205,7 +198,7 @@ export function useSearchStream(): UseSearchStreamReturn {
 
       // 5. Open SSE EventSource. Wrapper auto-parses JSON; we dispatch to reducer.
       const close = streamIntent(
-        `${process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:3001'}/api/v1/intent/stream?id=${encodeURIComponent(request_id)}`,
+        `/api/v1/intent/stream?id=${encodeURIComponent(request_id)}`,
         buildHandlers(mode, request_id),
         {
           onError: () => {

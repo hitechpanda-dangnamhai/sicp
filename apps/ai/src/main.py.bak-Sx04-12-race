@@ -241,63 +241,6 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                 await saver.asetup()
                 publisher = RedisPublisher(redis_url=redis_url)
                 try:
-                    # ─── Phiên Sx04-12 EMERGENCY FIX: wait-for-subscriber gate ───
-                    # D-S04-13 LAW Option Z race condition: graph publishes
-                    # immediately on spawn, but Gateway/FE need ~50-500ms to
-                    # open EventSource + SUBSCRIBE channel. Without this gate,
-                    # all early events (phase_progress, understanding, first
-                    # product_ready) publish to subscriber_count=0 → void.
-                    #
-                    # Poll PUBSUB NUMSUB <channel> until ≥1 subscriber, max 3s.
-                    # If timeout: continue anyway (best-effort — direct-call
-                    # dev mode in main.py _sse_subscribe_stream may pick up
-                    # later events, and FE will at least see final/error).
-                    pub_client = await publisher._ensure_client()
-                    channel = f"sse:pubsub:{request_id}"
-                    _gate_started_at = asyncio.get_event_loop().time()
-                    _gate_timeout_s = 3.0
-                    while True:
-                        try:
-                            counts = await pub_client.execute_command(
-                                "PUBSUB", "NUMSUB", channel
-                            )
-                            # ioredis-style reply: [channel_name, count]
-                            count = 0
-                            if isinstance(counts, (list, tuple)) and len(counts) >= 2:
-                                count = int(counts[1])
-                            elif isinstance(counts, dict):
-                                count = int(counts.get(channel, 0))
-                            if count >= 1:
-                                structlog.get_logger().info(
-                                    "intent.subscriber_ready",
-                                    request_id=request_id,
-                                    subscriber_count=count,
-                                    wait_ms=int(
-                                        (asyncio.get_event_loop().time() - _gate_started_at)
-                                        * 1000
-                                    ),
-                                )
-                                break
-                        except Exception as gate_err:  # noqa: BLE001
-                            structlog.get_logger().warning(
-                                "intent.subscriber_gate_error",
-                                request_id=request_id,
-                                error=str(gate_err),
-                            )
-                            break  # fail-open: proceed without waiting
-                        if (
-                            asyncio.get_event_loop().time() - _gate_started_at
-                        ) >= _gate_timeout_s:
-                            structlog.get_logger().warning(
-                                "intent.subscriber_gate_timeout",
-                                request_id=request_id,
-                                timeout_s=_gate_timeout_s,
-                                msg="No subscriber after timeout; publishing anyway (events may be lost)",
-                            )
-                            break
-                        await asyncio.sleep(0.05)  # 50ms poll interval
-                    # ─── End fix ───
-
                     graph = compile_searching_by_text_graph(saver, publisher)
                     config = {"configurable": {"thread_id": request_id}}
                     async for _chunk in graph.astream(initial_state, config=config):
