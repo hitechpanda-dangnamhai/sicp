@@ -127,14 +127,6 @@ import {
   IconSparkles,
   IconTrendingUp,
   IconUser,
-  // ─── S-04 T04 additions (Phiên Sx04-9a — V-SLICE feature molecules) ───
-  // Mockup ground truth: docs/mockups/intent-03/intent-03B-state-{0,A,D,E,F-typo}-*.html
-  // Per C-S04-I PHASE_02 §E EXCEPTION + S-03 Phiên 36 precedent (icon-map IS registry, NOT atom).
-  IconTarget,
-  IconCube,
-  IconBottle,
-  IconFlame,
-  IconDiscount2,
 } from '@tabler/icons-react';
 
 /**
@@ -267,17 +259,6 @@ export const ICON_MAP = {
   // settings menu row 3 "Trợ giúp Hướng dẫn, liên hệ". Lucide `HelpCircle`
   // shape (circle + question mark) matches mockup byte-for-byte.
   help: HelpCircle,
-
-  // ─── S-04 T04 additions (Phiên Sx04-9a — V-SLICE feature molecules) ───
-  // Per C-S04-I PHASE_02 §E EXCEPTION + S-03 Phiên 36 precedent (icon-map IS registry, NOT atom).
-  // Mockup ground truth: docs/mockups/intent-03/intent-03B-state-{0,A,D,E,F-typo}-*.html cross-verified.
-  // 5 NEW Tabler imports + 1 alias (trending → IconTrendingUp) per Sx04-9a-discover Q-T04-1 Option A lock.
-  target: IconTarget,         // ProductCardSearchB match badge tier='exact' (≥92%)
-  cube: IconCube,             // ProductCardSearchB match badge tier='similar' (<85%)
-  bottle: IconBottle,         // Variant B 172px card product placeholder + CoPurchaseHintCard suggested
-  flame: IconFlame,           // HOT corner badge inside product image (intent-03B-state-0-happy.html line 184)
-  trending: IconTrendingUp,   // ALIAS — mockup uses i-trending; Tabler v3.44 has no plain IconTrending (only Up/Down); IconTrendingUp visual identical at 10px
-  discount: IconDiscount2,    // FollowupFilterChips chip 1 "Dưới 20.000₫" leftIcon (intent-03A-state-0-happy.html line 308)
 } as const satisfies Record<string, IconComponent>;
 
 /**

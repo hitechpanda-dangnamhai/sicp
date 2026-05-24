@@ -122,39 +122,3 @@ export {
   type ListTileAccent,
   type ListTileChip,
 } from './ListTile';
-
-// ─── S-04 T04 NEW V-SLICE feature molecules (Phiên Sx04-9a) ─────────────────
-// Per C-S04-I PHASE_02 §E EXCEPTION clause: V-SLICE feature-specific molecules ARE allowed
-// when mockup directly evidences them. 5 molecules cover Variant B 172px product card with
-// match badge + reason chip (ProductCardSearchB), pre-query welcome (SuggestedQueryChips),
-// Variant A AI followup chips (FollowupFilterChips), cart-add stub toast (AddToCartConfirmCard),
-// and Variant B co-purchase hint (CoPurchaseHintCard).
-
-export {
-  ProductCardSearchB,
-  type ProductCardSearchBProps,
-  type ProductCardSearchBBadge,
-} from './ProductCardSearchB';
-
-export {
-  SuggestedQueryChips,
-  type SuggestedQueryChipsProps,
-} from './SuggestedQueryChips';
-
-export {
-  FollowupFilterChips,
-  type FollowupFilterChipsProps,
-  type FilterChipSpec,
-  type FilterPayload,
-} from './FollowupFilterChips';
-
-export {
-  AddToCartConfirmCard,
-  type AddToCartConfirmCardProps,
-} from './AddToCartConfirmCard';
-
-export {
-  CoPurchaseHintCard,
-  type CoPurchaseHintCardProps,
-  type CoPurchaseSuggestedProduct,
-} from './CoPurchaseHintCard';

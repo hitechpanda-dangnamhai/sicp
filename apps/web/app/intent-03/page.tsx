@@ -1,30 +1,856 @@
+'use client';
+
 /**
- * apps/web/app/intent-03/page.tsx — Placeholder for Intent 03 (Tìm sản phẩm).
+ * apps/web/app/intent-03/page.tsx — Intent 03 (Text Search) — V-SLICE page wire.
  *
- * Slice:    S-03 T03b — Home Dashboard hub (placeholder routes per R1 mapping)
- * Mapping:  → /intent-03 → future S-04 V-SLICE owner
+ * Slice:    S-04 First Product Discovery
+ * Task:     T05 FE Page Wire (Phiên Sx04-10) — REPLACE S-03 T03b placeholder (30 LOC)
  *
- * Per S-03 D-11 + C-23 LOCKED Phiên 35.
+ * Source:   14 mockup states (docs/mockups/intent-03/intent-03[A|B]-state-*.html)
  *
- * S-03 T03b emit (Phiên 36 Batch 5).
+ * Decisions applied (15 D-S04-NN + 1 D-S04-16 NEW):
+ * - D-S04-01 LAW: Back btn → router.push('/home') per S-03 D-28 precedent
+ * - D-S04-02 LAW: Entry route /intent-03 (S03-C-23 inherit)
+ * - D-S04-03 LAW: Adaptive Single Endpoint — mode='ai_augmented' initial; flip via continue_basic
+ * - D-S04-04 LAW: Avatar dynamic initials from useMe() → /me route
+ * - D-S04-05 LAW: BottomNav decorative activeTab='tro_chuyen' — inline hand-roll per MAR-1 #1 Option C LOCK
+ * - D-S04-06 LAW: Input Bar functional Enter; camera+mic decorative
+ * - D-S04-07 LAW: Pre-query welcome state (Rule 6 EXCEPTION) — idle kind renders SuggestedQueryChips
+ * - D-S04-08 LAW: Variant A FollowupFilterChips functional (mode='basic_fallback' only)
+ * - D-S04-09 LAW: Add-to-cart stub — emit cart.item_added + AddToCartConfirmCard + POST /action
+ * - D-S04-12 LAW Part 2: 3 hardcoded SuggestedQueryChips
+ * - D-S04-13 LAW: Option Z Redis pub/sub — EventSource stays open through interrupt+resume;
+ *                 Pattern P2 interrupt at typo/degrade/cart_action
+ * - D-S04-14 LAW: per-index render slot driven by product_ready SSE event
+ * - D-S04-16 LAW NEW (Sx04-9b): Variant B match tier filter — 3 chips client-side filter
+ * - C-S04-I scope extension: PHASE_02 §E EXCEPTION clause covers feature-specific molecules + organisms
+ * - C-15: 'use client' (composes event handlers)
+ *
+ * Confusion warnings honored (Phiên Sx04-9b):
+ * - W1: raw UUID Idempotency-Key (middleware composites server-side)
+ * - W2: D-S04-16 chip filter is full functional, NOT decorative
+ * - W3: 5 search.* behavior events deferred T06 (// TODO T06); only cart.item_added empirical T05
+ * - W5: Variant A NO co_purchase_hint render (mode='ai_augmented' guard)
+ * - W6: Empty state widen_query functional; capture/create_product → "Coming soon"
+ * - W7: NO pre-search mode toggle UI
+ * - W8: NO autofocus on Input Bar
  */
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useCallback, useMemo, useState } from 'react';
+import { useMe } from '@/lib/dashboard/use-me';
+import { getTracker } from '@/lib/tracker';
+import { SearchHeader } from '@/components/icp/organisms';
+import {
+  ConversationBubble,
+  SuggestedQueryChips,
+  FollowupFilterChips,
+  AddToCartConfirmCard,
+  CoPurchaseHintCard,
+  ProductCardSearchB,
+  ProductCard,
+  PhasesCard,
+  type PhaseItem,
+} from '@/components/icp/molecules';
+import { Icon, ChipPill } from '@/components/icp/atoms';
+import { useSearchStream } from '@/src/features/search/use-search-stream';
+import { useFollowupFilter } from '@/src/features/search/use-followup-filter';
+import { postAction } from '@/src/features/search/action-poster';
+import {
+  filterProductsByTier,
+  type MatchTierFilter,
+  type SearchProductItem,
+} from '@/src/features/search/search-state-machine';
+import { cn } from '@/lib/utils';
+import styles from '../home/home.module.css';
 
-export default function Intent03PlaceholderPage() {
+// ─── D-S04-12 LAW Part 2: 3 hardcoded suggested query chips (page-level default) ──
+
+const SUGGESTED_QUERIES: readonly string[] = [
+  'Nước tương cho phở',
+  'Đồ cay cay ăn phở',
+  'Soy sauce for pho',
+];
+
+// ─── D-S04-14 LAW: 4-phase progress label fallback ──────────────────────────────
+
+const PHASE_LABEL_FALLBACK: Record<0 | 1 | 2 | 3, string> = {
+  0: 'Hiểu ngữ nghĩa câu hỏi',
+  1: 'Tìm sản phẩm khớp nghĩa + tên',
+  2: 'Viết lý do gợi ý cho từng món',
+  3: 'Xếp hạng theo độ phù hợp',
+};
+
+// ─── D-S04-16 LAW: 3 match tier filter chip specs ────────────────────────────────
+
+const MATCH_TIER_CHIPS: ReadonlyArray<{
+  tier: MatchTierFilter;
+  label: string;
+  icon?: 'sparkles' | 'target' | undefined;
+}> = [
+  { tier: 'all', label: 'AI gợi ý', icon: 'sparkles' },
+  { tier: 'exact', label: 'Khớp chính xác', icon: 'target' },
+  { tier: 'similar', label: 'Gần giống' },
+];
+
+export default function Intent03Page() {
+  const router = useRouter();
+  const meQuery = useMe();
+
+  const stream = useSearchStream();
+  const followupFilter = useFollowupFilter(stream.submitQuery, stream.state.query);
+
+  // ─── Input bar state ─────────────────────────────────────────────────────
+  const [inputValue, setInputValue] = useState('');
+
+  // ─── Handlers ────────────────────────────────────────────────────────────
+
+  const handleSuggestedChipTap = useCallback(
+    (query: string, position: number) => {
+      // TODO T06: emit search.suggested_chip_tapped
+      //   { query, chip_label: query, chip_position: position }
+      void position;
+      setInputValue(query);
+      void stream.submitQuery(query);
+    },
+    [stream],
+  );
+
+  const handleSubmitFromInput = useCallback(() => {
+    const trimmed = inputValue.trim();
+    if (!trimmed) return;
+    void stream.submitQuery(trimmed);
+  }, [inputValue, stream]);
+
+  /** Add-to-cart "+" handler — Variant B + Variant A unified. */
+  const handleAdd = useCallback(
+    (product: { brand?: string; name?: string; price?: number; productId?: string }) => {
+      const title = product.name ?? 'Sản phẩm';
+      const price = product.price ?? 0;
+      const productId =
+        product.productId ?? `${product.brand ?? 'unknown'}-${product.name ?? 'unknown'}`;
+
+      // ─── T05 empirical: cart.item_added (only schema in catalog per W3 LOCK) ──
+      try {
+        getTracker().track('cart.item_added', {
+          product_id: productId,
+          qty: 1,
+          unit_price: price,
+          source: 'search',
+          from_query: stream.state.query,
+        });
+      } catch {
+        /* analytics non-blocking */
+      }
+
+      // ─── Option α D-S04-13 LAW: Variant B → POST /action choice='add_to_cart'
+      //     to trigger co_purchase_lookup node. Variant A skips (W5 LOCK).
+      if (stream.state.mode === 'ai_augmented' && stream.state.requestId) {
+        void postAction(stream.state.requestId, {
+          choice: 'add_to_cart',
+          value: { product_id: productId },
+          _meta: { attempt_n: stream.state.attemptN },
+        });
+      }
+
+      // ─── Open AddToCartConfirmCard (auto-dismiss 3s per AddToCartConfirmCard internal timer) ──
+      stream.setAddToCartConfirm({ title, price });
+    },
+    [stream],
+  );
+
+  const handleTypoAccept = useCallback(() => {
+    if (!stream.state.requestId) return;
+    // TODO T06: emit search.typo_corrected { user_choice: 'accept', original, corrected }
+    void postAction(stream.state.requestId, {
+      choice: 'accept',
+      _meta: { attempt_n: stream.state.attemptN },
+    });
+  }, [stream]);
+
+  const handleTypoReject = useCallback(() => {
+    if (!stream.state.requestId) return;
+    // TODO T06: emit search.typo_corrected { user_choice: 'reject' }
+    void postAction(stream.state.requestId, {
+      choice: 'reject',
+      _meta: { attempt_n: stream.state.attemptN },
+    });
+  }, [stream]);
+
+  const handleRetryAi = useCallback(() => {
+    if (!stream.state.requestId) return;
+    // Local state transition first (clear pending), then POST resume.
+    stream.dispatch({ type: 'retry_ai' });
+    void postAction(stream.state.requestId, {
+      choice: 'retry_ai',
+      _meta: { attempt_n: stream.state.attemptN + 1 },
+    });
+  }, [stream]);
+
+  const handleContinueBasic = useCallback(() => {
+    if (!stream.state.requestId) return;
+    stream.dispatch({ type: 'continue_basic' });
+    void postAction(stream.state.requestId, {
+      choice: 'continue_basic',
+      _meta: { attempt_n: stream.state.attemptN + 1 },
+    });
+  }, [stream]);
+
+  const handleWidenQuery = useCallback(
+    (widenValue: string) => {
+      // W6 LOCK: widen_query is functional — set query + re-trigger search.
+      setInputValue(widenValue);
+      void stream.submitQuery(widenValue);
+    },
+    [stream],
+  );
+
+  const handleComingSoonAction = useCallback(() => {
+    // W6 LOCK: capture_image + create_product decorative S-04 — no toast library installed.
+    // Inline alert per W2 (no toast lib). S-07 owner replaces with real flow.
+    // eslint-disable-next-line no-alert
+    alert('Tính năng đang được phát triển. Vui lòng quay lại sau.');
+  }, []);
+
+  const handleMatchTierTap = useCallback(
+    (tier: MatchTierFilter) => {
+      stream.setMatchTierFilter(tier);
+    },
+    [stream],
+  );
+
+  // ─── Derived data ────────────────────────────────────────────────────────
+
+  const initials = meQuery.data?.avatar_initials ?? '?';
+  const { state } = stream;
+
+  /** D-S04-16 LAW filter applied to carousel products (Variant B only). */
+  const filteredProducts = useMemo(
+    () => filterProductsByTier(state.products, state.matchTierFilter),
+    [state.products, state.matchTierFilter],
+  );
+
+  /** Per-tier count (badge text on chip) — based on full products, not filtered. */
+  const tierCounts = useMemo(() => {
+    const all = state.products.filter((p): p is SearchProductItem => !!p).length;
+    const exact = filterProductsByTier(state.products, 'exact').length;
+    const similar = filterProductsByTier(state.products, 'similar').length;
+    return { all, exact, similar };
+  }, [state.products]);
+
+  /** Input placeholder per state kind. */
+  const inputPlaceholder =
+    state.kind === 'idle'
+      ? 'Tìm sản phẩm...'
+      : state.kind === 'streaming'
+        ? 'AI đang xử lý...'
+        : 'Tinh chỉnh tìm kiếm...';
+
+  /** PhasesCard phase items derived from state.phases map (D-S04-14 LAW). */
+  const phaseItems: PhaseItem[] = useMemo(() => {
+    return ([0, 1, 2, 3] as const).map((id) => {
+      const slot = state.phases[id];
+      const fallback: PhaseItem = {
+        id: String(id),
+        label: PHASE_LABEL_FALLBACK[id],
+        status: 'pending',
+      };
+      if (!slot) return fallback;
+      return {
+        id: String(id),
+        label: slot.label,
+        status: slot.status,
+        meta:
+          slot.status === 'done' && typeof slot.ms === 'number'
+            ? `${slot.ms}ms`
+            : slot.meta,
+      };
+    });
+  }, [state.phases]);
+
+  // ─── Render ──────────────────────────────────────────────────────────────
+
   return (
-    <div className="min-h-screen bg-pink-50/40 flex flex-col items-center justify-center px-6 text-center">
-      <div className="text-6xl mb-4">🔍</div>
-      <h1 className="text-[20px] font-bold text-rose-900 mb-2">Tìm sản phẩm (Intent 03)</h1>
-      <p className="text-[13px] text-pink-700 mb-6 max-w-xs">
-        Tính năng tìm kiếm sản phẩm bằng gõ hoặc nói đang được phát triển. Vui lòng quay lại sau.
-      </p>
-      <Link
-        href="/home"
-        className="bg-gradient-to-r from-pink-600 to-orange-400 text-white text-[13px] font-semibold px-5 py-2.5 rounded-full shadow-[0_6px_16px_rgba(233,30,99,0.25)]"
-      >
-        ← Trang chính
-      </Link>
+    <div className={styles.pageWrap}>
+      <div className={cn(styles.phoneFrame, 'flex flex-col min-h-[600px]')}>
+        <SearchHeader
+          initials={initials}
+          onBack={() => router.push('/home')}
+          onProfileClick={() => router.push('/me')}
+        />
+
+        {/* ─── CHAT AREA ──────────────────────────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto px-3.5 pt-4 pb-2 flex flex-col gap-3.5 relative">
+          {/* ─── User query echo (all non-idle states) ─────────────────── */}
+          {state.kind !== 'idle' && state.query && (
+            <ConversationBubble role="user" text={state.query} />
+          )}
+
+          {/* ═══ State: idle (pre-query welcome) ═══════════════════════════ */}
+          {state.kind === 'idle' && (
+            <>
+              <ConversationBubble
+                role="ai"
+                variant="greet"
+                text="Em tìm sản phẩm gì giúp anh nhé?"
+              />
+              <SuggestedQueryChips
+                queries={[...SUGGESTED_QUERIES]}
+                onTap={handleSuggestedChipTap}
+              />
+            </>
+          )}
+
+          {/* ═══ State: streaming (PhasesCard realtime + shimmer slots) ════ */}
+          {state.kind === 'streaming' && (
+            <>
+              <ConversationBubble role="ai" text="Em đang phân tích..." />
+              {/* PhasesCard list mode (mockup state-A-loading.html lines 156-189) */}
+              <div className="ml-9">
+                <PhasesCard mode="list" phases={phaseItems} />
+              </div>
+              {/* Per-index render slots — D-S04-14 LAW shimmer skeleton → product card materialize */}
+              {state.totalExpected > 0 && (
+                <div className="flex gap-2.5 overflow-x-auto -mx-3.5 px-3.5 pb-3 ml-9 -ml-3.5 pl-9">
+                  {Array.from({ length: state.totalExpected }, (_, idx) => {
+                    const item = state.products[idx];
+                    if (item) {
+                      return (
+                        <ProductCardSearchB
+                          key={`p-${idx}`}
+                          brand={item.brand ?? ''}
+                          name={item.name ?? ''}
+                          price={item.price ?? 0}
+                          originalPrice={item.original_price}
+                          matchScore={
+                            typeof item.match_score === 'number'
+                              ? item.match_score <= 1
+                                ? item.match_score * 100
+                                : item.match_score
+                              : 0
+                          }
+                          reason={item.reason ?? ''}
+                          onAdd={() =>
+                            handleAdd({
+                              brand: item.brand,
+                              name: item.name,
+                              price: item.price,
+                              productId: item.product_id,
+                            })
+                          }
+                        />
+                      );
+                    }
+                    // Shimmer skeleton slot (mockup state-A-loading.html lines 192-201)
+                    return (
+                      <div
+                        key={`s-${idx}`}
+                        className="flex-shrink-0 w-[172px] bg-white border-[0.5px] border-pink-200 rounded-2xl overflow-hidden"
+                      >
+                        <div className="w-full aspect-square bg-gradient-to-r from-pink-100 via-pink-50 to-pink-100 animate-pulse" />
+                        <div className="px-2.5 py-3 space-y-1.5">
+                          <div className="h-2 w-[40%] rounded bg-pink-100 animate-pulse" />
+                          <div className="h-2.5 rounded bg-pink-100 animate-pulse" />
+                          <div className="h-2.5 w-[80%] rounded bg-pink-100 animate-pulse" />
+                          <div className="h-[26px] rounded-lg bg-pink-50 animate-pulse" />
+                          <div className="h-3 w-[50%] rounded bg-pink-100 animate-pulse" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* ═══ State: result (carousel + understanding + filter chips) ═══ */}
+          {state.kind === 'result' && (
+            <>
+              {/* Understanding card (Variant B only — mockup state-0-happy line 152-160) */}
+              {state.mode === 'ai_augmented' && state.understanding && (
+                <div className="flex gap-2 items-start ml-0">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-white via-pink-50 to-orange-300 flex items-center justify-center flex-shrink-0 shadow-[0_4px_10px_rgba(190,24,93,0.3)]">
+                    <Icon name="sparkles" size={14} className="text-pink-700" />
+                  </div>
+                  <div className="flex-1 max-w-[80%]">
+                    <div className="bg-gradient-to-br from-white to-pink-50 border-[0.5px] border-pink-200 rounded-[4px_18px_18px_18px] px-3.5 py-3 shadow-[0_4px_12px_rgba(233,30,99,0.08)] mb-1.5">
+                      <div className="flex items-center gap-1.5 text-[10px] text-pink-700 font-semibold uppercase tracking-wider mb-1.5">
+                        <Icon name="lightbulb" size={12} />
+                        Đã hiểu ý anh
+                      </div>
+                      <div className="text-[13px] text-rose-900 leading-[1.5] font-medium">
+                        {state.understanding.text}
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-rose-700 flex items-center gap-1 px-1">
+                      <Icon name="search" size={12} />
+                      Tìm thấy <b className="ml-1">{tierCounts.all} sản phẩm</b> phù hợp
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Variant B match tier filter chips (D-S04-16 LAW NEW Phiên Sx04-9b) */}
+              {state.mode === 'ai_augmented' && state.products.length > 0 && (
+                <div
+                  className="flex gap-1.5 overflow-x-auto -mr-3.5 pr-3.5"
+                  role="tablist"
+                  aria-label="Lọc theo độ khớp"
+                >
+                  {MATCH_TIER_CHIPS.map(({ tier, label, icon }) => {
+                    const count =
+                      tier === 'all'
+                        ? tierCounts.all
+                        : tier === 'exact'
+                          ? tierCounts.exact
+                          : tierCounts.similar;
+                    const active = state.matchTierFilter === tier;
+                    return (
+                      <button
+                        key={tier}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        data-match-tier-chip={tier}
+                        onClick={() => handleMatchTierTap(tier)}
+                        className={cn(
+                          'flex-shrink-0 px-3.5 py-1.5 rounded-full text-[12px] font-semibold flex items-center gap-1.5 transition-all',
+                          active
+                            ? 'bg-gradient-to-br from-pink-600 to-rose-500 text-white shadow-[0_4px_10px_rgba(233,30,99,0.3)]'
+                            : 'bg-white border-[0.5px] border-pink-200 text-pink-700',
+                        )}
+                      >
+                        {icon && <Icon name={icon} size={13} />}
+                        {label}
+                        <span
+                          className={cn(
+                            'px-1.5 py-px rounded-md text-[10px] font-bold',
+                            active
+                              ? 'bg-white/25 text-white'
+                              : 'text-rose-700',
+                          )}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Carousel — Variant B 172px filtered | Variant A 138px */}
+              <div className="flex gap-2.5 overflow-x-auto -mx-3.5 px-3.5 pb-3">
+                {state.mode === 'ai_augmented'
+                  ? filteredProducts.map((item, idx) => {
+                      if (!item) return null;
+                      return (
+                        <ProductCardSearchB
+                          key={item.product_id ?? `f-${idx}`}
+                          brand={item.brand ?? ''}
+                          name={item.name ?? ''}
+                          price={item.price ?? 0}
+                          originalPrice={item.original_price}
+                          matchScore={
+                            typeof item.match_score === 'number'
+                              ? item.match_score <= 1
+                                ? item.match_score * 100
+                                : item.match_score
+                              : 0
+                          }
+                          reason={item.reason ?? ''}
+                          badges={item.badges}
+                          rating={item.rating}
+                          soldCount={item.sold_count}
+                          onAdd={() =>
+                            handleAdd({
+                              brand: item.brand,
+                              name: item.name,
+                              price: item.price,
+                              productId: item.product_id,
+                            })
+                          }
+                        />
+                      );
+                    })
+                  : state.products.map((item, idx) => {
+                      if (!item) return null;
+                      // Variant A baseline ProductCard 138px (S-01 reuse). Note: ProductCard.badges
+                      // is single object | tuple of 2 (different shape than ProductCardSearchB.badges
+                      // which is an array). Variant A mockup shows at most 1 corner badge per card.
+                      const firstBadge = item.badges?.[0];
+                      const pcBadge =
+                        firstBadge && firstBadge.type !== 'trend'
+                          ? { type: firstBadge.type, label: firstBadge.label }
+                          : undefined;
+                      return (
+                        <ProductCard
+                          key={item.product_id ?? `a-${idx}`}
+                          width={138}
+                          brand={item.brand ?? ''}
+                          name={item.name ?? ''}
+                          price={item.price ?? 0}
+                          originalPrice={item.original_price}
+                          badge={pcBadge}
+                          rating={item.rating}
+                          soldCount={item.sold_count}
+                          addButton={{ variant: 'pink', position: 'image-overlay' }}
+                          onAdd={() =>
+                            handleAdd({
+                              brand: item.brand,
+                              name: item.name,
+                              price: item.price,
+                              productId: item.product_id,
+                            })
+                          }
+                        />
+                      );
+                    })}
+              </div>
+
+              {/* Variant A AI followup hint + 3 functional filter chips (D-S04-08 LAW) */}
+              {state.mode === 'basic_fallback' && state.products.length > 0 && (
+                <div className="flex gap-2 items-start">
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-white via-pink-50 to-orange-300 flex items-center justify-center flex-shrink-0 shadow-[0_4px_10px_rgba(190,24,93,0.3)]">
+                    <Icon name="sparkles" size={14} className="text-pink-700" />
+                  </div>
+                  <div className="flex-1 max-w-[85%]">
+                    <div className="bg-white border-[0.5px] border-pink-200 rounded-[4px_18px_18px_18px] px-3.5 py-3 shadow-[0_4px_12px_rgba(233,30,99,0.08)] mb-2">
+                      <div className="text-[13px] text-rose-900 leading-[1.45] font-medium">
+                        Em có thể lọc thêm theo gợi ý dưới đây:
+                      </div>
+                    </div>
+                    <FollowupFilterChips
+                      chips={followupFilter.chips}
+                      onTap={followupFilter.handleFilterTap}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* AddToCartConfirmCard (auto-dismiss 3s; mockup state-E-cart line 209-220) */}
+              {state.addToCartConfirm && (
+                <div className="ml-9">
+                  <AddToCartConfirmCard
+                    product={{
+                      title: state.addToCartConfirm.title,
+                      price: state.addToCartConfirm.price,
+                    }}
+                    onUndo={stream.dismissAddToCartConfirm}
+                    onDismiss={stream.dismissAddToCartConfirm}
+                  />
+                </div>
+              )}
+
+              {/* CoPurchaseHintCard (Variant B only — W5 LOCK; mockup state-E-cart line 228-251) */}
+              {state.mode === 'ai_augmented' && state.coPurchaseHint && (
+                <>
+                  <ConversationBubble
+                    role="ai"
+                    text={state.coPurchaseHint.reason}
+                  />
+                  <CoPurchaseHintCard
+                    hint={{
+                      ratePct: state.coPurchaseHint.rate_pct,
+                      reason: state.coPurchaseHint.reason,
+                      suggestedProduct: {
+                        brand:
+                          (state.coPurchaseHint.suggested_product.brand as string) ?? '',
+                        name:
+                          (state.coPurchaseHint.suggested_product.name as string) ?? '',
+                        price:
+                          (state.coPurchaseHint.suggested_product.price as number) ?? 0,
+                        soldCount: state.coPurchaseHint.suggested_product
+                          .sold_count as string | undefined,
+                      },
+                      anchorCategory: state.coPurchaseHint.anchor_category,
+                      suggestedCategory: state.coPurchaseHint.suggested_category,
+                    }}
+                    onAddSuggested={(suggested) => handleAdd(suggested)}
+                  />
+                </>
+              )}
+            </>
+          )}
+
+          {/* ═══ State: pending_typo_confirm (mockup state-F-typo line 146-163) ═══ */}
+          {state.kind === 'pending_typo_confirm' && state.typoSuggestion && (
+            <div className="flex gap-2 items-start">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-white via-pink-50 to-orange-300 flex items-center justify-center flex-shrink-0 shadow-[0_4px_10px_rgba(190,24,93,0.3)]">
+                <Icon name="sparkles" size={14} className="text-pink-700" />
+              </div>
+              <div className="flex-1 max-w-[80%]">
+                <div className="bg-gradient-to-br from-white to-pink-50 border-[0.5px] border-pink-200 rounded-[4px_18px_18px_18px] px-3.5 py-3 shadow-[0_4px_12px_rgba(233,30,99,0.08)]">
+                  <div className="flex items-center gap-1.5 text-[10px] text-pink-700 font-semibold uppercase tracking-wider mb-1.5">
+                    <Icon name="check" size={12} />
+                    Em hiểu ý anh
+                  </div>
+                  <div className="text-[13px] text-rose-900 leading-[1.5] font-medium">
+                    Có phải anh đang tìm{' '}
+                    <span className="inline-block bg-gradient-to-br from-pink-100 to-pink-200 text-pink-700 px-2 py-0.5 rounded-md font-bold">
+                      {state.typoSuggestion.corrected}
+                    </span>
+                    ? Em đã sửa lỗi chính tả giúp anh.
+                  </div>
+                  <div className="mt-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleTypoAccept}
+                      data-typo-action="accept"
+                      className="bg-gradient-to-br from-pink-600 to-rose-500 text-white px-3 py-1 rounded-[11px] text-[11px] font-semibold shadow-[0_4px_10px_rgba(233,30,99,0.28)]"
+                    >
+                      Đúng rồi
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleTypoReject}
+                      data-typo-action="reject"
+                      className="bg-white border-[0.5px] border-pink-200 text-pink-700 px-3 py-1 rounded-[11px] text-[11px] font-medium"
+                    >
+                      Không, em tìm &quot;{state.typoSuggestion.original}&quot;
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ State: pending_degrade_choice (mockup state-C-error line 153-175) ═══ */}
+          {state.kind === 'pending_degrade_choice' && state.variantDegraded && (
+            <div className="ml-9">
+              <div className="bg-gradient-to-br from-white to-pink-50 border-[0.5px] border-red-200 border-l-[3px] border-l-red-600 rounded-[14px] px-4 py-3.5 shadow-[0_6px_16px_rgba(220,38,38,0.12)]">
+                <div className="flex items-start gap-2.5 mb-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-red-100 to-red-300 rounded-[10px] flex items-center justify-center flex-shrink-0">
+                    <Icon name="alert-triangle" size={18} className="text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[13px] text-rose-900 font-bold mb-0.5 tracking-tight">
+                      {state.variantDegraded.title}
+                    </div>
+                    <div className="text-[11px] text-rose-700 leading-[1.5]">
+                      {state.variantDegraded.user_message}
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-white border-[0.5px] border-pink-100 rounded-[10px] px-2.5 py-2 font-mono text-[10px] text-rose-700 mb-3 flex items-center justify-between">
+                  <span>
+                    Mã lỗi: <b className="text-rose-800">{state.variantDegraded.error_code}</b>
+                  </span>
+                  <span className="text-gray-400">
+                    trace:{' '}
+                    {`${state.variantDegraded.trace_id.slice(0, 4)}...${state.variantDegraded.trace_id.slice(-4)}`}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRetryAi}
+                    data-degrade-action="retry_ai"
+                    className="flex-1 bg-gradient-to-br from-pink-600 to-rose-500 text-white px-3.5 py-2.5 rounded-[11px] text-[12px] font-semibold flex items-center justify-center gap-1.5 shadow-[0_4px_12px_rgba(233,30,99,0.28)]"
+                  >
+                    <Icon name="refresh" size={14} />
+                    Thử lại với AI
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleContinueBasic}
+                    data-degrade-action="continue_basic"
+                    className="bg-white border-[0.5px] border-pink-200 text-pink-700 px-3 py-2.5 rounded-[11px] text-[12px] font-semibold"
+                  >
+                    Dùng bản cơ bản
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ═══ State: empty (mockup state-B-empty line 162-200) ═══ */}
+          {state.kind === 'empty' && state.emptyState && (
+            <div className="ml-9">
+              <div className="bg-gradient-to-br from-white to-pink-50 border-[0.5px] border-pink-200 rounded-[18px] px-4 py-5 shadow-[0_8px_22px_rgba(233,30,99,0.1)] text-center">
+                <div className="relative w-20 h-20 mx-auto mb-3">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle,_rgba(251,146,60,0.2),_transparent_65%)] rounded-full" />
+                  <div className="relative w-20 h-20 bg-gradient-to-br from-pink-100 to-pink-200 rounded-full flex items-center justify-center shadow-[0_6px_18px_rgba(233,30,99,0.15)]">
+                    <Icon name="search" size={38} className="text-pink-700" />
+                  </div>
+                </div>
+                <div className="text-[14px] text-rose-900 font-bold mb-1 tracking-tight">
+                  Không có món nào khớp ý anh
+                </div>
+                <div className="text-[11px] text-rose-700 leading-[1.5] mb-3.5">
+                  {state.emptyState.message}
+                </div>
+                <div className="flex flex-col gap-2">
+                  {state.emptyState.fallback_actions.map((action, idx) => {
+                    const isWiden = action.type === 'widen_query';
+                    return (
+                      <button
+                        key={`${action.type}-${idx}`}
+                        type="button"
+                        data-empty-action={action.type}
+                        onClick={() =>
+                          isWiden
+                            ? handleWidenQuery(action.value ?? action.label)
+                            : handleComingSoonAction()
+                        }
+                        className={cn(
+                          'px-3.5 py-2.5 rounded-[13px] text-[13px] font-semibold flex items-center justify-center gap-1.5',
+                          isWiden
+                            ? 'bg-gradient-to-br from-pink-600 to-rose-500 text-white shadow-[0_6px_14px_rgba(233,30,99,0.3)]'
+                            : 'bg-white border-[0.5px] border-pink-200 text-pink-700',
+                        )}
+                      >
+                        <Icon
+                          name={
+                            action.type === 'widen_query'
+                              ? 'search'
+                              : action.type === 'capture_image'
+                                ? 'camera'
+                                : 'plus'
+                          }
+                          size={15}
+                        />
+                        {action.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {state.emptyState.suggested_queries.length > 0 && (
+                <div className="mt-3.5 flex flex-wrap gap-1.5">
+                  {state.emptyState.suggested_queries.map((q, idx) => (
+                    <ChipPill
+                      key={`sq-${idx}`}
+                      variant="tag"
+                      color="pink"
+                      size="md"
+                      interactive
+                      onClick={() => handleSuggestedChipTap(q, idx)}
+                    >
+                      {q}
+                    </ChipPill>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ═══ State: error (SSE error event) ═════════════════════════════ */}
+          {state.kind === 'error' && (
+            <div className="ml-9">
+              <div className="bg-white border-[0.5px] border-red-200 border-l-[3px] border-l-red-600 rounded-[14px] px-4 py-3.5 shadow-[0_6px_16px_rgba(220,38,38,0.12)]">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 bg-red-100 rounded-[10px] flex items-center justify-center flex-shrink-0">
+                    <Icon name="alert-triangle" size={18} className="text-red-600" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[13px] text-rose-900 font-bold mb-0.5 tracking-tight">
+                      Có lỗi xảy ra
+                    </div>
+                    <div className="text-[11px] text-rose-700 leading-[1.5]">
+                      {state.errorMessage ?? 'Vui lòng thử lại sau.'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ─── INPUT BAR (mockup line 300-311) ─────────────────────────── */}
+        {/* D-S04-06 LAW: functional Enter; camera+mic decorative. W8 LOCK: NO autofocus. */}
+        <div className="px-3.5 py-2.5 flex-shrink-0">
+          <div className="flex gap-2 items-center bg-gradient-to-br from-white to-pink-50 border-[0.5px] border-pink-200 rounded-[30px] px-4 py-1.5 shadow-[0_10px_26px_rgba(233,30,99,0.15)]">
+            <Icon name="sparkles" size={18} className="text-pink-600" />
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleSubmitFromInput();
+                }
+              }}
+              placeholder={inputPlaceholder}
+              aria-label="Ô tìm kiếm"
+              className="flex-1 bg-transparent border-0 text-[13px] outline-none text-rose-900 placeholder:text-pink-400"
+            />
+            <button
+              type="button"
+              aria-label="Chụp ảnh"
+              onClick={handleComingSoonAction}
+              className="bg-pink-100 border-0 w-9 h-9 rounded-full flex items-center justify-center text-pink-700"
+            >
+              <Icon name="camera" size={18} />
+            </button>
+            <button
+              type="button"
+              aria-label="Ghi âm"
+              onClick={handleComingSoonAction}
+              className="bg-gradient-to-br from-pink-600 via-rose-500 to-orange-400 border-0 text-white w-[42px] h-[42px] rounded-full flex items-center justify-center shadow-[0_10px_22px_rgba(233,30,99,0.5)]"
+            >
+              <Icon name="mic" size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* ─── BOTTOM NAV (mockup line 314-336) — inline hand-roll per MAR-1 #1 Option C LOCK ─── */}
+        <nav
+          aria-label="Điều hướng chính"
+          className="flex px-1 pt-2 pb-3 bg-white border-t-[0.5px] border-pink-100 flex-shrink-0"
+        >
+          {/* Trang chính (inactive) */}
+          <button
+            type="button"
+            onClick={() => router.push('/home')}
+            className="flex-1 bg-transparent border-0 flex flex-col items-center gap-0.5 px-1 py-1"
+          >
+            <div className="h-[3px]" />
+            <Icon name="home" size={22} className="text-gray-300" />
+            <span className="text-[10px] text-gray-400">Trang chính</span>
+          </button>
+
+          {/* Trò chuyện (ACTIVE — D-S04-05 LAW pink+bold + top gradient bar) */}
+          <button
+            type="button"
+            data-bottomnav-tab="tro_chuyen"
+            data-active="true"
+            className="flex-1 bg-transparent border-0 flex flex-col items-center gap-0.5 px-1 py-1 relative"
+          >
+            <span
+              aria-hidden="true"
+              className="absolute top-[-2px] w-[22px] h-[3px] bg-gradient-to-r from-pink-600 to-orange-400 rounded-sm"
+            />
+            <div className="h-[3px]" />
+            <Icon name="message-circle" size={22} className="text-pink-600" />
+            <span className="text-[10px] text-pink-700 font-bold">Trò chuyện</span>
+          </button>
+
+          {/* Đề xuất (inactive, badge=2 decorative per S-03 D-13 inherit) */}
+          <button
+            type="button"
+            onClick={() => router.push('/intent-04')}
+            className="flex-1 bg-transparent border-0 flex flex-col items-center gap-0.5 px-1 py-1 relative"
+          >
+            <div className="h-[3px]" />
+            <Icon name="inbox" size={22} className="text-gray-300" />
+            <span className="text-[10px] text-gray-400">Đề xuất</span>
+            <span className="absolute top-0 right-3.5 bg-gradient-to-br from-orange-500 to-orange-600 text-white text-[10px] min-w-[18px] h-[18px] rounded-[9px] px-1 flex items-center justify-center font-bold border-2 border-white">
+              2
+            </span>
+          </button>
+
+          {/* Cửa hàng (inactive) */}
+          <button
+            type="button"
+            className="flex-1 bg-transparent border-0 flex flex-col items-center gap-0.5 px-1 py-1"
+          >
+            <div className="h-[3px]" />
+            <Icon name="user" size={22} className="text-gray-300" />
+            <span className="text-[10px] text-gray-400">Cửa hàng</span>
+          </button>
+        </nav>
+      </div>
     </div>
   );
 }

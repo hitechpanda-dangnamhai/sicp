@@ -126,3 +126,12 @@ export {
   LogoutConfirmCard,
   type LogoutConfirmCardProps,
 } from './LogoutConfirmCard';
+
+// ─── S-04 T05 NEW V-SLICE feature organism (Phiên Sx04-10) ───────────────────
+//
+// Per MAR-1 #2 LOCKED Phiên Sx04-9b + C-S04-I scope extension (PHASE_02 §E EXCEPTION
+// clause amended: "feature-specific molecules + organisms ARE allowed when mockup
+// directly evidences them"). SearchHeader composition (back btn + title block +
+// bell + avatar) is mockup-verbatim across 5/5 intent-03B states.
+
+export { SearchHeader, type SearchHeaderProps } from './SearchHeader';
