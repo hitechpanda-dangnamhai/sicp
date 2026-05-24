@@ -112,6 +112,6 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
 
 # Auto-discover: import all tool modules so register() side-effects fire.
 # Order matters only for consistent system.list_tools output (sorted anyway).
-from src.tools import auth, events, products  # noqa: E402, F401
+from src.tools import auth, events, products, vespa  # noqa: E402, F401
 
 __all__ = ["register", "list_tools", "dispatch"]

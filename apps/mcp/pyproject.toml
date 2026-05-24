@@ -36,6 +36,9 @@ dependencies = [
     "psycopg[binary]>=3.2,<4.0",
     "redis>=5.0,<6.0",
 
+    # --- S-04 T02 NEW: HTTP client for vespa.hybrid_search tool (D-S04-14 Q-Sx04-4-1 LAW sync HTTP) ---
+    "httpx>=0.27,<0.28",
+
     # --- OpenTelemetry Python SDK (mirror T03 pin range >=1.27,<2.0) ---
     "opentelemetry-api>=1.27,<2.0",
     "opentelemetry-sdk>=1.27,<2.0",

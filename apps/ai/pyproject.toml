@@ -1,16 +1,34 @@
 # =============================================================================
-# apps/ai/pyproject.toml — ICP AI Orchestration service (T03)
+# apps/ai/pyproject.toml — ICP AI Orchestration service (S-04 T02 amended)
 # =============================================================================
-# Replaces S-00b stub (empty deps).
+# Phase 1 baseline emit (T03 Phiên 24): Flask + LangGraph 0.2.x router scaffold.
 #
-# Reference: docs/phases/PHASE_01_INFRA.md Day 4 deps list.
+# S-04 T02 amendment (Phiên Sx04-5 emit per D-S04-13 LAW + D-S04-14 LAW):
+#   ADD 4 NEW deps for foundational interrupt+resume + progressive streaming:
+#     - langgraph-checkpoint-redis>=0.1,<0.2  (D-S04-13 Pattern A — RedisSaver)
+#     - redis>=5.0,<6.0                       (D-S04-13 Option Z — async pub/sub
+#                                              + RedisSaver transitive dep)
+#     - google-generativeai>=0.7,<1.0         (D-S04-14 Q-Sx04-4-2 LAW — Gemini
+#                                              gemini-1.5-flash PRIMARY LLM)
+#     - openai>=1.30,<2.0                     (D-S04-14 Q-Sx04-4-2 LAW — OpenAI
+#                                              gpt-4o-mini FALLBACK LLM)
 #
-# Version pinning strategy (per S-02 T03 task pack Q-2 resolution):
-#   - Python OTel: `>=1.27,<2.0` (Python ecosystem stable 1.x late-2025).
-#     Decoupled from JS OTel pin 1.25.1 (T01 C-03 pnpm.overrides — Node-only).
-#   - LangGraph: `>=0.2,<0.3` (Q-2 resolution: range > exact pin for
-#     auto-resolve patches without manual maintenance burden).
-#   - Flask + structlog: range pin to last-known major.
+# Verified Phiên Sx04-3 audit Q-Sx04-3-3:
+#   - pip download langgraph==0.2.76 + langgraph-checkpoint-redis==0.1.3 PASS no
+#     conflict; namespace import `from langgraph.checkpoint.redis import RedisSaver`
+#     works after install
+#   - langgraph-checkpoint-redis 0.1.3 metadata requires:
+#       langgraph-checkpoint (>=2.0.21,<3.0.0) + orjson (>=3.9.0,<4.0.0) +
+#       redis (>=5.2.1,<7.0.0) + redisvl (>=0.5.1,<1.0.0)
+#   - Installs cleanly alongside langgraph 0.2.76 (which requires
+#     langgraph-checkpoint >=2.0.10,<3.0.0)
+#
+# Reference:
+#   - slices/S-04_decisions-log.md D-S04-13 LAW (Pattern A + Option Z + Pattern P2
+#     + Strategy β)
+#   - slices/S-04_decisions-log.md D-S04-14 LAW (Sync HTTP MCP + Gemini Primary +
+#     Per-product product_ready + Paired telemetry)
+#   - docs/phases/PHASE_02_AUTH_SEARCH.md §C deps list
 # =============================================================================
 
 [project]
@@ -22,16 +40,23 @@ dependencies = [
     # --- Web framework ---
     "flask>=3.0,<4.0",
     "werkzeug>=3.0,<4.0",          # Flask transitive — pin family
-    # --- LangGraph + LangChain core (router skeleton only Phase 1) ---
+    # --- LangGraph + LangChain core ---
     "langgraph>=0.2,<0.3",
     "langchain-core>=0.3,<0.4",    # LangGraph 0.2.x transitive
+    # --- S-04 T02 NEW: RedisSaver checkpointer (D-S04-13 Pattern A) ---
+    "langgraph-checkpoint-redis>=0.1,<0.2",
+    # --- S-04 T02 NEW: Redis async client (D-S04-13 Option Z pub/sub + RedisSaver) ---
+    "redis>=5.0,<6.0",
+    # --- S-04 T02 NEW: Gemini PRIMARY LLM (D-S04-14 Q-Sx04-4-2 LAW) ---
+    "google-generativeai>=0.7,<1.0",
+    # --- S-04 T02 NEW: OpenAI FALLBACK LLM (D-S04-14 Q-Sx04-4-2 LAW) ---
+    "openai>=1.30,<2.0",
     # --- Logging + validation ---
     "structlog>=24.1,<25.0",
     "pydantic>=2.6,<3.0",
-    # --- HTTP client (MCP JSON-RPC) ---
+    # --- HTTP client (MCP JSON-RPC + AI internal /resume forwarding) ---
     "httpx>=0.27,<0.28",
     # --- OpenTelemetry Python SDK ---
-    # Python OTel separate from JS (T01 C-03 pin 1.25.1 = Node-only).
     "opentelemetry-api>=1.27,<2.0",
     "opentelemetry-sdk>=1.27,<2.0",
     "opentelemetry-exporter-otlp-proto-grpc>=1.27,<2.0",

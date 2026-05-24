@@ -87,7 +87,16 @@ services:
       start_period: 30s
 
   redis:
-    image: redis:7-alpine
+    # Phiên Sx04-7 fix: switched from `redis:7-alpine` to `redis/redis-stack-server`
+    # because langgraph-checkpoint-redis AsyncRedisSaver REQUIRES RedisJSON +
+    # RediSearch modules at setup() time (calls FT.CREATE for checkpoint
+    # indices + JSON.SET for checkpoint payload). Stock Redis 7 does not bundle
+    # these modules; Redis Stack does. Verified Phiên Sx04-7 smoke:
+    # `docker exec icp-redis redis-cli MODULE LIST` returned empty array →
+    # AsyncRedisSaver.asetup() fired ResponseError "unknown command FT.CREATE"
+    # → graph crashed at node 1 with no events emitted.
+    # See: https://pypi.org/project/langgraph-checkpoint-redis/ requirements.
+    image: redis/redis-stack-server:7.4.0-v8
     container_name: icp-redis
     volumes:
       - redis_data:/data
