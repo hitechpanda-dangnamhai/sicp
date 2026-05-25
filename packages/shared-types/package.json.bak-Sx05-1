@@ -20,10 +20,6 @@
       "types": "./dist/sse/index.d.ts",
       "default": "./dist/sse/index.js"
     },
-    "./cart": {
-      "types": "./dist/cart.d.ts",
-      "default": "./dist/cart.js"
-    },
     "./api": {
       "types": "./dist/api/index.d.ts",
       "default": "./dist/api/index.js"

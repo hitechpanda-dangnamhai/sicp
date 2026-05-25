@@ -1,0 +1,29 @@
+[
+  {
+    "_comment": "Promo code SALE15 — 15% off cart subtotal. Mockup intent-05-state-G-promo-applied.html line 159 'giảm 15% toàn giỏ' + line 303 'Mã SALE15 đã áp dụng'. Per D-S05-05 LAW (decisions-log line 216-250: LLM-Assisted Promo Code Typo Correction). Consumed by cart.apply_promo MCP tool (T02 territory) via case-insensitive exact match first; LLM typo fallback (cart_promo_typo.txt prompt) only if exact match fails.",
+    "code": "SALE15",
+    "type": "percent",
+    "value": 15,
+    "label": "Giảm 15% toàn giỏ",
+    "min_subtotal": 0,
+    "applies_to_shipping": false
+  },
+  {
+    "_comment": "Promo code FREESHIP — cancel shipping fee. Even when subtotal < 100k threshold (per handoff §A1 free-ship rule), FREESHIP forces shipping=0. value=null because type='shipping' uses on/off semantics, not numeric discount.",
+    "code": "FREESHIP",
+    "type": "shipping",
+    "value": null,
+    "label": "Miễn phí vận chuyển",
+    "min_subtotal": 0,
+    "applies_to_shipping": true
+  },
+  {
+    "_comment": "Promo code NEWUSER — 10.000₫ fixed off cart subtotal for new users. min_subtotal=0 (no minimum). Per handoff §6 line 282 fixture spec hint.",
+    "code": "NEWUSER",
+    "type": "fixed",
+    "value": 10000,
+    "label": "Giảm 10.000₫ cho khách mới",
+    "min_subtotal": 0,
+    "applies_to_shipping": false
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "_comment": "Free-gift rule — subtotal threshold 200000 → 'Dầu ăn Tường An 250ml'. Handoff §3 line 111 (CartSchema example) + §6 line 283 (Phase 02 BE task hardcoded) authoritative. Mockup state-G line 289 'Mua thêm 52.500₫ nữa' designer artistic license (actual gap to 200000 from state-G subtotal 145000 = 55000, not 52500; total 123250+52500=175750 also off). Handoff spec wins per Rule 7 evidence hierarchy. T01 emit single rule; array structure preserves forward-compat for future multi-rule (e.g. tier 300k → product B). Cross-ref: D-S05-06 LAW free_gift_hint field nullable in CartSchema (line 84-88 of cart.ts).",
+    "threshold": 200000,
+    "gift_label": "Dầu ăn Tường An 250ml",
+    "gift_category_id": "dau_an",
+    "active": true
+  }
+]

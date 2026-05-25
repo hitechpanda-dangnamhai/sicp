@@ -1,0 +1,13 @@
+[
+  {
+    "_comment": "Entry 1 — tuong_ot/Chin-su 250g → Chin-su 500g. Mockup intent-05-state-E-stock-issue.html line 187 (out-of-stock anchor: 'Tương ớt Chin-su 250g' qty=2) + line 282 (replacement: 'Tương ớt Chin-su 500g (chai lớn)' 29.000₫ + line 285 'còn 47 chai') ground truth. NOTE: D-S05-04 LAW body (decisions-log lines 202-208) rejects pure-fixture (Option A) + hybrid-fixture-first (Option C); runtime path is Vespa+LLM only per LAW. This fixture file is emit per TASKLIST T01 row + BRIEF line 96 + LAYER_MATRIX line 138 + INDEX_SLICES line 83+84 (5 sources concur emit) — inventory artifact + demo safety net. T02 owner (next phiên) decides whether stock_issue_lookup AI graph node loads this fixture (per INDEX_SLICES line 84 fixture-pattern reuse hint) or strictly follows D-S05-04 LAW body (Vespa+LLM only). Surface C-S05-E drift Phiên Sx05-1 T01 per Rule 8.4 LAW mid-execution amendment + ER-R5.",
+    "anchor_category": "tuong_ot",
+    "anchor_brand_filter": "Chinsu",
+    "out_of_stock_product_id_seed": "REPLACE_AT_SEED_RUNTIME:tuong_ot:Chin-su 250g",
+    "replacement_product_title_seed": "Tương ớt Chin-su 500g (chai lớn)",
+    "replacement_product_id_seed": "REPLACE_AT_SEED_RUNTIME:tuong_ot:Chin-su 500g",
+    "replacement_unit_price": 29000,
+    "replacement_available_stock": 47,
+    "reason_template": "Cùng thương hiệu {brand}, dung tích lớn tiết kiệm hơn."
+  }
+]
