@@ -209,6 +209,18 @@ schema product {
     }
   }
 
+  # === Fieldset (schema-level) ==========================================
+  # Phiên Sx04-X fix — without `fieldset default { fields: title, description }`,
+  # YQL `userQuery()` does not bind tokens to any BM25-indexed field → 0 hits
+  # even when title text matches the query. Verified empirically: query="Tam"
+  # against title "Nước tương Tam Thái Tử nâu 500ml" returned 0 hits without
+  # this fieldset declaration, 1 hit with `model.defaultIndex=title`.
+  # fieldset is a schema-level element (peer with rank-profile), NOT a
+  # document-body element — Vespa parser rejects it inside `document { ... }`.
+  fieldset default {
+    fields: title, description
+  }
+
   # === Rank profiles =======================================================
   # S-04 D-S04-03 LAW (Phiên Sx04): Dual rank profiles for Adaptive Single
   # Endpoint + Graceful Degradation architecture. Variant A baseline (BM25

@@ -256,6 +256,95 @@ def _build_headers() -> dict[str, str]:
     return headers
 
 
+def _call_vespa_once(
+    *,
+    query: str,
+    rank_profile: str,
+    limit: int,
+    url: str,
+    headers: dict[str, str],
+    category_filter: str | None,
+    brand_filter: str | None,
+    price_min: int | None,
+    price_max: int | None,
+    level: str,
+) -> tuple[list[dict[str, Any]], int, bool]:
+    """Execute a single Vespa search call and parse the response.
+
+    Helper for F2 cascading retry pattern (D-S04-X LAW). Called up to 3 times
+    by `search()` at different cascade levels with progressively dropped
+    filters. Each call creates a nested Tempo span for trace clarity.
+
+    Args:
+        query, rank_profile, limit: search params (constant across cascade levels)
+        url, headers: pre-built (constant across cascade levels)
+        category_filter, brand_filter, price_min, price_max: filters for THIS
+            level (caller passes None for any filter dropped at this level)
+        level: trace span suffix — one of "primary", "retry_drop_value",
+            "retry_drop_all" — for Tempo span naming + log correlation
+
+    Returns:
+        (items, total, ok): items list + total count + success bool.
+        ok=False signals HTTP error; caller should not cascade further on
+        HTTP failure (Vespa is down — retrying same call is pointless).
+    """
+    body = _build_request_body(
+        query, rank_profile, limit,
+        category_filter, price_min, price_max, brand_filter,
+    )
+
+    span_name = "vespa.hybrid_search" if level == "primary" else f"vespa.hybrid_search.{level}"
+    with _tracer.start_as_current_span(span_name) as span:
+        span.set_attribute("vespa.url", url)
+        span.set_attribute("vespa.rank_profile", rank_profile)
+        span.set_attribute("vespa.limit", limit)
+        span.set_attribute("vespa.cascade_level", level)
+        if category_filter:
+            span.set_attribute("vespa.category_filter", category_filter)
+        if brand_filter:
+            span.set_attribute("vespa.brand_filter", brand_filter)
+        if price_min is not None:
+            span.set_attribute("vespa.price_min", price_min)
+        if price_max is not None:
+            span.set_attribute("vespa.price_max", price_max)
+
+        try:
+            with httpx.Client(timeout=_DEFAULT_TIMEOUT_S) as client:
+                resp = client.post(url, json=body, headers=headers)
+                resp.raise_for_status()
+                payload = resp.json()
+        except httpx.HTTPError as e:
+            _logger.error(
+                "vespa.search.http_error",
+                level=level,
+                error=str(e),
+            )
+            span.record_exception(e)
+            span.set_attribute("vespa.status", "http_error")
+            return [], 0, False
+
+        # Parse Vespa response shape (same logic as original search()).
+        root = payload.get("root", {})
+        children = root.get("children", []) or []
+        hits = [
+            c for c in children
+            if c.get("id", "").startswith("id:") or "fields" in c
+        ]
+        if not hits:
+            for c in children:
+                if isinstance(c.get("children"), list):
+                    hits.extend(c["children"])
+
+        items = [_hit_to_product(h, rank_profile) for h in hits]
+        total = int(root.get("fields", {}).get("totalCount", len(items)))
+
+        span.set_attribute("vespa.result_count", len(items))
+        span.set_attribute("vespa.total_count", total)
+        span.set_attribute("vespa.status", "ok")
+
+        return items, total, True
+
+
 def search(params: dict[str, Any]) -> dict[str, Any]:
     """vespa.hybrid_search MCP tool handler.
 
@@ -318,64 +407,166 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
         except (TypeError, ValueError) as e:
             raise ValueError(f"'price_max' must be int or null; got {params.get('price_max')!r}") from e
 
-    body = _build_request_body(query, rank_profile, limit, category_filter, price_min, price_max, brand_filter)
     url = _vespa_url()
     headers = _build_headers()
 
+    # Phiên Sx04-X fix: log all filters (was missing brand/price/limit).
     _logger.info(
         "vespa.search.request",
         query=query,
         rank_profile=rank_profile,
         limit=limit,
         category_filter=category_filter,
+        brand_filter=brand_filter,
+        price_min=price_min,
+        price_max=price_max,
     )
 
-    # Sync httpx call (D-S04-14 Q-Sx04-4-1 LAW sync HTTP architecture).
-    with _tracer.start_as_current_span("vespa.hybrid_search") as span:
-        span.set_attribute("vespa.url", url)
-        span.set_attribute("vespa.rank_profile", rank_profile)
-        span.set_attribute("vespa.limit", limit)
-        if category_filter:
-            span.set_attribute("vespa.category_filter", category_filter)
+    # ========================================================================
+    # F2 Cascading Retry Architecture (D-S04-X LAW).
+    # ========================================================================
+    # Rationale: LLM `parse_filters` extracts filters that may not match the
+    # data — most commonly brand (e.g. "Tam Thái Tử" is a Chin-Su product line
+    # name, NOT a brand) but occasionally also category or price. A hard AND
+    # filter clause yields 0 hits despite title BM25 matching.
+    #
+    # Cascade levels (each progressively drops more filters):
+    #   L1 primary:           query + ALL filters (category + brand + price)
+    #   L2 retry_drop_value:  query + category;  DROP brand + price
+    #   L3 retry_drop_all:    query only;        DROP all filters
+    #
+    # Trigger logic:
+    #   - L1 always runs.
+    #   - L2 runs IFF total_L1 == 0 AND (brand or price filter present).
+    #   - L3 runs IFF total still 0 after L1/L2 AND category filter present.
+    #
+    # Returns `degraded_filters: list[str]` listing dropped filter categories
+    # — caller (S-04/S-07/S-08 AI graph) can decide UX (warn user, modify
+    # understanding text, log telemetry). Empty list = happy path no degrade.
+    # Field is ADDITIVE — caller that ignores it remains backward-compatible.
+    #
+    # Forward-compat: S-07 image import + S-08 voice buy reuse THIS tool with
+    # the same cascade contract. Each slice decides its own UX based on
+    # `degraded_filters` content.
+    # ========================================================================
 
-        try:
-            with httpx.Client(timeout=_DEFAULT_TIMEOUT_S) as client:
-                resp = client.post(url, json=body, headers=headers)
-                resp.raise_for_status()
-                payload = resp.json()
-        except httpx.HTTPError as e:
-            _logger.error("vespa.search.http_error", error=str(e))
-            span.record_exception(e)
-            span.set_attribute("vespa.status", "http_error")
-            raise RuntimeError(f"Vespa search failed: {e}") from e
+    # ---- LEVEL 1: primary search with ALL filters ----
+    items, total, ok = _call_vespa_once(
+        query=query,
+        rank_profile=rank_profile,
+        limit=limit,
+        url=url,
+        headers=headers,
+        category_filter=category_filter,
+        brand_filter=brand_filter,
+        price_min=price_min,
+        price_max=price_max,
+        level="primary",
+    )
+    if not ok:
+        # HTTP error in primary — Vespa down; retrying same call won't help.
+        raise RuntimeError("Vespa search failed at primary level")
 
-        # Parse Vespa response shape.
-        root = payload.get("root", {})
-        children = root.get("children", []) or []
-        # Vespa returns wrapper "group" children too; filter to actual hits.
-        hits = [c for c in children if c.get("id", "").startswith("id:") or "fields" in c]
-        if not hits:
-            # Some Vespa configs nest hits one level deeper.
-            for c in children:
-                if isinstance(c.get("children"), list):
-                    hits.extend(c["children"])
+    degraded_filters: list[str] = []
 
-        items = [_hit_to_product(h, rank_profile) for h in hits]
-        total = int(root.get("fields", {}).get("totalCount", len(items)))
+    has_value_filters = bool(
+        brand_filter or price_min is not None or price_max is not None
+    )
 
-        span.set_attribute("vespa.result_count", len(items))
-        span.set_attribute("vespa.total_count", total)
-        span.set_attribute("vespa.status", "ok")
-
-        _logger.info(
-            "vespa.search.response",
+    # ---- LEVEL 2: drop value filters (brand, price), KEEP category ----
+    if total == 0 and has_value_filters:
+        _logger.warning(
+            "vespa.search.retry_drop_value_filters",
             query=query,
             rank_profile=rank_profile,
-            result_count=len(items),
-            total_count=total,
+            kept_category=category_filter,
+            dropped_brand=brand_filter,
+            dropped_price_min=price_min,
+            dropped_price_max=price_max,
         )
+        l2_items, l2_total, l2_ok = _call_vespa_once(
+            query=query,
+            rank_profile=rank_profile,
+            limit=limit,
+            url=url,
+            headers=headers,
+            category_filter=category_filter,  # KEEP structural filter
+            brand_filter=None,                # DROP value filter
+            price_min=None,                   # DROP value filter
+            price_max=None,                   # DROP value filter
+            level="retry_drop_value",
+        )
+        if l2_ok and l2_total > 0:
+            items, total = l2_items, l2_total
+            if brand_filter:
+                degraded_filters.append("brand")
+            if price_min is not None or price_max is not None:
+                degraded_filters.append("price")
+            _logger.info(
+                "vespa.search.retry_drop_value_response",
+                query=query,
+                result_count=len(items),
+                total_count=total,
+                degraded_filters=degraded_filters,
+            )
 
-        return {"items": items, "total": total}
+    # ---- LEVEL 3: drop ALL filters (last-resort fallback) ----
+    if total == 0 and category_filter:
+        _logger.warning(
+            "vespa.search.retry_drop_all_filters",
+            query=query,
+            rank_profile=rank_profile,
+            dropped_category=category_filter,
+            dropped_brand=brand_filter,
+            dropped_price_min=price_min,
+            dropped_price_max=price_max,
+        )
+        l3_items, l3_total, l3_ok = _call_vespa_once(
+            query=query,
+            rank_profile=rank_profile,
+            limit=limit,
+            url=url,
+            headers=headers,
+            category_filter=None,
+            brand_filter=None,
+            price_min=None,
+            price_max=None,
+            level="retry_drop_all",
+        )
+        if l3_ok and l3_total > 0:
+            items, total = l3_items, l3_total
+            # Mark category as dropped (additive — brand/price may already be in list)
+            if "category" not in degraded_filters:
+                degraded_filters.append("category")
+            if brand_filter and "brand" not in degraded_filters:
+                degraded_filters.append("brand")
+            if (price_min is not None or price_max is not None) and "price" not in degraded_filters:
+                degraded_filters.append("price")
+            _logger.info(
+                "vespa.search.retry_drop_all_response",
+                query=query,
+                result_count=len(items),
+                total_count=total,
+                degraded_filters=degraded_filters,
+            )
+
+    # ---- Final response logging ----
+    _logger.info(
+        "vespa.search.response",
+        query=query,
+        rank_profile=rank_profile,
+        result_count=len(items),
+        total_count=total,
+        degraded_filters=degraded_filters,
+    )
+
+    return {
+        "items": items,
+        "total": total,
+        # NEW field per F2 LAW — list of filter categories dropped during
+        # cascade. Empty list = happy path. Caller can ignore safely.
+        "degraded_filters": degraded_filters,
+    }
 
 
 # Register at import time per MCP tools registry pattern (see

@@ -1,56 +1,45 @@
-"""LLM client — Gemini PRIMARY + OpenAI FALLBACK per D-S04-14 LAW (Q-Sx04-4-2).
+"""LLM client — Gemini PRIMARY + OpenAI FALLBACK with per-call model selection.
 
-S-04 T02 (Phiên Sx04-5):
-    - PRIMARY:  Gemini `gemini-2.5-flash` via `google-generativeai` SDK
+S-04 T02 (Phiên Sx04-5 emit; refactored Phiên Sx04-X for O2 model split):
+    - PRIMARY:  Gemini family via `google-generativeai` SDK
                 (env: GOOGLE_GEMINI_API_KEY)
-    - FALLBACK: OpenAI  `gpt-4o-mini`     via `openai` SDK
-                (env: OPENAI_API_KEY)
-    - 5s timeout per call; raises LLMTimeout on exceed.
-      (Phiên Sx04-7 amendment: original 2s timeout was too aggressive for
-      VN→Google network latency — TTFB Gemini API from VN typically
-      1-2s + inference 0.5-2s = 2-4s actual call time. 5s gives Gemini
-      enough room while still triggering interrupt protocol on true hangs.)
+                * Default model: `gemini-2.5-flash`
+                * Per-call override: `gemini-2.5-flash-lite` for background
+                  classification tasks (detect_typo, parse_filters) — empirically
+                  validated identical-or-better output quality at ~50-70%
+                  lower latency than full Flash.
+    - FALLBACK: OpenAI `gpt-4o-mini` via `openai` SDK (env: OPENAI_API_KEY)
+                * Non-timeout transient errors only (rate limit, API down).
+                * Per D-S04-14 LAW: timeout = degrade signal, NOT fallback trigger.
+    - Per-node calibrated timeouts (D-S04-15 LAW amended Phiên Sx04-X per
+      empirical measurement of Gemini inference time on Vietnamese prompts):
+        detect_typo:            5s   (Flash-Lite ~1.3s typical)
+        parse_filters:          5s   (Flash-Lite ~1.4s typical)
+        generate_understanding: 14s  (Flash ~7-12s typical, output 270-310 chars)
+        generate_reasons:       10s  (Flash ~3-5s per product, shorter output)
+        DEFAULT (other calls):  10s
     - `MOCK_LLM_TIMEOUT=true` env override → ALL calls raise LLMTimeout
-      immediately (for smoke testing degrade interrupt protocol per
-      D-S04-13 LAW Pattern A without burning real API quota).
+      immediately (smoke test degrade protocol).
 
-Phiên Sx04-7 fix amendment (2026-05-24) — two-step model name correction:
-    Step 1 (intermediate): Original Phiên Sx04-5 emit used `gemini-1.5-flash`
-        which was valid at emit time per Q-Sx04-4-2 audit. By smoke-test
-        time, Google had retired this exact model name on v1beta endpoint
-        → 404 NotFound on generateContent call.
-
-    Step 2 (final): Tried `gemini-2.0-flash` as direct replacement, but
-        per Google Cloud retirement matrix (effective March 6, 2026)
-        gemini-2.0-flash is "only available for existing customers" — new
-        API keys / new projects get 404 "no longer available to new users".
-
-    FINAL CHOICE: `gemini-2.5-flash` — recommended-for-new-projects per
-        Google's current retirement matrix. Same multilingual support,
-        same JSON-mode support, same family behavior as 2.0-flash so
-        prompts in `apps/ai/src/prompts/*.txt` are expected to work
-        without modification.
-
-    NOTE: `google-generativeai` package itself is deprecated (Google
-    recommends migrating to `google-genai`). Deferring that migration to
-    Phiên Sx04-8 or later — model name swap is sufficient for unblock.
-
-Rationale per D-S04-14 LAW Q-Sx04-4-2 LAW:
-    - VN multilingual native (cross-language Q-Sx04-3-1 LAW "soy sauce for
-      pho" → nuoc_tuong works out-of-the-box)
-    - Free tier RPD generous (scrappy startup signal)
-    - Vietnamese hackathon judges familiar with Gemini brand
-    - Fallback resilience for demo
-
-Structured output mode (JSON):
-    - Gemini: response_mime_type='application/json' + response_schema (when
-              provided) → enforces well-formed JSON
-    - OpenAI: response_format={'type': 'json_object'}
+Model selection rationale (O2 — Phiên Sx04-X):
+    detect_typo + parse_filters use Flash-Lite because:
+      1. Tasks are structured classification (typo confidence + category
+         enum + filter extraction) — not requiring deep Vietnamese fluency
+      2. Output is JSON, not user-facing text
+      3. Background nodes blocking sequential pipeline → latency dominant
+      4. Empirical A/B (n=10) shows Flash-Lite output identical or better
+         (5/6 vs 4/6 correct on typo edge cases; 4/4 identical on filters)
+    generate_understanding + generate_reasons keep Flash because:
+      1. Output is user-facing Vietnamese natural language
+      2. Mockup LOCKED strings require fluency (Rule 6 Mockup-is-LAW)
+      3. Quality regression here = visible to demo judges
 
 Reference:
     - slices/S-04_decisions-log.md D-S04-14 LAW Q-Sx04-4-2 sub-decision
     - slices/S-04_decisions-log.md D-S04-15 (Phiên Sx04-7 — Gemini model
       name update 1.5-flash → 2.5-flash via two-step verification)
+    - slices/S-04_decisions-log.md D-S04-X (Phiên Sx04-X — O2 model split +
+      empirical timeout calibration)
     - docs/phases/PHASE_02_AUTH_SEARCH.md §C deps + env vars
 """
 
@@ -67,10 +56,17 @@ from opentelemetry import trace
 _tracer = trace.get_tracer(__name__)
 _logger = structlog.get_logger()
 
-# 5s timeout per call (Phiên Sx04-7 amendment per D-S04-15; was 2s in D-S04-13
-# LAW + D-S04-14 LAW emit time, increased to accommodate VN→Google network
-# round-trip latency observed in smoke tests).
-DEFAULT_TIMEOUT_S = 15.0
+# Default model — full Flash for user-facing Vietnamese tasks.
+DEFAULT_MODEL = "gemini-2.5-flash"
+
+# Lightweight model — for background classification tasks.
+# Empirically validated identical-or-better quality at ~50-70% lower latency.
+LITE_MODEL = "gemini-2.5-flash-lite"
+
+# Default timeout (10s) — applies when caller doesn't specify timeout_s.
+# Per-node calibrated values are passed explicitly by graph nodes; see
+# searching_by_text.py for the calibration table.
+DEFAULT_TIMEOUT_S = 10.0
 
 
 class LLMError(Exception):
@@ -83,13 +79,13 @@ class LLMError(Exception):
 
 
 class LLMTimeout(LLMError):
-    """Raised on LLM timeout (>5s default).
+    """Raised on LLM timeout.
 
     Triggers D-S04-13 LAW degrade interrupt protocol at calling graph node
     (generate_understanding / parse_filters / generate_reasons).
     """
 
-    def __init__(self, message: str = "LLM call exceeded 5s timeout", provider: str | None = None):
+    def __init__(self, message: str = "LLM call exceeded timeout", provider: str | None = None):
         super().__init__(message, code="E_LLM_TIMEOUT", provider=provider)
 
 
@@ -103,30 +99,34 @@ class LLMRateLimited(LLMError):
 def _mock_llm_timeout_enabled() -> bool:
     """Smoke-test env override — when True, ALL calls raise LLMTimeout
     immediately. Lets us verify degrade interrupt protocol without burning
-    API quota or waiting 5s real.
+    API quota or waiting timeout real.
     """
     return os.getenv("MOCK_LLM_TIMEOUT", "").lower() in ("true", "1", "yes")
 
 
 class LLMClient:
-    """Gemini PRIMARY + OpenAI FALLBACK LLM client.
+    """Gemini PRIMARY + OpenAI FALLBACK LLM client with per-call model selection.
 
     Lazy-initialized SDK clients — first generate_json call constructs the
-    underlying Gemini + OpenAI clients. Both kept as instance state across
-    calls for connection reuse (Gemini ~50ms per cold connect overhead).
+    underlying SDK clients. Gemini clients are cached per model_name so that
+    Flash + Flash-Lite can coexist (re-use connection pool per model).
     """
 
     def __init__(self) -> None:
-        self._gemini_client: Any | None = None
-        self._openai_client: Any | None = None
+        # Cache Gemini GenerativeModel instances per model_name.
+        # Both Flash and Flash-Lite (and any future models) cached separately.
+        self._gemini_clients: dict[str, Any] = {}
+        self._gemini_configured = False
         self._gemini_disabled = False
+        self._openai_client: Any | None = None
         self._openai_disabled = False
 
-    def _ensure_gemini(self) -> Any:
+    def _ensure_gemini(self, model_name: str) -> Any:
+        """Return GenerativeModel for model_name, lazy-init and cache."""
         if self._gemini_disabled:
             return None
-        if self._gemini_client is not None:
-            return self._gemini_client
+        if model_name in self._gemini_clients:
+            return self._gemini_clients[model_name]
 
         api_key = os.getenv("GOOGLE_GEMINI_API_KEY")
         if not api_key:
@@ -137,25 +137,23 @@ class LLMClient:
         try:
             import google.generativeai as genai  # type: ignore[import-untyped]
 
-            genai.configure(api_key=api_key)
-            self._gemini_client = genai.GenerativeModel(
-                # Phiên Sx04-7 fix (two-step):
-                # 1. Original Sx04-5: "gemini-1.5-flash" — retired by Google
-                #    on v1beta endpoint.
-                # 2. Intermediate Sx04-7 attempt: "gemini-2.0-flash" — also
-                #    rejected for NEW projects per Google retirement matrix
-                #    effective March 6, 2026.
-                # 3. FINAL: "gemini-2.5-flash" — recommended-for-new-projects
-                #    per current matrix, same family behavior.
-                model_name="gemini-2.5-flash",
+            # configure() is global to genai module — call once only.
+            if not self._gemini_configured:
+                genai.configure(api_key=api_key)
+                self._gemini_configured = True
+
+            client = genai.GenerativeModel(
+                model_name=model_name,
                 generation_config={
                     "temperature": 0.3,
                     "response_mime_type": "application/json",
                 },
             )
-            return self._gemini_client
+            self._gemini_clients[model_name] = client
+            _logger.info("llm.gemini.client_init", model=model_name)
+            return client
         except Exception as e:  # noqa: BLE001
-            _logger.warning("llm.gemini.init_failed", error=str(e))
+            _logger.warning("llm.gemini.init_failed", model=model_name, error=str(e))
             self._gemini_disabled = True
             return None
 
@@ -181,14 +179,17 @@ class LLMClient:
             self._openai_disabled = True
             return None
 
-    async def _call_gemini(self, prompt: str, timeout_s: float) -> dict[str, Any]:
-        client = self._ensure_gemini()
+    async def _call_gemini(
+        self, prompt: str, timeout_s: float, model: str
+    ) -> dict[str, Any]:
+        client = self._ensure_gemini(model)
         if client is None:
-            raise LLMError("Gemini not configured", provider="gemini")
+            raise LLMError(f"Gemini not configured (model={model})", provider="gemini")
 
         with _tracer.start_as_current_span("llm.gemini.generate") as span:
             span.set_attribute("llm.provider", "gemini")
-            span.set_attribute("llm.model", "gemini-2.5-flash")
+            span.set_attribute("llm.model", model)
+            span.set_attribute("llm.timeout_s", timeout_s)
 
             # Wrap sync SDK call in asyncio.to_thread + asyncio.wait_for for timeout.
             try:
@@ -197,14 +198,24 @@ class LLMClient:
                     timeout=timeout_s,
                 )
             except asyncio.TimeoutError as e:
-                raise LLMTimeout(provider="gemini") from e
+                raise LLMTimeout(
+                    f"Gemini call exceeded {timeout_s}s (model={model})",
+                    provider="gemini",
+                ) from e
 
             text = getattr(resp, "text", None) or ""
             try:
                 return json.loads(text)
             except (json.JSONDecodeError, TypeError) as e:
-                _logger.warning("llm.gemini.json_parse_failed", text_preview=text[:200])
-                raise LLMError(f"Invalid JSON from Gemini: {e}", provider="gemini") from e
+                _logger.warning(
+                    "llm.gemini.json_parse_failed",
+                    model=model,
+                    text_preview=text[:200],
+                )
+                raise LLMError(
+                    f"Invalid JSON from Gemini (model={model}): {e}",
+                    provider="gemini",
+                ) from e
 
     async def _call_openai(self, prompt: str, timeout_s: float) -> dict[str, Any]:
         client = self._ensure_openai()
@@ -214,6 +225,7 @@ class LLMClient:
         with _tracer.start_as_current_span("llm.openai.generate") as span:
             span.set_attribute("llm.provider", "openai")
             span.set_attribute("llm.model", "gpt-4o-mini")
+            span.set_attribute("llm.timeout_s", timeout_s)
 
             try:
                 resp = await asyncio.wait_for(
@@ -226,30 +238,43 @@ class LLMClient:
                     timeout=timeout_s,
                 )
             except asyncio.TimeoutError as e:
-                raise LLMTimeout(provider="openai") from e
+                raise LLMTimeout(
+                    f"OpenAI call exceeded {timeout_s}s",
+                    provider="openai",
+                ) from e
 
             text = resp.choices[0].message.content or ""
             try:
                 return json.loads(text)
             except (json.JSONDecodeError, TypeError) as e:
                 _logger.warning("llm.openai.json_parse_failed", text_preview=text[:200])
-                raise LLMError(f"Invalid JSON from OpenAI: {e}", provider="openai") from e
+                raise LLMError(
+                    f"Invalid JSON from OpenAI: {e}", provider="openai"
+                ) from e
 
     async def generate_json(
-        self, prompt: str, timeout_s: float = DEFAULT_TIMEOUT_S
+        self,
+        prompt: str,
+        timeout_s: float = DEFAULT_TIMEOUT_S,
+        model: str = DEFAULT_MODEL,
     ) -> dict[str, Any]:
         """Generate JSON structured output via Gemini PRIMARY, OpenAI FALLBACK.
 
         Behavior:
             - MOCK_LLM_TIMEOUT=true → raise LLMTimeout immediately (no API call)
-            - Try Gemini first; on LLMTimeout → re-raise (degrade trigger)
-            - On non-timeout Gemini error → try OpenAI (transient resilience)
+            - Try Gemini first (with specified model); on LLMTimeout → re-raise
+              (degrade trigger per D-S04-14 LAW)
+            - On non-timeout Gemini error → try OpenAI (transient resilience).
+              Note: OpenAI fallback ignores `model` param (uses gpt-4o-mini).
             - If both fail → raise last LLMError
 
         Args:
             prompt:    Full prompt text (caller renders template with .format)
-            timeout_s: Per-call timeout in seconds (default 5.0s per Phiên
-                Sx04-7 D-S04-15 amendment of D-S04-13 LAW; was 2.0s originally)
+            timeout_s: Per-call timeout in seconds (caller passes node-calibrated
+                       value per D-S04-15 LAW table; falls back to DEFAULT_TIMEOUT_S)
+            model:     Gemini model name. Use LITE_MODEL for background
+                       classification (detect_typo, parse_filters) per O2 split.
+                       Default is DEFAULT_MODEL (full Flash) for user-facing tasks.
 
         Returns:
             Parsed JSON dict.
@@ -263,22 +288,27 @@ class LLMClient:
             _logger.info("llm.mock_timeout", reason="MOCK_LLM_TIMEOUT env override")
             raise LLMTimeout(provider="mock")
 
-        # Primary: Gemini.
+        # Primary: Gemini with specified model.
         try:
-            return await self._call_gemini(prompt, timeout_s)
+            return await self._call_gemini(prompt, timeout_s, model)
         except LLMTimeout:
-            # Timeout = degrade trigger; do NOT fall back to OpenAI (per D-S04-14
-            # LAW, OpenAI fallback is for non-timeout transient errors only —
-            # timeout is the WHOLE POINT of triggering graceful degrade).
+            # Timeout = degrade trigger; do NOT fall back to OpenAI per
+            # D-S04-14 LAW (OpenAI fallback is for non-timeout transient
+            # errors only — timeout is the WHOLE POINT of degrade signal).
             raise
         except LLMError as gemini_err:
-            _logger.warning("llm.gemini.fallback_to_openai", error=str(gemini_err))
+            _logger.warning(
+                "llm.gemini.fallback_to_openai",
+                model=model,
+                error=str(gemini_err),
+            )
             # Try OpenAI fallback for non-timeout errors.
             try:
                 return await self._call_openai(prompt, timeout_s)
             except LLMError as openai_err:
                 _logger.error(
                     "llm.both_failed",
+                    model=model,
                     gemini_error=str(gemini_err),
                     openai_error=str(openai_err),
                 )

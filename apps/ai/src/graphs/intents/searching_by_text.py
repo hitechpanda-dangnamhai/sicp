@@ -83,7 +83,7 @@ from langgraph.types import Command, interrupt
 from opentelemetry import trace
 
 from ...state import IcpState
-from ...tools.llm_client import LLMTimeout, get_llm_client
+from ...tools.llm_client import LITE_MODEL, LLMTimeout, get_llm_client
 from ...tools.mcp_client import McpClient, McpError
 from ...tools.redis_publisher import RedisPublisher
 from ...prompts import load_prompt
@@ -153,7 +153,7 @@ async def _node_detect_typo(state: IcpState, publisher: RedisPublisher) -> IcpSt
     llm = get_llm_client()
     prompt = load_prompt("detect_typo").format(query=state["content"])
     try:
-        result = await llm.generate_json(prompt, timeout_s=15.0)
+        result = await llm.generate_json(prompt, timeout_s=5.0, model=LITE_MODEL)
     except LLMTimeout:
         # Variant B detect_typo timeout = NOT critical → skip (no interrupt);
         # continue to generate_understanding with original query.
@@ -229,7 +229,7 @@ async def _node_generate_understanding(
     prompt = load_prompt("generate_understanding").format(query=state["content"])
     t0 = time.monotonic()
     try:
-        result = await llm.generate_json(prompt, timeout_s=15.0)
+        result = await llm.generate_json(prompt, timeout_s=14.0)
     except LLMTimeout:
         # Flip mode + degrade interrupt.
         elapsed_ms = int((time.monotonic() - t0) * 1000)
@@ -335,7 +335,7 @@ async def _node_parse_filters(state: IcpState, publisher: RedisPublisher) -> Icp
     llm = get_llm_client()
     prompt = load_prompt("parse_filters").format(query=query)
     try:
-        result = await llm.generate_json(prompt, timeout_s=15.0)
+        result = await llm.generate_json(prompt, timeout_s=5.0, model=LITE_MODEL)
         category = result.get("category")
         filters = result.get("filters", {})
         _logger.info(
@@ -469,7 +469,7 @@ async def _per_product_reason(
     item = dict(product)  # shallow copy so we can augment
     try:
         prompt = prompt_template.format(query=query, product=json.dumps(product, ensure_ascii=False))
-        result = await llm.generate_json(prompt, timeout_s=15.0)
+        result = await llm.generate_json(prompt, timeout_s=10.0)
         item["reason"] = result.get("reason", "")
         return {"item": item, "success": True}
     except LLMTimeout:
