@@ -3,8 +3,12 @@
  *
  * Slice:   S-01 UI Foundation
  * Tasks:   T04 (9 Family A molecules) + T05 (4 Family B molecules)
+ *          + S-03 T03b (3 Dashboard hub molecules)
+ *          + S-04 T04 (5 V-SLICE Search molecules per Phiên Sx04-9a)
+ *          + S-05 T03 (9 V-SLICE Cart molecules per Phiên Sx05-3 — C-S05-I Path A)
  *
- * Total: 13 molecule components + type exports + 2 ProductCard presets + 2 CVA exports.
+ * Total: 22 + 9 (S-05) = 31 molecule components + type exports + 2 ProductCard
+ * presets + 2 CVA exports.
  *
  * Compact-only for TrendCard + ShopeeCompareCard per C-21 (expanded modes
  * defer S-07 V-SLICE as page composition).
@@ -12,6 +16,13 @@
  * Family B molecules added in T05 (Phiên 17) per Concern 2 (ProductCard
  * single-component with width preset exports I03A_138 + I04_172) and
  * Concern 3 A1 (CartItemRow stockIssue='out' only, no 'low' skeleton).
+ *
+ * S-05 NEW V-SLICE feature molecules per C-S05-I Path A (Phiên Sx05-3):
+ * EXTEND existing CartItemRow +3 props (NOT new <CartItem>) — preserves 6
+ * production consumers from S-01 + Storybook + barrel + BottomSheet docstring.
+ * 9 NEW supporting molecules: CartSummary + CartAIHintBubble + StockIssueAlert +
+ * StockReplacementCard + ClearConfirmModal + PromoSuccessBanner + UndoRemoveToast +
+ * PendingSyncToast + SwipeableCartItem.
  */
 
 // ─── T04 Family A (9 molecules) ─────────────────────────────────────────────
@@ -158,3 +169,53 @@ export {
   type CoPurchaseHintCardProps,
   type CoPurchaseSuggestedProduct,
 } from './CoPurchaseHintCard';
+
+// ─── S-05 T03 NEW V-SLICE feature molecules (Phiên Sx05-3 per C-S05-I Path A) ───
+// EXTEND existing CartItemRow +3 props (isUpdating + lineTotalOverride + currencyFormatter)
+// preserves 6 S-01 consumers backward-compat. 9 NEW supporting molecules below cover all
+// 8 mockup states (state-0/A/B/C/D/E/F/G) — state-B reused EmptyState organism inline.
+
+export {
+  CartSummary,
+  type CartSummaryProps,
+} from './CartSummary';
+
+export {
+  CartAIHintBubble,
+  type CartAIHintBubbleProps,
+} from './CartAIHintBubble';
+
+export {
+  StockIssueAlert,
+  type StockIssueAlertProps,
+} from './StockIssueAlert';
+
+export {
+  StockReplacementCard,
+  type StockReplacementCardProps,
+} from './StockReplacementCard';
+
+export {
+  ClearConfirmModal,
+  type ClearConfirmModalProps,
+} from './ClearConfirmModal';
+
+export {
+  PromoSuccessBanner,
+  type PromoSuccessBannerProps,
+} from './PromoSuccessBanner';
+
+export {
+  UndoRemoveToast,
+  type UndoRemoveToastProps,
+} from './UndoRemoveToast';
+
+export {
+  PendingSyncToast,
+  type PendingSyncToastProps,
+} from './PendingSyncToast';
+
+export {
+  SwipeableCartItem,
+  type SwipeableCartItemProps,
+} from './SwipeableCartItem';

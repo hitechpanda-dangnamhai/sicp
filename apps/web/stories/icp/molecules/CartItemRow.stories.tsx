@@ -1,36 +1,23 @@
 /**
  * apps/web/stories/icp/molecules/CartItemRow.stories.tsx
  *
- * Slice:   S-01 UI Foundation
- * Task:    T07 — Storybook + COMPONENT_REGISTRY + Visual Smoke
- * Molecule: <CartItemRow> (T05, Family B)
+ * Slice:   S-01 UI Foundation (baseline 9 stories)
+ *          S-05 T03 EXTEND (Phiên Sx05-3) — +3 NEW stories per C-S05-I + C-S05-J
+ *
+ * Task:    T07 — Storybook + COMPONENT_REGISTRY + Visual Smoke (S-01)
+ *          S-05 T03 (Phiên Sx05-3) — verify EXTEND props in Storybook UI
+ *
+ * Molecule: <CartItemRow> (T05 Family B baseline + S-05 T03 EXTEND +3 props)
  *
  * Source verified: components/icp/molecules/CartItemRow.tsx
- *   Props: product: CartItemProduct (REQUIRED, {brand, name, price, originalPrice?,
- *                                              imageGradient?, imageIcon?}),
- *          qty: number (REQUIRED, parent-controlled, NOT internally clamped),
- *          onQtyChange?: (newQty: number) => void,
- *          onRemove?: () => void,
- *          stockIssue?: 'out' (only 'out' shipped in T05 per Concern 3 A1),
- *          onResolveStockIssue?: () => void,
- *          cornerBadge?: CartItemCornerBadge ({type: 'discount'|'new', label})
- *
- * Decisions applied:
- * - C-22 verify: 7 props, qty parent-controlled (parent state owns clamping)
- * - C-15 Client (onQtyChange + onRemove + onResolveStockIssue handlers)
- * - C-07 navigation-agnostic — callbacks only
- * - C-08 VN labels in mock data
- * - C-13 Omit 'children' from HTMLAttributes (composable but no children slot)
- * - C-23 atom bypass for +/- stepper buttons (28-30px micro UI per T05)
- * - Concern 3 A1: stockIssue='out' only — no 'low' skeleton state yet
- * - Q4 Registry: MULTI-INTENT (qty stepper + stock issue + corner badges + image variants)
- *
- * Story coverage: Default + various qty + stockIssue + corner badges + edge cases
+ *   Props (S-01 baseline): product, qty, onQtyChange, onRemove, stockIssue, onResolveStockIssue, cornerBadge
+ *   Props (S-05 T03 NEW): isUpdating?, lineTotalOverride?, currencyFormatter?
  */
 
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
 import { CartItemRow, type CartItemProduct } from '@/components/icp/molecules';
+import { formatVNDCompact } from '@/lib/utils';
 
 const PRODUCT_BASIC: CartItemProduct = {
   brand: 'Vinamilk',
@@ -45,6 +32,13 @@ const PRODUCT_WITH_DISCOUNT: CartItemProduct = {
   originalPrice: 35000,
 };
 
+const PRODUCT_MAGGI: CartItemProduct = {
+  brand: 'Maggi',
+  name: 'Nước tương Maggi đậm đặc 700ml',
+  price: 25500,
+  originalPrice: 30000,
+};
+
 const meta = {
   title: 'Molecules/CartItemRow',
   component: CartItemRow,
@@ -57,7 +51,9 @@ const meta = {
           'Cart line item row: product thumbnail + brand/name + price + qty stepper +/-. ' +
           'qty parent-controlled (NOT internally clamped — parent state owns clamping logic). ' +
           'stockIssue="out" renders rose banner with "Bỏ" CTA. Corner badge optional (-15% discount ' +
-          'or MỚI new). C-23 atom bypass for +/- stepper buttons.',
+          'or MỚI new). C-23 atom bypass for +/- stepper buttons. ' +
+          'S-05 T03 EXTEND adds isUpdating (Spinner overlay), lineTotalOverride (optimistic UI), ' +
+          'currencyFormatter (formatVNDCompact for mockup parity).',
       },
     },
   },
@@ -67,6 +63,7 @@ const meta = {
       control: 'inline-radio',
       options: [undefined, 'out'],
     },
+    isUpdating: { control: 'boolean' },
   },
   args: {
     product: PRODUCT_BASIC,
@@ -164,5 +161,67 @@ export const FullCombined: Story = {
     product: PRODUCT_WITH_DISCOUNT,
     qty: 3,
     cornerBadge: { type: 'discount', label: '-20%' },
+  },
+};
+
+// ─── S-05 T03 NEW stories (Phiên Sx05-3 per C-S05-I + C-S05-J) ──────────────
+
+export const Updating: Story = {
+  name: '[S-05] isUpdating=true (Spinner overlay)',
+  args: {
+    product: PRODUCT_MAGGI,
+    qty: 2,
+    isUpdating: true,
+    cornerBadge: { type: 'discount', label: '-15%' },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'isUpdating=true renders <Spinner size={14} color="pink"> in place of qty number. ' +
+          'Used during state-C debounce-pending window OR PATCH /cart/items/:id in-flight. ' +
+          'Stepper +/- buttons disabled during update. D-S05-07 LAW optimistic UI pattern.',
+      },
+    },
+  },
+};
+
+export const OptimisticLineTotal: Story = {
+  name: '[S-05] lineTotalOverride (optimistic line_total)',
+  args: {
+    product: PRODUCT_MAGGI,
+    qty: 2, // server truth
+    lineTotalOverride: 76500, // 25500 × 3 (user tapped + once, optimistic qty=3)
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'lineTotalOverride=76500 overrides default product.price * qty (25500 × 2 = 51000) ' +
+          'with optimistic computed value. Used during D-S05-07 LAW debounce window where ' +
+          'qty number stays as server truth but line_total reflects optimistic intent.',
+      },
+    },
+  },
+};
+
+export const WithCompactFormatter: Story = {
+  name: '[S-05] currencyFormatter=formatVNDCompact (cart context parity)',
+  args: {
+    product: PRODUCT_MAGGI,
+    qty: 3,
+    currencyFormatter: formatVNDCompact,
+    cornerBadge: { type: 'discount', label: '-15%' },
+  },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'currencyFormatter override → renders "25.500₫" (no space) matching mockup ' +
+          'state-0 line 158 verbatim per Rule 6 LAW (237 mockup instances verified ' +
+          'Sx05-3-DISCOVER). Default formatVND (NBSP) preserved for backward-compat with ' +
+          '6 S-01 production consumers + molecules.test.tsx:658 assertion. C-S05-J Path A additive.',
+      },
+    },
   },
 };

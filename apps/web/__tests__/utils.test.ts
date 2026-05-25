@@ -2,14 +2,16 @@
  * apps/web/__tests__/utils.test.ts — Smoke tests for lib/utils.ts
  *
  * Slice:    S-01 UI Foundation
+ *           S-05 T03 EXTEND (Phiên Sx05-3) — +3 formatVNDCompact tests per C-S05-J
+ *
  * Task:     T01 Tokens + Utility Foundation
- * AC:       AC-21 (≥3 smoke tests)
+ * AC:       AC-21 (≥3 smoke tests S-01); AC14 (S-05 T03 — formatVNDCompact parity)
  *
  * Runs via vitest (see vitest.config.ts).
  */
 
 import { describe, it, expect } from 'vitest';
-import { cn, formatVND, clampPct } from '@/lib/utils';
+import { cn, formatVND, formatVNDCompact, clampPct } from '@/lib/utils';
 
 describe('cn()', () => {
   it('merges classes deduping Tailwind conflicts (last wins)', () => {
@@ -42,6 +44,33 @@ describe('formatVND()', () => {
 
   it('defensively handles NaN', () => {
     expect(formatVND(NaN)).toMatch(/^0[\s\u00A0]?₫$/);
+  });
+});
+
+// ─── S-05 T03 NEW (Phiên Sx05-3 per C-S05-J Path A additive) ─────────────────
+describe('formatVNDCompact()', () => {
+  it('formats positive integer without any whitespace (mockup parity)', () => {
+    // Mockup state-0 line 158: "25.500₫" (no space, no NBSP)
+    expect(formatVNDCompact(25500)).toBe('25.500₫');
+    // Mockup state-F line 238: "140.500₫"
+    expect(formatVNDCompact(140500)).toBe('140.500₫');
+    // Mockup state-G promo: "200.000₫"
+    expect(formatVNDCompact(200000)).toBe('200.000₫');
+  });
+
+  it('strips both regular space and NBSP from Intl output', () => {
+    // Defensive: result must not contain ANY whitespace between number and ₫
+    const result = formatVNDCompact(51000);
+    expect(result).toBe('51.000₫');
+    expect(result).not.toMatch(/\s/);
+    expect(result).not.toMatch(/\u00A0/);
+  });
+
+  it('defensively handles zero, NaN, Infinity', () => {
+    expect(formatVNDCompact(0)).toBe('0₫');
+    expect(formatVNDCompact(NaN)).toBe('0₫');
+    expect(formatVNDCompact(Infinity)).toBe('0₫');
+    expect(formatVNDCompact(-Infinity)).toBe('0₫');
   });
 });
 

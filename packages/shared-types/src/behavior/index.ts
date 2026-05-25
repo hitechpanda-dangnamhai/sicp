@@ -16,6 +16,7 @@
  *   AuthSignedInPropertiesSchema,
  *   NavSettingsSectionOpenedPropertiesSchema,
  *   NavTileClickedPropertiesSchema,
+ *   CartViewedPropertiesSchema,
  *   type BehaviorEvent,
  *   type BehaviorEventType,
  *   type PropertiesFor,
@@ -30,6 +31,7 @@
  * 3 new files: auth-events / nav-events / error-events). Extended S-03 T03b
  * Phiên 36 (+1 re-export NavTileClickedPropertiesSchema per D-11 + C-23 R1).
  * Extended S-04 T06 Phiên Sx04-12 (+5 re-exports Search* per D-S04-07/08/13/14 LAW).
+ * Extended S-05 T03 Phiên Sx05-3 (+6 re-exports Cart* per C-S05-H Path A FE-emit).
  */
 
 // Tracker contracts (canonical BehaviorEvent + batch request/response)
@@ -81,3 +83,15 @@ export {
   SearchVariantDegradedPropertiesSchema,
   SearchFirstCardRenderedPropertiesSchema,
 } from './search-events.js';
+
+// S-05 T03 (Phiên Sx05-3) — Cart subset (6 schemas per 07_BEHAVIOR §3.4; C-S05-H Path A)
+// NOT included: cart.stock_resolved (Conflict #1 SKIP — Layer 1 no schema; sub-actions
+// tracked via cart.item_removed + cart.item_added post-refetch).
+export {
+  CartViewedPropertiesSchema,
+  CartItemRemovedPropertiesSchema,
+  CartQtyChangedPropertiesSchema,
+  CartClearedPropertiesSchema,
+  CartPromoAppliedPropertiesSchema,
+  CartPromoRemovedPropertiesSchema,
+} from './cart-events.js';

@@ -123,6 +123,18 @@ export interface PostIntentBody {
     | 'cart_view_with_stock_check';
   /** S-04 NEW per D-S04-03 LAW Adaptive Single Endpoint. */
   mode?: 'ai_augmented' | 'basic_fallback';
+  /**
+   * Sx05-3-CODE HOTFIX (D-S05-13 LAW Cross-service User Context Propagation,
+   * Phiên Sx05-3-CODE manual test discovery).
+   *
+   * JWT-resolved authenticated user_id extracted by `intent.controller.ts`
+   * @UseGuards(JwtAuthGuard) → req.user.id, forwarded here for AI service to
+   * persist into IcpState. Without this field, AI cart_by_text graph nodes
+   * fall back to 'anon' user_id → wrong cart cleared/checked.
+   *
+   * Optional for backward-compat with non-authed smoke test callers.
+   */
+  user_id?: string;
 }
 
 /**

@@ -25,8 +25,10 @@
  * - **T06 (S-04 Phiên Sx04-12):** +5 types — `search.suggested_chip_tapped`,
  *   `search.followup_filter_tapped`, `search.typo_corrected`, `search.variant_degraded`,
  *   `search.first_card_rendered` — per D-S04-07/08/13/14 LAW. Total: 14 types.
- * - **Total T06 end:** 14 types. Full catalog (~25 per `07_BEHAVIOR §3`) populated
- *   incrementally per V-SLICE first-need.
+ * - **T03 (S-05 Phiên Sx05-3):** +6 types — `cart.viewed`, `cart.item_removed`,
+ *   `cart.qty_changed`, `cart.cleared`, `cart.promo_applied`, `cart.promo_removed`
+ *   per W1 LOCK FE-emit architecture + C-S05-H Conflict #1 SKIP (NO
+ *   `cart.stock_resolved` — Layer 1 docs no schema). Total: 20 types.
  *
  * @see docs/07_BEHAVIOR_LOGS.md §3 (event catalog) + §8 (type safety)
  * @see LOG_CATALOG.md Section B (behavior event types — append-only registry)
@@ -34,6 +36,7 @@
  * S-02 T06 emit. Extended S-03 T03 Phiên 33 (+5 schemas per C-07 + C-09 + DM-7).
  * Extended S-03 T03b Phiên 36 (+1 schema `nav.tile_clicked` per D-11 + C-23).
  * Extended S-04 T06 Phiên Sx04-12 (+5 schemas Search* per D-S04-07/08/13/14 LAW).
+ * Extended S-05 T03 Phiên Sx05-3 (+6 schemas Cart* per C-S05-H Path A — FE-emit).
  */
 
 import { z } from 'zod';
@@ -54,6 +57,14 @@ import {
   SearchVariantDegradedPropertiesSchema,
   SearchFirstCardRenderedPropertiesSchema,
 } from './search-events.js';
+import {
+  CartViewedPropertiesSchema,
+  CartItemRemovedPropertiesSchema,
+  CartQtyChangedPropertiesSchema,
+  CartClearedPropertiesSchema,
+  CartPromoAppliedPropertiesSchema,
+  CartPromoRemovedPropertiesSchema,
+} from './cart-events.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Properties schemas (Zod runtime validation per event type)
@@ -100,7 +111,7 @@ export const CartItemAddedPropertiesSchema = z
  *
  * **Discriminated union note:** `BehaviorEventSchema` in `./tracker.ts`
  * auto-extends as this map grows — Zod 3.x `discriminatedUnion` requires
- * ≥2 variants; 14 variants for T06 fully supported.
+ * ≥2 variants; 20 variants for S-05 T03 fully supported.
  */
 export const PROPERTIES_SCHEMA_MAP = {
   // S-02 T06 — baseline 3 types
@@ -121,12 +132,19 @@ export const PROPERTIES_SCHEMA_MAP = {
   'search.typo_corrected': SearchTypoCorrectedPropertiesSchema,
   'search.variant_degraded': SearchVariantDegradedPropertiesSchema,
   'search.first_card_rendered': SearchFirstCardRenderedPropertiesSchema,
+  // S-05 T03 — +6 types (Cart subset per 07_BEHAVIOR §3.4; Phiên Sx05-3 per C-S05-H Path A)
+  'cart.viewed': CartViewedPropertiesSchema,
+  'cart.item_removed': CartItemRemovedPropertiesSchema,
+  'cart.qty_changed': CartQtyChangedPropertiesSchema,
+  'cart.cleared': CartClearedPropertiesSchema,
+  'cart.promo_applied': CartPromoAppliedPropertiesSchema,
+  'cart.promo_removed': CartPromoRemovedPropertiesSchema,
 } as const;
 
 /**
  * Union of all registered behavior event types — keys of
  * `PROPERTIES_SCHEMA_MAP`. T06 = 3 types; T03 = 8 types; T03b = 9 types;
- * S-04 T06 = 14 types; expands per V-SLICE.
+ * S-04 T06 = 14 types; S-05 T03 = 20 types; expands per V-SLICE.
  */
 export type BehaviorEventType = keyof typeof PROPERTIES_SCHEMA_MAP;
 
@@ -147,11 +165,11 @@ export type PropertiesMap = {
  * type CartProps = PropertiesFor<'cart.item_added'>;
  * // { product_id: string; qty: number; unit_price: number; source: ...; from_query?: string }
  *
+ * type CartQtyProps = PropertiesFor<'cart.qty_changed'>;
+ * // { product_id: string; old_qty: number; new_qty: number }
+ *
  * type AuthInProps = PropertiesFor<'auth.signed_in'>;
  * // { method: 'password' }
- *
- * type NavProps = PropertiesFor<'nav.settings_section_opened'>;
- * // { section: 'notifications' | 'security' | 'help' }
  * ```
  */
 export type PropertiesFor<T extends BehaviorEventType> = PropertiesMap[T];

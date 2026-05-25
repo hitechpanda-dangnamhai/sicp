@@ -5,36 +5,50 @@
  *
  * Molecule: <CartItemRow> — Family B I05 cart line item
  *
- * Slice:    S-01 UI Foundation
- * Task:     T05 AC-2, AC-7 (dev preview)
+ * Slice:    S-01 UI Foundation (baseline 7 props + StockIssueBanner inline)
+ *           S-05 T03 EXTEND (Phiên Sx05-3) — +3 props per C-S05-I + C-S05-J
+ *
+ * Task:     T05 AC-2, AC-7 (S-01 dev preview)
+ *           S-05 T03 (Phiên Sx05-3) — qty Spinner overlay + optimistic line_total + currency formatter override
  *
  * Source:   Family B mockup HTML (per C-03 structural inference + Tailwind translation):
  *           - intent-05/intent-05-state-0-happy.html line 144-200 (base row pattern)
  *           - intent-05/intent-05-state-E-stock-issue.html line 185-212 (stockIssue='out' banner)
+ *           - intent-05/intent-05-state-C-update-qty.html line 178-201 (isUpdating spinner inline)
+ *           - intent-05/intent-05-state-0-happy.html line 158/171/187/199/228/256 (no-space currency)
  *
  * Reach:    I05 cart line item (single-intent, NOT C-24 multi-intent qualifier).
+ *           Now reused by /intent-05/page.tsx production consumer (S-05 T03).
  *
- * Decisions applied:
+ * Decisions applied (S-01 baseline preserved):
  * - C-03 structural inference + C-23 atom bypass for micro-elements (26×26 qty
- *   stepper buttons, 5px badge corner, mini "Bỏ" button in stock banner) —
- *   see decisions-log Section 3
+ *   stepper buttons, 5px badge corner, mini "Bỏ" button in stock banner)
  * - C-07 navigation-agnostic — onQtyChange/onRemove/onResolveStockIssue callbacks
  * - C-08 + D-05 VN inline — stockIssue copy "Đã hết hàng — em đề xuất bỏ khỏi giỏ"
  *   + "Bỏ" CTA owned by component
- * - C-13 Omit 'children' from HTMLAttributes (consumer doesn't pass children)
- * - C-15 'use client' for onQtyChange/onRemove/onResolveStockIssue event handlers
- * - C-18 Tier 4 Tailwind utility inline (no @layer components classes added)
- * - C-22 atom interface verified DISCOVER — bypasses Button/ChipPill atoms;
- *   only <Icon> from atoms barrel consumed (minus/plus/alert-triangle)
+ * - C-13 Omit 'children' from HTMLAttributes
+ * - C-15 'use client' for event handlers
+ * - C-18 Tier 4 Tailwind utility inline
+ * - C-22 atom interface verified — bypasses Button/ChipPill; only <Icon> + <Spinner> from atoms
  *
- * Concern 3 A1 lock: ship stockIssue='out' only (mockup state-E direct).
- * NO 'low' inferred variant (Phiên 15 anti-pattern lockdown — no skeleton stub
- * for missing mockup).
+ * Decisions applied (S-05 T03 NEW):
+ * - C-S05-I (Conflict #2 Path A): EXTEND existing CartItemRow +3 props (NOT new <CartItem>)
+ *   because S-01 ship has 6 consumers (/dev/* pages + Storybook + BottomSheet + barrel).
+ *   Backward-compat preserved — all 7 base props unchanged.
+ * - C-S05-J (Conflict #3 Option A additive): `currencyFormatter` prop defaults to
+ *   `formatVND` (NBSP). Cart contexts pass `formatVNDCompact` for no-space mockup parity
+ *   per Rule 6 LAW (237 mockup instances verified Sx05-3-DISCOVER).
+ * - D-S05-07 LAW: `lineTotalOverride` enables optimistic line_total during qty debounce
+ *   window — parent reducer computes `optimisticQty * product.price` and passes here.
+ *   Falls back to `product.price * qty` when undefined (S-01 baseline behavior).
+ *
+ * Concern 3 A1 lock (S-01): ship stockIssue='out' only (mockup state-E direct).
+ * NO 'low' inferred variant.
  */
 
 import * as React from 'react';
 import { cn, formatVND } from '@/lib/utils';
-import { Icon } from '@/components/icp/atoms';
+import { Icon, Spinner } from '@/components/icp/atoms';
 import type { IconName } from '@/lib/icon-map';
 
 // Public types
@@ -67,6 +81,26 @@ export interface CartItemRowProps extends Omit<React.HTMLAttributes<HTMLDivEleme
   onResolveStockIssue?: () => void;
   /** Optional top-right badge on product image (state-E shows discount/-15% or MỚI badges) */
   cornerBadge?: CartItemCornerBadge;
+
+  // ─── S-05 T03 NEW (Phiên Sx05-3 per C-S05-I + C-S05-J) ────────────────────
+  /**
+   * Render <Spinner size={14} color="pink" /> in place of qty number (state-C
+   * mockup line 181 inline pattern). Used during debounce-pending or in-flight
+   * PATCH /cart/items/:id window per D-S05-07 LAW optimistic UI.
+   */
+  isUpdating?: boolean;
+  /**
+   * Override line_total render for optimistic UI per D-S05-07 LAW. When
+   * undefined falls back to `product.price * qty` (S-01 baseline). Parent
+   * reducer computes `product.price * optimisticQty` and passes here.
+   */
+  lineTotalOverride?: number;
+  /**
+   * Currency formatter override. Default `formatVND` (with NBSP per Intl) for
+   * backward-compat with S-01 baseline + 6 production consumers. Cart contexts
+   * pass `formatVNDCompact` for no-space mockup parity per C-S05-J Path A.
+   */
+  currencyFormatter?: (value: number) => string;
 }
 
 // PRIVATE: stock-issue banner (raw inline per C-23 atom bypass)
@@ -108,11 +142,30 @@ function CornerBadge(props: { badge: CartItemCornerBadge }): React.ReactElement 
 
 // MAIN: <CartItemRow>
 export const CartItemRow = React.forwardRef<HTMLDivElement, CartItemRowProps>(
-  ({ product, qty, onQtyChange, stockIssue, onResolveStockIssue, cornerBadge, className, ...props }, ref) => {
+  (
+    {
+      product,
+      qty,
+      onQtyChange,
+      stockIssue,
+      onResolveStockIssue,
+      cornerBadge,
+      isUpdating,
+      lineTotalOverride,
+      currencyFormatter,
+      className,
+      ...props
+    },
+    ref
+  ) => {
     const imageGradient = product.imageGradient ?? 'linear-gradient(135deg, #FEF3C7, #FCD34D)';
     const imageIcon: IconName = product.imageIcon ?? 'package';
-    const lineTotal = product.price * qty;
+    const baseLineTotal = product.price * qty;
+    const lineTotal = lineTotalOverride ?? baseLineTotal;
     const isOutOfStock = stockIssue === 'out';
+
+    // C-S05-J: default to S-01 baseline formatVND when consumer doesn't pass override.
+    const fmt = currencyFormatter ?? formatVND;
 
     return (
       <div
@@ -145,11 +198,11 @@ export const CartItemRow = React.forwardRef<HTMLDivElement, CartItemRowProps>(
             </div>
             <div className="flex items-baseline gap-1.5 mb-2">
               <span className="text-[14px] text-icp-rose-700 font-bold font-mono tracking-[-0.3px]">
-                {formatVND(product.price)}
+                {fmt(product.price)}
               </span>
               {product.originalPrice !== undefined ? (
                 <span className="text-[11px] text-icp-text-muted line-through font-mono">
-                  {formatVND(product.originalPrice)}
+                  {fmt(product.originalPrice)}
                 </span>
               ) : null}
             </div>
@@ -161,25 +214,34 @@ export const CartItemRow = React.forwardRef<HTMLDivElement, CartItemRowProps>(
                   type="button"
                   aria-label="Giảm"
                   onClick={() => onQtyChange?.(qty - 1)}
-                  disabled={isOutOfStock}
+                  disabled={isOutOfStock || isUpdating}
                   className="w-[26px] h-[26px] bg-icp-pink-100 border-[0.5px] border-icp-pink-200 rounded-lg flex items-center justify-center text-icp-pink-700 disabled:opacity-50"
                 >
                   <Icon name="minus" size={14} />
                 </button>
-                <div className="text-[14px] text-icp-pink-900 font-bold min-w-[24px] text-center font-mono">
-                  {qty}
-                </div>
+                {/* S-05 T03 NEW: Spinner replaces qty number during in-flight PATCH */}
+                {isUpdating ? (
+                  <div className="min-w-[24px] flex items-center justify-center" aria-label="Đang cập nhật">
+                    <Spinner size={14} color="pink" />
+                  </div>
+                ) : (
+                  <div className="text-[14px] text-icp-pink-900 font-bold min-w-[24px] text-center font-mono">
+                    {qty}
+                  </div>
+                )}
                 <button
                   type="button"
                   aria-label="Tăng"
                   onClick={() => onQtyChange?.(qty + 1)}
-                  disabled={isOutOfStock}
+                  disabled={isOutOfStock || isUpdating}
                   className="w-[26px] h-[26px] bg-gradient-to-br from-icp-pink-500 to-icp-rose-500 rounded-lg flex items-center justify-center text-white shadow-[0_3px_8px_rgba(233,30,99,0.32)] disabled:opacity-50"
                 >
                   <Icon name="plus" size={14} />
                 </button>
               </div>
-              <div className="text-[14px] text-icp-rose-700 font-bold font-mono">{formatVND(lineTotal)}</div>
+              <div className="text-[14px] text-icp-rose-700 font-bold font-mono">
+                {fmt(lineTotal)}
+              </div>
             </div>
 
             {/* Stock issue banner (only when stockIssue='out') */}

@@ -37,7 +37,7 @@
  */
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMe } from '@/lib/dashboard/use-me';
 import { getTracker } from '@/lib/tracker';
 import { SearchHeader } from '@/components/icp/organisms';
@@ -66,6 +66,7 @@ import {
   type MatchTierFilter,
   type SearchProductItem,
 } from '@/src/features/search/search-state-machine';
+import { usePostCartItem } from '@/src/features/cart/use-cart-mutations';
 import { cn } from '@/lib/utils';
 import styles from '../home/home.module.css';
 
@@ -105,8 +106,35 @@ export default function Intent03Page() {
   const stream = useSearchStream();
   const followupFilter = useFollowupFilter(stream.submitQuery, stream.state.query);
 
+  // ─── Sx05-3-CODE HOTFIX (Bug #1 — S-04 add-to-cart no-persist gap):
+  //     S-04 T05 baseline `handleAdd` only fired SSE tracking + AI graph
+  //     POST /action; never invoked REST POST /cart/items. Cart BE stayed
+  //     empty after taps + (verified via curl GET /cart). Wire real cart
+  //     mutation here so item lands in BE. Uses S-05 T03 `usePostCartItem`
+  //     hook (TanStack mutation + auto invalidateQueries CART_QUERY_KEY).
+  const addItemMut = usePostCartItem();
+
   // ─── Input bar state ─────────────────────────────────────────────────────
   const [inputValue, setInputValue] = useState('');
+
+  // ─── Sx05-3-CODE HOTFIX (Bug #2-B — S-04 typo confirm UX gap):
+  //     Tap "Đúng rồi" / "Không, em tìm..." → 2-3s LLM/Vespa work after
+  //     POST /action → no visual feedback during this window → user thinks
+  //     app froze + may double-tap. Wire local "in-flight" flag to disable
+  //     both buttons + show inline spinner on "Đúng rồi" until next state
+  //     transition (typo_suggestion clears or kind changes from pending_typo_confirm).
+  //     Local useState (not state-machine field) because flag is purely UI
+  //     guard for one screen — no need to broaden SearchState schema.
+  const [typoActionPending, setTypoActionPending] = useState(false);
+
+  // ─── Auto-reset typoActionPending when state.kind exits 'pending_typo_confirm'
+  //     (server responded with new SSE event → search-state-machine reducer
+  //     transitioned kind to 'streaming' / 'result' / 'pending_degrade_choice' / etc.).
+  useEffect(() => {
+    if (stream.state.kind !== 'pending_typo_confirm' && typoActionPending) {
+      setTypoActionPending(false);
+    }
+  }, [stream.state.kind, typoActionPending]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -132,7 +160,13 @@ export default function Intent03Page() {
 
   /** Add-to-cart "+" handler — Variant B + Variant A unified. */
   const handleAdd = useCallback(
-    (product: { brand?: string; name?: string; price?: number; productId?: string }) => {
+    (product: {
+      brand?: string;
+      name?: string;
+      price?: number;
+      productId?: string;
+      originalPrice?: number;
+    }) => {
       const title = product.name ?? 'Sản phẩm';
       const price = product.price ?? 0;
       const productId =
@@ -151,6 +185,24 @@ export default function Intent03Page() {
         /* analytics non-blocking */
       }
 
+      // ─── Sx05-3-CODE HOTFIX (Bug #1 — S-04 add-to-cart no-persist gap):
+      //     Wire real REST POST /cart/items mutation so cart BE actually
+      //     contains the added item. Guard fake `brand-name` fallback id
+      //     (page-level synthesis when product_ready lacks product_id) —
+      //     POST would 400 on Postgres FK lookup. Only mutate when caller
+      //     supplied a real product.productId from search results.
+      if (product.productId) {
+        addItemMut.mutate({
+          productId: product.productId,
+          qty: 1,
+          snapshot: {
+            title,
+            brand: product.brand ?? null,
+            original_price: product.originalPrice ?? null,
+          },
+        });
+      }
+
       // ─── Option α D-S04-13 LAW: Variant B → POST /action choice='add_to_cart'
       //     to trigger co_purchase_lookup node. Variant A skips (W5 LOCK).
       if (stream.state.mode === 'ai_augmented' && stream.state.requestId) {
@@ -164,11 +216,16 @@ export default function Intent03Page() {
       // ─── Open AddToCartConfirmCard (auto-dismiss 3s per AddToCartConfirmCard internal timer) ──
       stream.setAddToCartConfirm({ title, price });
     },
-    [stream],
+    [stream, addItemMut],
   );
 
   const handleTypoAccept = useCallback(() => {
     if (!stream.state.requestId) return;
+    // Sx05-3-CODE HOTFIX (Bug #2-B): set in-flight flag BEFORE POST so UI
+    // disables both buttons + shows spinner during 2-3s server work window.
+    // Auto-reset via useEffect above when state.kind transitions out.
+    if (typoActionPending) return; // guard double-tap
+    setTypoActionPending(true);
     const typoCtx = stream.state.typoSuggestion;
     if (typoCtx) {
       // D-S04-13 LAW Pattern A: emit search.typo_corrected user_choice='accept' (T06 Phiên Sx04-12).
@@ -185,10 +242,13 @@ export default function Intent03Page() {
       choice: 'accept',
       _meta: { attempt_n: stream.state.attemptN },
     });
-  }, [stream]);
+  }, [stream, typoActionPending]);
 
   const handleTypoReject = useCallback(() => {
     if (!stream.state.requestId) return;
+    // Sx05-3-CODE HOTFIX (Bug #2-B): set in-flight flag (see handleTypoAccept).
+    if (typoActionPending) return;
+    setTypoActionPending(true);
     const typoCtx = stream.state.typoSuggestion;
     if (typoCtx) {
       // D-S04-13 LAW Pattern A: emit search.typo_corrected user_choice='reject' (T06 Phiên Sx04-12).
@@ -205,7 +265,7 @@ export default function Intent03Page() {
       choice: 'reject',
       _meta: { attempt_n: stream.state.attemptN },
     });
-  }, [stream]);
+  }, [stream, typoActionPending]);
 
   const handleRetryAi = useCallback(() => {
     if (!stream.state.requestId) return;
@@ -396,6 +456,7 @@ export default function Intent03Page() {
                               name: item.name,
                               price: item.price,
                               productId: item.product_id,
+                              originalPrice: item.original_price,
                             })
                           }
                         />
@@ -527,6 +588,7 @@ export default function Intent03Page() {
                               name: item.name,
                               price: item.price,
                               productId: item.product_id,
+                              originalPrice: item.original_price,
                             })
                           }
                         />
@@ -560,6 +622,7 @@ export default function Intent03Page() {
                               name: item.name,
                               price: item.price,
                               productId: item.product_id,
+                              originalPrice: item.original_price,
                             })
                           }
                         />
@@ -655,16 +718,48 @@ export default function Intent03Page() {
                     <button
                       type="button"
                       onClick={handleTypoAccept}
+                      disabled={typoActionPending}
                       data-typo-action="accept"
-                      className="bg-gradient-to-br from-pink-600 to-rose-500 text-white px-3 py-1 rounded-[11px] text-[11px] font-semibold shadow-[0_4px_10px_rgba(233,30,99,0.28)]"
+                      className={cn(
+                        'bg-gradient-to-br from-pink-600 to-rose-500 text-white px-3 py-1 rounded-[11px] text-[11px] font-semibold shadow-[0_4px_10px_rgba(233,30,99,0.28)] flex items-center gap-1.5 transition-opacity',
+                        typoActionPending && 'opacity-60 cursor-not-allowed',
+                      )}
                     >
-                      Đúng rồi
+                      {/* Sx05-3-CODE HOTFIX (Bug #2-B): inline spinner during in-flight */}
+                      {typoActionPending && (
+                        <svg
+                          className="animate-spin h-3 w-3"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <circle
+                            className="opacity-30"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                          />
+                          <path
+                            className="opacity-90"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"
+                          />
+                        </svg>
+                      )}
+                      {typoActionPending ? 'Đang xử lý...' : 'Đúng rồi'}
                     </button>
                     <button
                       type="button"
                       onClick={handleTypoReject}
+                      disabled={typoActionPending}
                       data-typo-action="reject"
-                      className="bg-white border-[0.5px] border-pink-200 text-pink-700 px-3 py-1 rounded-[11px] text-[11px] font-medium"
+                      className={cn(
+                        'bg-white border-[0.5px] border-pink-200 text-pink-700 px-3 py-1 rounded-[11px] text-[11px] font-medium transition-opacity',
+                        typoActionPending && 'opacity-60 cursor-not-allowed',
+                      )}
                     >
                       Không, em tìm &quot;{state.typoSuggestion.original}&quot;
                     </button>

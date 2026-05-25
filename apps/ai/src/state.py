@@ -164,6 +164,17 @@ class IcpState(TypedDict, total=False):
     confidence: Optional[float]
     trace_id: str
 
+    # --- Sx05-3-CODE HOTFIX (D-S05-13 LAW Cross-service User Context
+    #     Propagation, Phiên Sx05-3-CODE manual test discovery) ---
+    # JWT-resolved authenticated user_id propagated from Gateway POST /intent
+    # handler (intent.controller.ts @UseGuards(JwtAuthGuard) extracts req.user.id)
+    # → PostIntentBody.user_id → AI main.py initial_state['user_id'] → checkpointed
+    # via RedisSaver → restored on resume. Cart subgraph nodes MUST read from
+    # this field (NOT state.get('content') which holds user query text).
+    # Fallback 'anon' kept defensive for backward-compat with /intent calls
+    # that pre-date JWT propagation (e.g. smoke tests bypassing auth).
+    user_id: str
+
     # --- S-04 T02 D-S04-13 LAW fields (Phiên Sx04-5) ---
     mode: Mode
     cart_trigger_product_id: str

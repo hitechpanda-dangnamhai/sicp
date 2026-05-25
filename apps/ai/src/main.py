@@ -530,8 +530,17 @@ def create_app() -> Flask:
             entry_intent = payload.get("hint") if isinstance(
                 payload.get("hint"), str
             ) else None
+            # Sx05-3-CODE HOTFIX (D-S05-13 LAW): extract authenticated user_id
+            # forwarded by Gateway POST /intent handler. Fallback 'anon' for
+            # backward-compat with smoke tests that bypass JwtAuthGuard.
+            # Without this, cart_by_text graph nodes operate on anon cart →
+            # wrong cart cleared/checked per Bug #1+#2 manual test.
+            user_id = payload.get("user_id") if isinstance(
+                payload.get("user_id"), str
+            ) else "anon"
             span.set_attribute("ai.modality", modality)
             span.set_attribute("ai.mode", mode)
+            span.set_attribute("ai.user_id", user_id)
             if entry_intent:
                 span.set_attribute("ai.entry_intent", entry_intent)
 
@@ -559,6 +568,10 @@ def create_app() -> Flask:
                 # checkpointed state so _drive_graph_resume_async can recover
                 # the correct graph compile target on resume (cart vs search).
                 "entry_intent": entry_intent,
+                # Sx05-3-CODE HOTFIX (D-S05-13 LAW): authenticated user_id
+                # persisted in checkpointed state — survives interrupt/resume
+                # boundary so resume nodes still operate on correct user cart.
+                "user_id": user_id,
             }
 
             # Drive search graph async in background thread.

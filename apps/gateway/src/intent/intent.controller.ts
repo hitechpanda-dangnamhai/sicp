@@ -66,6 +66,7 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
@@ -74,6 +75,7 @@ import { AiClient } from '../clients/ai.client';
 import { RedisClient } from '../idempotency/redis.client';
 import { IntentRequestDto } from './dto/intent-request.dto';
 import { IntentService } from './intent.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 /** Lazy tracer per C-28 LOCK. */
 function getTracer(): Tracer {
@@ -159,19 +161,31 @@ export class IntentController {
    * to Redis channel `sse:pubsub:{rid}`).
    */
   @Post()
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Dispatch intent to AI service',
     description:
       'Returns request_id for SSE stream pickup via GET /intent/stream?id=<rid>. ' +
       'S-04 T03: mode field selects Variant B (ai_augmented) or Variant A ' +
-      '(basic_fallback) per D-S04-03 LAW Adaptive Single Endpoint.',
+      '(basic_fallback) per D-S04-03 LAW Adaptive Single Endpoint. ' +
+      'Sx05-3-CODE HOTFIX (D-S05-13 LAW): @UseGuards(JwtAuthGuard) added — ' +
+      'req.user.id forwarded to AI as PostIntentBody.user_id so cart_by_text ' +
+      'graph operates on correct authenticated cart.',
   })
+  @ApiCookieAuth('icp_session')
   @ApiBody({ type: IntentRequestDto })
   async dispatch(
     @Body() body: IntentRequestDto,
+    @Req() req: Request,
   ): Promise<{ request_id: string; status: 'accepted' }> {
-    return this.intentService.dispatch(body);
+    // Sx05-3-CODE HOTFIX (D-S05-13 LAW Cross-service User Context Propagation):
+    // Extract JWT-resolved authenticated user_id from req.user (populated by
+    // JwtAuthGuard above) → forward to AI service. Pre-hotfix this field was
+    // never sent → AI fell back to 'smoke-user-anon' → wrong cart cleared
+    // per Bug #1+#2 Phiên Sx05-3-CODE manual test discovery.
+    const userId = req.user?.id ?? 'anon';
+    return this.intentService.dispatch({ ...body, user_id: userId });
   }
 
   /**

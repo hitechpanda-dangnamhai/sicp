@@ -142,9 +142,12 @@ async def _node_clear_confirm_prompt(
                                 trái từng item thay vì xoá hết."
     """
     rid = state["request_id"]
-    # TODO Sx05-2c: source user_id from JWT-resolved field on IcpState
-    # (currently a placeholder; Gateway will inject user_id into initial_state).
-    user_id = state.get("content") or "smoke-user-anon"
+    # Sx05-3-CODE HOTFIX (D-S05-13 LAW): read authenticated user_id from
+    # IcpState (propagated by Gateway POST /intent JwtAuthGuard → AI main.py
+    # initial_state per fix #2). Pre-hotfix this was `state.get("content") or
+    # "smoke-user-anon"` which ALWAYS fell back to anon (content holds user
+    # query text, NOT user_id) → wrong cart cleared per Bug #1+#2 manual test.
+    user_id = state.get("user_id") or "anon"
 
     try:
         cart = await mcp_client.call("cart.get", {"user_id": user_id})
@@ -208,7 +211,8 @@ async def _node_clear_execute(
     cancel_clear  → emit clear_cancelled (no cart mutation)
     """
     rid = state["request_id"]
-    user_id = state.get("content") or "smoke-user-anon"
+    # Sx05-3-CODE HOTFIX (D-S05-13 LAW) — see _node_cart_clear_prompt docstring.
+    user_id = state.get("user_id") or "anon"
     choice = state.get("cart_clear_action")
 
     if choice == "confirm_clear":
@@ -245,7 +249,8 @@ async def _node_cart_view(
     stock_issue_lookup node.
     """
     rid = state["request_id"]
-    user_id = state.get("content") or "smoke-user-anon"
+    # Sx05-3-CODE HOTFIX (D-S05-13 LAW) — see _node_cart_clear_prompt docstring.
+    user_id = state.get("user_id") or "anon"
 
     try:
         cart = await mcp_client.call("cart.get", {"user_id": user_id})
@@ -550,7 +555,8 @@ async def _node_stock_resolve(
     Emits cart_updated SSE (minimal trigger per D-S05-11 LAW — FE refetches).
     """
     rid = state["request_id"]
-    user_id = state.get("content") or "smoke-user-anon"
+    # Sx05-3-CODE HOTFIX (D-S05-13 LAW) — see _node_cart_clear_prompt docstring.
+    user_id = state.get("user_id") or "anon"
     choice = state.get("cart_stock_action")
     product_id = state.get("cart_stock_resolve_product_id", "")
     replacement_id = state.get("cart_stock_resolve_replacement_id")
