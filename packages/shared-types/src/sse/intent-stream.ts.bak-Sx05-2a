@@ -23,35 +23,18 @@
  *   - `product_ready` — Per-product progressive streaming (D-S04-14 LAW)
  * + augmented `products` payload (mode field + per-item match_score/reason).
  *
- * **S-05 T02 amendment (Phiên Sx05-2 per D-S05-01..05 LAW + D-S05-09/10/11 +
- * C-S05-F Path α resolution):** 7 NEW cart-domain event types added per
- * `03_API_CONTRACTS.md §3` (17→24 LOCKED post-T02 reconcile):
- *   - `clear_confirm` — Pattern A interrupt at cart_clear_confirm entry intent
- *     (mockup state-F-clear-confirm) — BE-driven `user_message` per D-S05-10
- *   - `cart_cleared` — terminal post-cart.clear (minimal trigger per D-S05-11)
- *   - `clear_cancelled` — user cancel clear (no-op refetch)
- *   - `stock_issue_ready` — per-item progressive replacement (Vespa+LLM 8s
- *     soft-timeout per D-S05-04 + C-S05-E path-a fixture fallback)
- *   - `stock_issue_summary` — pre-interrupt summary signal
- *   - `cart_updated` — terminal post-cart-mutation (minimal trigger per D-S05-11)
- *   - `cart_view_ready` — terminal happy-path no stock issue
- *
  * **Dual access pattern (C-32 LOCKED post-T06):**
  * - **FE** subpath: `import { SseStatusEvent } from '@icp/shared-types/sse'`
  *   (tree-shaking via bundler).
  * - **BE** root: `import { SseStatusEvent } from '@icp/shared-types'`
  *   (CommonJS resolution via root barrel re-export).
  *
- * @see docs/03_API_CONTRACTS.md §1.2 + §3 (endpoint + 24 event catalog post-S-05)
+ * @see docs/03_API_CONTRACTS.md §1.2 + §3 (endpoint + 17 event catalog post-S-04)
  * @see docs/08_FE_BE_CONTRACT.md §6 + §12 (typed schemas + cookie auth)
  * @see docs/DECISIONS.md ADR-019 (cookie httpOnly SSE auth)
  * @see slices/S-02_decisions-log.md Section 1 D-05 + Section 5 C-32/C-34/C-36/C-37/C-38
  * @see slices/S-04_decisions-log.md D-S04-03 LAW (Adaptive Single Endpoint),
  *      D-S04-13 LAW (Pattern A + Option Z + Option α), D-S04-14 LAW (Progressive Streaming)
- * @see slices/S-05_decisions-log.md D-S05-01..05 LAW (Hybrid Routing + Redis JSON
- *      Cart + Pattern A Interrupt Reuse + Vespa+LLM Stock + LLM Promo Typo),
- *      D-S05-09 (clear_confirm exclude actions[]), D-S05-10 (user_message BE-driven),
- *      D-S05-11 (minimal trigger + FE refetch), C-S05-F (Path α hint enum extend)
  */
 
 import { z } from 'zod';
@@ -355,167 +338,6 @@ export const SseProductReadyEvent = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// S-05 T02 NEW 7 events (Phiên Sx05-2 per D-S05-01..05 LAW + sub-decisions
-// D-S05-09/10/11 + C-S05-F Path α resolution)
-// ---------------------------------------------------------------------------
-// Cart domain SSE events emitted by `apps/ai/src/graphs/intents/cart_by_text.py`
-// via `redis_publisher.publish_cart_event()` thin helper (event_type prefix
-// whitelist: `cart_`, `clear_`, `stock_issue_`).
-//
-// 17 → 24 LOCKED SSE event catalog post-T02 per `03_API_CONTRACTS.md §3`
-// reconcile (inline atomic batch with this emit per C-S05-D resolution).
-// ---------------------------------------------------------------------------
-
-/**
- * `clear_confirm` event — Cart clear-all confirmation interrupt UX per
- * D-S05-01/03 LAW Hybrid Routing + Pattern A Interrupt Reuse.
- *
- * Triggered by AI `cart_by_text.py` `cart_clear_confirm` entry intent
- * (dispatched via Gateway POST /intent body field `hint: 'cart_clear_confirm'`
- * per C-S05-F Path α extend hint enum 4→6).
- *
- * Pairs with `status: 'awaiting_user_input'` emitted immediately after. User
- * POSTs `/api/v1/intent/{rid}/action` with `{choice: 'confirm_clear' | 'cancel_clear'}`
- * to resume the graph from interrupt checkpoint.
- *
- * **Per D-S05-09 LAW**: NO `actions[]` field — FE hardcodes button labels
- * "Ở lại giỏ" / "Xoá hết" (clone of `SseVariantDegradedEvent` reject-retry-actions
- * precedent line 219-225). Server doesn't govern label strings.
- *
- * **Per D-S05-10 LAW**: `user_message` BE-driven Rule 6 mockup-locked with
- * embedded numeric substitution (item_count + subtotal). Mockup
- * `intent-05-state-F-clear-confirm.html` line 196 dynamic copy ground truth.
- *
- * Mockup `intent-05-state-F-clear-confirm.html`:
- *   - line 196: "Em sẽ xoá <N> món trị giá <X>₫ khỏi giỏ. Hành động này không thể hoàn tác."
- *   - line 209: AI advice line
- */
-export const SseClearConfirmEvent = z.object({
-  item_count: z.number().int().nonnegative(),
-  subtotal: z.number().int().nonnegative(),
-  /** BE-templated full Vietnamese string with embedded item_count + subtotal substitution (D-S05-10 LAW). */
-  user_message: z.string(),
-  /** BE-templated AI advice line (mockup state-F line 209). */
-  advice: z.string(),
-});
-
-/**
- * `cart_cleared` event — terminal status emitted after `cart.clear` MCP tool
- * succeeds on resume `choice: 'confirm_clear'` path.
- *
- * **Per D-S05-11 LAW**: minimal trigger payload + FE refetch pattern. FE
- * `useQuery` with `CART_QUERY_KEY` invalidates on event arrival → refetch
- * `GET /cart` → server truth (empty cart) replaces state. Mockup state-B
- * empty cart renders post-refetch.
- *
- * Per `S-05_BRIEF.md` AC7 explicit: "emit cart_cleared SSE → FE refetch shows
- * state-B empty".
- *
- * `.passthrough()` allows forward-compat additive fields (e.g. `cleared_at`)
- * without breaking FE schema validation.
- */
-export const SseCartClearedEvent = z.object({}).passthrough();
-
-/**
- * `clear_cancelled` event — emitted on resume `choice: 'cancel_clear'` path.
- *
- * No cart mutation occurred; FE just closes the clear-confirm modal and
- * keeps current cart state unchanged (no refetch needed, but FE may refetch
- * defensively per D-S05-07 LAW optimistic-rollback pattern).
- *
- * Mockup state-F: dismiss action returns to state-0-happy without changes.
- */
-export const SseClearCancelledEvent = z.object({}).passthrough();
-
-/**
- * `stock_issue_ready` event — per-item progressive stock replacement per
- * D-S05-04 LAW Stock Replacement via Vespa Similarity + LLM Reason.
- *
- * Emitted PER out-of-stock item as Vespa+LLM lookup completes (progressive
- * streaming mirrors `SseProductReadyEvent` pattern via generic
- * `publish_cart_event` helper). Mockup `intent-05-state-E-stock-issue.html`
- * shimmer skeleton designed for progressive arrival.
- *
- * **Nullable `replacement` + `reason` per D-S05-04 LAW step 4**: if Vespa
- * returns no candidate OR LLM 8s soft-timeout fired (R-S05-2 mitigation),
- * emit with `replacement=null, reason=null`. FE shows only "Bỏ" CTA, no
- * "Thay" option in that case (graceful degrade per D-S04-13 LAW pattern).
- *
- * **C-S05-E resolution path (a)** Phiên Sx05-2-DISCOVER: Vespa+LLM is
- * primary; on null result, fallback to `cart_stock_replacement.json` fixture
- * lookup by category+brand anchor. Replacement candidate still arrives via
- * this event whether sourced live or fixture.
- *
- * Mockup `intent-05-state-E-stock-issue.html`:
- *   - line 282: replacement card title "Tương ớt Chin-su 500g (chai lớn)"
- *   - line 285: available_stock display "còn 47 chai"
- *   - reason chip ≤120 chars Vietnamese per LLM prompt
- */
-export const SseStockIssueReadyEvent = z.object({
-  product_id: z.string().uuid(),
-  replacement: z
-    .object({
-      product_id: z.string().uuid(),
-      title: z.string(),
-      brand: z.string(),
-      unit_price: z.number().int().nonnegative(),
-      available_stock: z.number().int().nonnegative(),
-    })
-    .nullable(),
-  /** LLM-generated 1-line reason ≤120 chars Vietnamese, or null on LLM timeout. */
-  reason: z.string().nullable(),
-});
-
-/**
- * `stock_issue_summary` event — emitted AFTER all `stock_issue_ready` items
- * have been published, BEFORE the `interrupt('stock_action')` pause.
- *
- * FE uses this as the "all replacement candidates ready" signal to enable
- * the "Bỏ" / "Thay" action UI, then waits for user choice → POSTs
- * `/action` with `choice: 'resolve_remove' | 'resolve_replace'` +
- * `value: {product_id, replacement_id?}` per D-S05-03 LAW.
- *
- * Per D-S05-11 LAW pattern: minimal payload (just out-of-stock product IDs
- * for FE state-machine routing); cart state itself fetched via REST not SSE.
- */
-export const SseStockIssueSummaryEvent = z.object({
-  out_of_stock_count: z.number().int().positive(),
-  product_ids: z.array(z.string().uuid()),
-});
-
-/**
- * `cart_updated` event — terminal status emitted after a cart mutation
- * (cart.remove + cart.upsert) on resume `choice: 'resolve_remove'` or
- * `'resolve_replace'` paths.
- *
- * **Per D-S05-11 LAW**: minimal trigger + FE refetch pattern.
- * `queryClient.invalidateQueries({queryKey: CART_QUERY_KEY})` → FE refetch
- * `GET /cart` → server truth replaces local optimistic state.
- *
- * Per `S-05_BRIEF.md` AC6 explicit: "emit cart_updated → FE refetch".
- *
- * Also emitted by Direct REST cart write endpoints (e.g. POST /cart/items)
- * is NOT required — those paths return the updated Cart in the HTTP
- * response body directly per D-S05-01 LAW Hybrid Routing topology.
- */
-export const SseCartUpdatedEvent = z.object({}).passthrough();
-
-/**
- * `cart_view_ready` event — terminal happy-path emitted when
- * `cart_view_with_stock_check` entry intent completes with NO out-of-stock
- * items detected.
- *
- * Per D-S05-11 LAW: minimal payload. FE already has cart from initial
- * `GET /cart` REST call (cart page load) — this event just signals "stock
- * validation complete, no replacements needed, you can dismiss any loading
- * spinner / shimmer state".
- *
- * Distinction vs `cart_updated`: `cart_view_ready` = no mutation occurred
- * (stock OK); `cart_updated` = mutation occurred (item removed/replaced).
- */
-export const SseCartViewReadyEvent = z.object({}).passthrough();
-
-// ---------------------------------------------------------------------------
 // Type registry — handler signature lookup for `streamIntent()` wrapper
 // ---------------------------------------------------------------------------
 
@@ -549,14 +371,6 @@ export type IntentStreamEventMap = {
   co_purchase_hint: z.infer<typeof SseCoPurchaseHintEvent>;
   empty_state: z.infer<typeof SseEmptyStateEvent>;
   product_ready: z.infer<typeof SseProductReadyEvent>;
-  // S-05 T02 NEW 7 (Phiên Sx05-2 per D-S05-01..05 + D-S05-09/10/11 + C-S05-F)
-  clear_confirm: z.infer<typeof SseClearConfirmEvent>;
-  cart_cleared: z.infer<typeof SseCartClearedEvent>;
-  clear_cancelled: z.infer<typeof SseClearCancelledEvent>;
-  stock_issue_ready: z.infer<typeof SseStockIssueReadyEvent>;
-  stock_issue_summary: z.infer<typeof SseStockIssueSummaryEvent>;
-  cart_updated: z.infer<typeof SseCartUpdatedEvent>;
-  cart_view_ready: z.infer<typeof SseCartViewReadyEvent>;
 };
 
 /** Union of typed event names — used in `streamIntent(handlers)` key constraint. */
@@ -583,12 +397,4 @@ export const IntentStreamSchemas = {
   co_purchase_hint: SseCoPurchaseHintEvent,
   empty_state: SseEmptyStateEvent,
   product_ready: SseProductReadyEvent,
-  // S-05 T02 NEW 7 (Phiên Sx05-2 per D-S05-01..05 + D-S05-09/10/11 + C-S05-F)
-  clear_confirm: SseClearConfirmEvent,
-  cart_cleared: SseCartClearedEvent,
-  clear_cancelled: SseClearCancelledEvent,
-  stock_issue_ready: SseStockIssueReadyEvent,
-  stock_issue_summary: SseStockIssueSummaryEvent,
-  cart_updated: SseCartUpdatedEvent,
-  cart_view_ready: SseCartViewReadyEvent,
 } as const;

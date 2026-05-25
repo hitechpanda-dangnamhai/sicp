@@ -106,21 +106,7 @@ export interface AiIntentResumeResponse {
 export interface PostIntentBody {
   modality: 'text' | 'image' | 'voice';
   content?: string;
-  /**
-   * S-04 ship: classifier-informational hint (import/buy/search/recommend).
-   * S-05 T02 NEW per C-S05-F Path α LAW (Phiên Sx05-2): +2 explicit
-   * entry-intent override values dispatching AI service to cart_by_text.py
-   * (cart_clear_confirm + cart_view_with_stock_check). Mirrors
-   * `intent-request.dto.ts` Zod enum (S-05 emit). Backward-compat:
-   * `hint` absent → AI uses S-04 classifier path.
-   */
-  hint?:
-    | 'import'
-    | 'buy'
-    | 'search'
-    | 'recommend'
-    | 'cart_clear_confirm'
-    | 'cart_view_with_stock_check';
+  hint?: 'import' | 'buy' | 'search' | 'recommend';
   /** S-04 NEW per D-S04-03 LAW Adaptive Single Endpoint. */
   mode?: 'ai_augmented' | 'basic_fallback';
 }
@@ -131,25 +117,13 @@ export interface PostIntentBody {
  * `apps/gateway/src/intent/dto/intent-action.dto.ts`.
  */
 export interface PostIntentResumeBody {
-  /**
-   * Resume choice for Pattern A interrupt+resume per D-S04-13 LAW + S-05 T02
-   * extension per D-S05-01/03 LAW (Phiên Sx05-2 — cart_by_text.py
-   * clear_action + stock_action interrupts).
-   *
-   * Mirrors `intent-action.dto.ts` Zod enum (S-05 emit).
-   */
   choice:
     | 'accept'
     | 'reject'
     | 'retry_ai'
     | 'continue_basic'
     | 'add_to_cart'
-    | 'skip'
-    // S-05 T02 NEW per D-S05-01 + D-S05-03 LAW:
-    | 'confirm_clear'
-    | 'cancel_clear'
-    | 'resolve_remove'
-    | 'resolve_replace';
+    | 'skip';
   value?: Record<string, unknown>;
   _meta?: { attempt_n: number };
 }

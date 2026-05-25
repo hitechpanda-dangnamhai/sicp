@@ -298,21 +298,7 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                         await asyncio.sleep(0.05)  # 50ms poll interval
                     # ─── End fix ───
 
-                    # S-05 T02 NEW per C-S05-F Path α LAW + D-S05-01 LAW:
-                    # Dispatch graph compile target by entry_intent.
-                    entry_intent_dispatch = initial_state.get("entry_intent")
-                    if entry_intent_dispatch in (
-                        "cart_clear_confirm", "cart_view_with_stock_check"
-                    ):
-                        # Lazy import — defers cart_by_text module load until
-                        # first cart entry-intent request fires (avoids
-                        # module-import side effects polluting main.py).
-                        from .graphs.intents.cart_by_text import (
-                            compile_cart_by_text_graph,
-                        )
-                        graph = compile_cart_by_text_graph(saver, publisher)
-                    else:
-                        graph = compile_searching_by_text_graph(saver, publisher)
+                    graph = compile_searching_by_text_graph(saver, publisher)
                     config = {"configurable": {"thread_id": request_id}}
                     async for _chunk in graph.astream(initial_state, config=config):
                         # Events are published by nodes via redis_publisher;
@@ -404,38 +390,8 @@ def _drive_graph_resume_async(request_id: str, resume_value: Any) -> None:
                 await saver.asetup()
                 publisher = RedisPublisher(redis_url=redis_url)
                 try:
-                    # S-05 T02 NEW per C-S05-F Path α LAW + D-S05-01 LAW:
-                    # Peek checkpointed state to recover entry_intent for
-                    # correct graph compile target on resume. RedisSaver
-                    # persisted state.entry_intent at first node's interrupt;
-                    # we read it back before compile.
+                    graph = compile_searching_by_text_graph(saver, publisher)
                     config = {"configurable": {"thread_id": request_id}}
-                    entry_intent_dispatch = None
-                    try:
-                        checkpoint_tuple = await saver.aget_tuple(config)
-                        if checkpoint_tuple and checkpoint_tuple.checkpoint:
-                            channel_values = (
-                                checkpoint_tuple.checkpoint.get("channel_values")
-                                or {}
-                            )
-                            entry_intent_dispatch = channel_values.get(
-                                "entry_intent"
-                            )
-                    except Exception as peek_err:  # noqa: BLE001
-                        structlog.get_logger().warning(
-                            "intent.resume_peek_failed",
-                            request_id=request_id,
-                            error=str(peek_err),
-                        )
-                    if entry_intent_dispatch in (
-                        "cart_clear_confirm", "cart_view_with_stock_check"
-                    ):
-                        from .graphs.intents.cart_by_text import (
-                            compile_cart_by_text_graph,
-                        )
-                        graph = compile_cart_by_text_graph(saver, publisher)
-                    else:
-                        graph = compile_searching_by_text_graph(saver, publisher)
                     async for _chunk in graph.astream(
                         Command(resume=resume_value), config=config
                     ):
@@ -522,18 +478,8 @@ def create_app() -> Flask:
             content = payload.get("content", "")
             # S-04 NEW: mode field defaults to 'ai_augmented' per D-S04-03 LAW.
             mode = payload.get("mode", "ai_augmented")
-            # S-05 T02 NEW (Phiên Sx05-2 per C-S05-F Path α + D-S05-01 LAW):
-            # Extract optional hint field as entry_intent for graph dispatch.
-            # Allowed values: 'cart_clear_confirm', 'cart_view_with_stock_check'.
-            # Backward-compat: hint absent/other values → classifier-driven
-            # default search flow (S-04 router_graph heuristic).
-            entry_intent = payload.get("hint") if isinstance(
-                payload.get("hint"), str
-            ) else None
             span.set_attribute("ai.modality", modality)
             span.set_attribute("ai.mode", mode)
-            if entry_intent:
-                span.set_attribute("ai.entry_intent", entry_intent)
 
             logger.info(
                 "intent.received",
@@ -555,10 +501,6 @@ def create_app() -> Flask:
                 "intent": None,
                 "confidence": None,
                 "trace_id": format(span.get_span_context().trace_id, "032x"),
-                # S-05 T02 NEW per C-S05-F Path α LAW: entry_intent persists in
-                # checkpointed state so _drive_graph_resume_async can recover
-                # the correct graph compile target on resume (cart vs search).
-                "entry_intent": entry_intent,
             }
 
             # Drive search graph async in background thread.

@@ -47,61 +47,6 @@ Progressive Streaming architecture for Intent 03 (`searching_by_text`):
                                   emission; subsequent emissions skip the log).
                                   Per Q-Sx04-4-4 Metric-2 LAW paired telemetry.
 
-S-05 T02 amendment (Phiên Sx05-2 per D-S05-01/03 LAW + C-S05-F Path α
-resolution): ADD 8 NEW cart-domain fields supporting Pattern A interrupt+resume
-for the 2 cart entry intents in `cart_by_text.py`:
-
-    entry_intent               — **C-S05-F Path α LAW.** Set by main.py from
-                                  POST /intent body `hint` field when value is
-                                  `'cart_clear_confirm'` or
-                                  `'cart_view_with_stock_check'`. Consumed by
-                                  `_drive_graph_async` dispatch chain to select
-                                  cart_by_text vs searching_by_text graph
-                                  compile target. Persisted by RedisSaver so
-                                  `_drive_graph_resume_async` can recover the
-                                  same graph compilation choice on resume.
-                                  Backward-compat: `None` → default
-                                  searching_by_text per S-04 classifier path.
-    cart_clear_action          — Set by Command(resume={choice:'confirm_clear'
-                                  | 'cancel_clear'}) at the clear_confirm
-                                  interrupt. Consumed by `_node_clear_execute`
-                                  conditional logic (confirm → cart.clear MCP
-                                  + emit cart_cleared; cancel → emit
-                                  clear_cancelled).
-    cart_stock_action          — Set by Command(resume={choice:'resolve_remove'
-                                  | 'resolve_replace'}) at the stock_issue
-                                  interrupt. Consumed by `_node_stock_resolve`
-                                  conditional logic.
-    cart_stock_resolve_product_id
-                               — Product ID the user is resolving (from
-                                  resume.value.product_id). Required for
-                                  cart.remove + cart.upsert MCP calls.
-    cart_stock_resolve_replacement_id
-                               — Replacement product ID (from
-                                  resume.value.replacement_id). Only populated
-                                  when cart_stock_action == 'resolve_replace';
-                                  None for 'resolve_remove' path.
-
-    _cart_data                 — Internal transient: cart snapshot loaded
-                                  from `cart.get` MCP at `_node_cart_view`
-                                  entry; reused downstream nodes to avoid
-                                  redundant MCP roundtrips. Underscore prefix
-                                  marks internal (NOT surfaced to SSE) per
-                                  Phiên Sx04-7 fix pattern.
-    _cart_out_of_stock_ids     — Internal transient: list[str] of product_ids
-                                  flagged in_stock=False by validate_stock
-                                  inline check. Drives per-item Vespa+LLM
-                                  lookup loop in `_node_stock_issue_lookup`.
-    _cart_stock_replacements   — Internal transient: dict mapping
-                                  out_of_stock_product_id → replacement dict
-                                  (or None on Vespa+LLM null/timeout per
-                                  D-S05-04 LAW step 4 graceful degrade).
-                                  Built incrementally as
-                                  stock_issue_ready events are published;
-                                  passed forward to stock_resolve node so it
-                                  can issue the correct cart.upsert call when
-                                  user picks 'resolve_replace'.
-
 Fields kept Phase 1:
     request_id  — UUID per /intent invocation (AI-issued per Q-Sx04-3-6 Option A
                   LAW; matches RedisSaver thread_id + Redis pub/sub channel +
@@ -118,12 +63,9 @@ intent-specific fields without breaking existing nodes.
 
 Reference:
     - slices/S-04_decisions-log.md D-S04-13 LAW + D-S04-14 LAW
-    - slices/S-05_decisions-log.md D-S05-01 LAW + D-S05-03 LAW + C-S05-F
-      (Phiên Sx05-2 Path α hint enum extend + entry_intent dispatch field)
-    - docs/04_INTENT_SPECS.md Intent 03 Graph stages + Intent 05 cart graph
-      (post-T02 reconcile)
+    - docs/04_INTENT_SPECS.md Intent 03 Graph stages
     - docs/02_DATA_MODEL.md §5 Redis Key Patterns (intent:checkpoint:{rid} +
-      intent:action:{rid}:{attempt_n} + sse:pubsub:{rid} + cart:{user_id})
+      intent:action:{rid}:{attempt_n} + sse:pubsub:{rid})
 """
 
 from __future__ import annotations
@@ -136,24 +78,13 @@ Mode = Literal["ai_augmented", "basic_fallback"]
 DegradedFrom = Literal["ai_augmented"]
 DegradedReason = Literal["llm_timeout", "llm_rate_limited"]
 
-# --- S-05 T02 (Phiên Sx05-2 per D-S05-01 LAW + C-S05-F Path α resolution) ---
-# Entry intent override values — extends `hint` enum on POST /intent body to
-# explicitly dispatch the cart_by_text graph vs default searching_by_text.
-# `None` value (hint unset) preserves S-04 classifier path (backward-compat).
-EntryIntent = Literal["cart_clear_confirm", "cart_view_with_stock_check"]
-
-# Resume choice values for cart interrupts (D-S05-03 LAW Pattern A Reuse).
-CartClearAction = Literal["confirm_clear", "cancel_clear"]
-CartStockAction = Literal["resolve_remove", "resolve_replace"]
-
 
 class IcpState(TypedDict, total=False):
     """LangGraph router state. `total=False` allows V-SLICE extensions.
 
     Phase 1 (T03) router-skeleton fields + S-04 T02 (Phiên Sx04-5) intent-specific
-    fields per D-S04-13 LAW + D-S04-14 LAW + S-05 T02 (Phiên Sx05-2) cart entry
-    intent fields per D-S05-01/03 LAW + C-S05-F Path α resolution.
-    See module docstring for per-field semantics + provenance.
+    fields per D-S04-13 LAW + D-S04-14 LAW. See module docstring for per-field
+    semantics + provenance.
     """
 
     # --- Phase 1 router-skeleton fields (T03 baseline) ---
@@ -186,23 +117,3 @@ class IcpState(TypedDict, total=False):
     _filters: dict
     _search_items: list
     _search_total: int
-
-    # --- S-05 T02 D-S05-01/03 LAW fields (Phiên Sx05-2 — Pattern A cart entry
-    #     intents per C-S05-F Path α resolution). 5 user-facing fields drive
-    #     graph dispatch + interrupt resume semantics; persisted by RedisSaver
-    #     across interrupt+resume boundary. ---
-    entry_intent: EntryIntent
-    cart_clear_action: CartClearAction
-    cart_stock_action: CartStockAction
-    cart_stock_resolve_product_id: str
-    cart_stock_resolve_replacement_id: Optional[str]
-
-    # --- S-05 T02 internal transient fields (Phiên Sx04-7 declare-or-drop
-    #     pattern). _cart_data is loaded once at _node_cart_view entry and
-    #     reused downstream to avoid redundant MCP cart.get roundtrips.
-    #     _cart_out_of_stock_ids + _cart_stock_replacements drive the
-    #     per-item Vespa+LLM lookup loop + carry replacement candidates
-    #     forward to the stock_resolve node. ---
-    _cart_data: dict
-    _cart_out_of_stock_ids: list
-    _cart_stock_replacements: dict

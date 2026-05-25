@@ -9,14 +9,6 @@ S-04 T02 (Phiên Sx04-5) per D-S04-13 LAW Option Z + D-S04-14 LAW:
       idempotency-guarded ops log (NOT a Redis publish — just structlog ops
       log via W3C traceparent)
 
-S-05 T02 amendment (Phiên Sx05-2 per D-S05-01/03 LAW + D-S05-11 LAW):
-    - publish_cart_event(rid, event_type, payload) — thin wrapper over
-      publish_sse enforcing cart-domain event-type prefix whitelist
-      (`cart_`, `clear_`, `stock_issue_`). Used by `cart_by_text.py` graph
-      nodes to emit the 7 NEW S-05 SSE events: clear_confirm / cart_cleared /
-      clear_cancelled / stock_issue_ready / stock_issue_summary / cart_updated
-      / cart_view_ready.
-
 Channel format: `sse:pubsub:{request_id}` per 02_DATA_MODEL.md §5 Redis keys.
 
 Message format: each pub/sub message is a pre-formatted SSE block
@@ -31,9 +23,6 @@ Reference:
     - slices/S-04_decisions-log.md D-S04-14 LAW Sub-decision 3 (Shape-2 NEW
       product_ready event) + Sub-decision 4 (Metric-2 paired telemetry
       idempotency guard)
-    - slices/S-05_decisions-log.md D-S05-01/03 LAW (Hybrid Cart Routing
-      + Pattern A Interrupt Reuse for clear-confirm + stock-resolve)
-      + D-S05-11 LAW (minimal trigger + FE refetch pattern)
     - docs/02_DATA_MODEL.md §5 Redis Key Patterns
     - docs/LOG_CATALOG.md §A.SSE Pub/Sub
 """
@@ -55,13 +44,6 @@ _propagator = TraceContextTextMapPropagator()
 
 # Channel template per 02_DATA_MODEL.md §5.
 _CHANNEL_TEMPLATE = "sse:pubsub:{request_id}"
-
-# S-05 T02 (Phiên Sx05-2): cart-domain event prefix whitelist for
-# publish_cart_event guard. Any event_type NOT starting with one of these
-# prefixes raises ValueError before publishing (defense-in-depth so a typo
-# like 'card_cleared' fails loud rather than silently emitting an
-# undocumented event into the SSE catalog).
-_CART_EVENT_PREFIXES: tuple[str, ...] = ("cart_", "clear_", "stock_issue_")
 
 
 def _format_sse_block(event_type: str, data: dict[str, Any]) -> str:
@@ -114,10 +96,8 @@ class RedisPublisher:
         Args:
             request_id: UUID; matches RedisSaver thread_id namespace.
             event_type: SSE `event:` field value (e.g. "understanding",
-                        "typo_suggestion", "product_ready", "final",
-                        "clear_confirm", "cart_updated").
-                        Must match one of 24 LOCKED types per 03_API §3
-                        (17 S-02/S-04 + 7 S-05 T02 NEW post-reconcile).
+                        "typo_suggestion", "product_ready", "final").
+                        Must match one of 17 LOCKED types per 03_API §3.
             data:       SSE `data:` field payload (serialized JSON).
 
         Returns:
@@ -188,76 +168,6 @@ class RedisPublisher:
             "product_ready",
             {"item": item, "index": index, "total": total},
         )
-
-    # ========================================================================
-    # S-05 T02 helpers (Phiên Sx05-2 — Cart Domain Events)
-    # ========================================================================
-
-    async def publish_cart_event(
-        self,
-        request_id: str,
-        event_type: str,
-        payload: dict[str, Any],
-    ) -> int:
-        """Publish a cart-domain SSE event per D-S05-01/03 LAW.
-
-        Thin wrapper over `publish_sse` that enforces an event-type prefix
-        whitelist for the 7 NEW S-05 T02 cart-domain event types. Defense-in-
-        depth so typos like ``'card_cleared'`` or undocumented events
-        ``'fake_cart_event'`` raise ValueError before publishing, instead of
-        silently polluting the SSE event catalog.
-
-        Whitelisted event types (per S-05 T02 emit + 03_API §3 catalog 17→24
-        post-reconcile per C-S05-D resolution):
-            - clear_confirm     — Pattern A interrupt UX (D-S05-01/03 LAW)
-            - cart_cleared      — terminal post-cart.clear (D-S05-11 LAW)
-            - clear_cancelled   — user cancel clear (no-op)
-            - stock_issue_ready    — per-item progressive (D-S05-04 LAW)
-            - stock_issue_summary  — pre-interrupt summary signal
-            - cart_updated      — terminal post-cart-mutation (D-S05-11 LAW)
-            - cart_view_ready   — terminal happy-path no stock issue
-
-        Args:
-            request_id: same rid namespace as publish_sse.
-            event_type: must start with one of `cart_`, `clear_`, or
-                `stock_issue_` (whitelist). Mismatched prefix raises
-                ValueError before publish.
-            payload:    event-specific payload matching the corresponding
-                Zod schema in `@icp/shared-types/sse intent-stream.ts`
-                (SseClearConfirmEvent / SseCartUpdatedEvent / etc).
-
-        Returns:
-            Number of subscribers that received the message.
-
-        Raises:
-            ValueError: when event_type doesn't match cart-domain prefix
-                whitelist (defensive guard against typo / unauthorized event
-                emit). Caller (graph node) should never trigger this in
-                normal operation — if it fires, fix the caller's event_type
-                string literal.
-
-        Example:
-            >>> await publisher.publish_cart_event(
-            ...     rid, "clear_confirm",
-            ...     {"item_count": 4, "subtotal": 175000,
-            ...      "user_message": "Em sẽ xoá 4 món trị giá 175.000₫ khỏi giỏ.",
-            ...      "advice": "Nếu chỉ muốn bỏ vài món, anh hãy vuốt..."}
-            ... )
-            >>> # → publishes "event: clear_confirm\\ndata: {...}\\n\\n" to
-            >>> #   channel "sse:pubsub:{rid}".
-        """
-        if not event_type.startswith(_CART_EVENT_PREFIXES):
-            raise ValueError(
-                f"publish_cart_event: event_type={event_type!r} not in "
-                f"cart-domain prefix whitelist (allowed prefixes: "
-                f"{_CART_EVENT_PREFIXES}). Use publish_sse() directly for "
-                f"non-cart events."
-            )
-        return await self.publish_sse(request_id, event_type, payload)
-
-    # ========================================================================
-    # D-S04-14 LAW paired telemetry (Phiên Sx04-4)
-    # ========================================================================
 
     def emit_first_card_emitted_log(
         self,

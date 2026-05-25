@@ -202,11 +202,6 @@ services:
       OTEL_SERVICE_NAME: ai
     ports:
       - "5001:5001"
-    # S-05 T02 fixturefix (Phiên Sx05-2c): bind-mount infra/seed for runtime
-    # fixture access (cart_by_text.py stock_issue_lookup fallback path-a +
-    # co_purchase_category.json S-04 inheritance). Read-only.
-    volumes:
-      - ../infra/seed:/app/infra/seed:ro
     networks: [icp]
     depends_on:
       redpanda:
@@ -231,11 +226,6 @@ services:
       OTEL_SERVICE_NAME: mcp
     ports:
       - "5050:5050"
-    # S-05 T02 fixturefix (Phiên Sx05-2c): bind-mount infra/seed for runtime
-    # fixture access (cart.py: promo_codes.json + free_gift_rules.json +
-    # cart_stock_replacement.json). Read-only — no container can mutate seed.
-    volumes:
-      - ../infra/seed:/app/infra/seed:ro
     networks: [icp]
     depends_on:
       postgres:

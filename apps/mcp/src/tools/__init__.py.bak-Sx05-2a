@@ -13,16 +13,9 @@
 #     spans the tool itself creates, e.g. DB query via psycopg auto-instrument).
 #   - system.list_tools returns registered tool names sorted.
 #
-# S-05 T02 amendment (Phiên Sx05-2 per D-S05-02 LAW): ADD `cart` module to
-# auto-discover import list. cart.py registers 7 cart-domain tools:
-#   cart.get / cart.update_qty / cart.remove / cart.clear /
-#   cart.validate_stock / cart.apply_promo / cart.remove_promo
-#
 # Reference:
 #   - docs/specs/03_API_CONTRACTS.md §5 (MCP Tool Specs LOCKED — JSON-RPC 2.0)
 #   - docs/phases/PHASE_01_INFRA.md Day 5
-#   - slices/S-05_decisions-log.md D-S05-02 LAW (7 MCP cart tools per
-#     C-S05-A resolution 4→7 reconcile)
 # =============================================================================
 
 from __future__ import annotations
@@ -119,7 +112,6 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
 
 # Auto-discover: import all tool modules so register() side-effects fire.
 # Order matters only for consistent system.list_tools output (sorted anyway).
-# S-05 T02 amendment (Phiên Sx05-2 per D-S05-02 LAW): ADD `cart` module.
-from src.tools import auth, cart, events, products, vespa  # noqa: E402, F401
+from src.tools import auth, events, products, vespa  # noqa: E402, F401
 
 __all__ = ["register", "list_tools", "dispatch"]
