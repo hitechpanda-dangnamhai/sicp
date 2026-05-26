@@ -9,16 +9,12 @@
  * thay vì handle Nest default + custom + Zod parse error differently.
  *
  * @see docs/08_FE_BE_CONTRACT.md §4.3 — Standard Response Shape
- * @see docs/03_API_CONTRACTS.md §4 — Error code catalog (S-04 added 2 codes,
- *      S-07 added 1 code)
+ * @see docs/03_API_CONTRACTS.md §4 — Error code catalog (S-04 added 2 codes)
  *
  * S-02 T02 emit. Global filter wiring DEFER → S-03 (first auth endpoint).
  * S-04 T03 amendment (Phiên Sx04-8b per D-S04-03 LAW Adaptive Single Endpoint
  * + Graceful Degradation): ADD `E_LLM_TIMEOUT` + `E_LLM_RATE_LIMITED` codes
  * for Variant B `variant_degraded` SSE event payload.
- * S-07 T01.F amendment (Phiên Sx07-D per C-S07-F + C-S07-J 3-threshold blur
- * check): ADD `E_VISION_BLUR` code documented in JSDoc only (no new Zod enum
- * per C-S07-F resolution Option ⓐ; reuses open `code: z.string()` pattern).
  */
 
 import { z } from 'zod';
@@ -37,12 +33,6 @@ import { z } from 'zod';
  * as plain `code: string` in `ErrorResponseSchema` below (backward-compat).
  * This enum exists for S-04+ V-SLICE typed narrowing where LLM-error codes
  * are surfaced in `variant_degraded.error_code` field.
- *
- * S-07 NOTE: `E_VISION_BLUR` intentionally NOT added to this enum (per
- * C-S07-F Option ⓐ resolution). It surfaces only via SSE `error` event from
- * AI graph node `_node_vision_analyze` (Intent 01 importing_by_images flow),
- * NOT via Variant B fallback path; same open `code: z.string()` treatment
- * as `INVALID_INTENT` / `PRODUCT_NOT_FOUND` (S-02 T02 precedent).
  */
 export const LlmErrorCodeSchema = z.enum(['E_LLM_TIMEOUT', 'E_LLM_RATE_LIMITED']);
 
@@ -70,14 +60,6 @@ export type LlmErrorCode = z.infer<typeof LlmErrorCodeSchema>;
  * { "error": { "code": "E_LLM_TIMEOUT", "message": "LLM provider timed out",
  *              "request_id": "..." } }
  * ```
- *
- * @example S-07 NEW vision blur (surfaced via SSE `error` event from AI graph
- * `_node_vision_analyze`, NOT as HTTP error — Intent 01 importing_by_images
- * flow state-E terminal; mockup line 393 displays code verbatim):
- * ```json
- * { "error": { "code": "E_VISION_BLUR", "message": "Ảnh mờ hoặc thiếu ánh sáng",
- *              "details": { "retriable": true }, "request_id": "..." } }
- * ```
  */
 export const ErrorResponseSchema = z.object({
   error: z.object({
@@ -86,8 +68,6 @@ export const ErrorResponseSchema = z.object({
      * `VALIDATION_FAILED`, `IDEMPOTENCY_CONFLICT`, `UNAUTHORIZED`, `FORBIDDEN`,
      * `INVALID_INTENT`, `PRODUCT_NOT_FOUND`, etc.
      * S-04 NEW codes: `E_LLM_TIMEOUT`, `E_LLM_RATE_LIMITED` (per D-S04-03 LAW).
-     * S-07 NEW code: `E_VISION_BLUR` (per C-S07-F + C-S07-J 3-threshold check:
-     * overall conf<0.3 OR category='unknown'/'unreadable'/'' OR max field conf<0.4).
      */
     code: z.string(),
     /** Human-readable message. Localizable in future (currently English). */

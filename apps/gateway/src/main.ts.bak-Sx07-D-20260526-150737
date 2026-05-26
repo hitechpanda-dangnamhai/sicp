@@ -13,16 +13,6 @@
  * `readCookie()` helper in intent.controller.ts (S02-C-40 handoff closure).
  * cookie-parser populates `req.cookies` typed dict — JwtAuthGuard reads from
  * there instead of parsing `req.headers.cookie` manually.
- *
- * S-07 T01.E amendment (Phiên Sx07-D per C-S07-G Option ❶): + `useBodyParser`
- * 10mb limit for `application/json` after cookieParser. NestJS default body
- * parser limit is 100KB which is too small for Intent 01 base64 image content
- * (~67KB for 50KB JPEG; up to ~7.5MB for high-res phone camera). Paired with
- * `intent-request.dto.ts` `content: z.string().min(1).max(10_000_000)` so the
- * application-layer Zod validation reflects the transport-layer ceiling.
- * Multipart upload deferred (reuse-max: zero changes to FE EventSource +
- * existing JSON-only intent body handling). See slices/S-07_decisions-log.md
- * C-S07-G Option ❶ rationale + verify command #11 inspection.
  */
 
 // ↓↓↓ MUST BE FIRST. DO NOT MOVE. ↓↓↓
@@ -31,7 +21,6 @@ import './observability/otel';
 
 import { NestFactory } from '@nestjs/core';
 import { INestApplication, Logger as NestLogger } from '@nestjs/common';
-import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { patchNestJsSwagger } from 'nestjs-zod';
 import cookieParser from 'cookie-parser';
@@ -71,7 +60,6 @@ function buildSwaggerDocument(app: INestApplication) {
     .addTag('intent', 'Universal intent endpoint (S-02 T07 SSE wrapper + AI dispatch)')
     .addTag('products', 'Product CRUD (V-SLICE)')
     .addTag('cart', 'Shopping cart (V-SLICE S-05)')
-    .addTag('cards', 'Action cards (V-SLICE S-07)')
     .addTag('orders', 'Order checkout (V-SLICE S-06)')
     .build();
 
@@ -104,9 +92,7 @@ async function exportOpenApi(app: INestApplication): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
-  // S-07 T01.E: Type-narrow to NestExpressApplication so app.useBodyParser()
-  // is available (NestJS 10.0+ Express-specific method). Per C-S07-G Option ❶.
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+  const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn'],
     bufferLogs: false,
   });
@@ -122,13 +108,6 @@ async function bootstrap(): Promise<void> {
   // No secret arg → cookies parsed but NOT signed (we use httpOnly + Secure
   // for trust; JWT itself is signed via JWT_SECRET).
   app.use(cookieParser());
-
-  // S-07 T01.E NEW per C-S07-G Option ❶: bump JSON body parser limit
-  // 100KB (NestJS default) → 10mb to accept base64 image content for
-  // Intent 01 import-by-image flow. Paired with
-  // intent-request.dto.ts max(10_000_000) Zod validation.
-  // useBodyParser() = NestJS 10.0+ Express-specific overload.
-  app.useBodyParser('json', { limit: '10mb' });
 
   // EXPORT_OPENAPI=true short-circuit
   if (process.env.EXPORT_OPENAPI === 'true') {

@@ -1,0 +1,25 @@
+Bạn là chuyên gia mô tả sản phẩm tiêu dùng Việt Nam cho merchant nhỏ lẻ.
+Dựa vào dữ liệu sau, viết tiêu đề (title) và mô tả ngắn (description) cho sản phẩm.
+
+Dữ liệu:
+- Danh mục (category): {category}
+- Thương hiệu (brand): {brand}
+- Kích thước/Trọng lượng (size): {size}
+- Loại (type): {type}
+- Văn bản đọc được từ ảnh (OCR): {ocr_text}
+- Giá thị trường trung bình tham khảo (VND): {shopee_avg_price}
+- Xu hướng thị trường: {trend_trajectory}
+
+Trả về JSON DUY NHẤT (không markdown, không text khác) theo schema:
+
+{{
+  "title": "<tên sản phẩm 50-120 ký tự, format: 'Brand Type Size' nếu đủ data; nếu OCR rõ thì ưu tiên OCR>",
+  "description": "<mô tả 1-2 câu 60-180 ký tự, đậm chất tiếng Việt tự nhiên; nêu công dụng + đặc điểm chính>",
+  "suggested_price": <số nguyên VND — giá đề xuất dựa trên giá trung bình thị trường, làm tròn 500 VND>
+}}
+
+QUY TẮC:
+- Title KHÔNG được rỗng. Nếu thiếu data, ghép Brand + Type + Size cho đủ.
+- Description nói tiếng Việt tự nhiên, KHÔNG dùng từ kỹ thuật như "category", "brand"; nói như người bán hàng thực tế.
+- suggested_price = shopee_avg_price nếu > 0; nếu = 0 thì đoán dựa trên category (vd: nước tương 22000-30000 VND, mì tôm 4000-8000 VND).
+- Chỉ trả JSON, KHÔNG kèm ```json fence hoặc giải thích.

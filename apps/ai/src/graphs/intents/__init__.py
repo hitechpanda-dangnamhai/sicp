@@ -8,26 +8,41 @@ builder accepting pre-initialized saver+publisher) alongside legacy
 `build_searching_by_text_graph` (now raises with migration message — kept
 only so stale callers fail loud at import-call boundary).
 
-Future V-SLICEs will add sibling modules:
-    - S-07 T0X: `importing_by_images.py` for Intent 01 (vision + form prefill)
-    - S-08 T0X: `buying_by_voices.py` for Intent 02 (voice + ordinal choice)
-Both reuse the same RedisSaver + Pattern P2 interrupt() + Option Z pub/sub
-pattern that S-04 T02 ships as foundational architecture (per D-S04-13 LAW
-cross-slice forward-compat note).
+S-05 T02 (Phiên Sx05-2 per D-S05-01..03 LAW + C-S05-F Path α): SECOND per-intent
+subgraph — `cart_by_text` for Intent 05 cart-domain entry intents
+(cart_clear_confirm + cart_view_with_stock_check). Lazy-imported in main.py
+dispatch to avoid module-import side effects on startup.
+
+S-07 T01.D (Phiên Sx07-D per C-S07-A/C/D/J/L/M): THIRD per-intent subgraph —
+`importing_by_images` for Intent 01 import-by-image flow (vision.analyze +
+4-tool parallel enrich + 3 NEW SSE events form_prefill/market_trend/
+shopee_compare + 2 Pattern A interrupts submit_draft + commit). Lazy-imported
+in main.py dispatch (modality=="image" branch) to avoid module-import side
+effects on startup.
+
+All three subgraphs reuse the same RedisSaver + Pattern P2 interrupt() +
+Option Z pub/sub pattern that S-04 T02 ships as foundational architecture
+(per D-S04-13 LAW cross-slice forward-compat note).
 
 Reference:
     - slices/S-04_decisions-log.md D-S04-13 LAW + D-S04-14 LAW + D-S04-15
-      (Phiên Sx04-7 saver lifecycle correctness)
-    - docs/04_INTENT_SPECS.md Intent 03 graph stages
+    - slices/S-05_decisions-log.md D-S05-01/03 LAW + C-S05-F Path α
+    - slices/S-07_decisions-log.md C-S07-A/C/D/J/L/M
+    - docs/04_INTENT_SPECS.md Intent 01 + Intent 03 + Intent 05 graph stages
     - docs/phases/PHASE_02_AUTH_SEARCH.md §C
+    - docs/phases/PHASE_03_IMPORT.md §B
 """
 
 from .searching_by_text import (
     build_searching_by_text_graph,
     compile_searching_by_text_graph,
 )
+from .cart_by_text import compile_cart_by_text_graph
+from .importing_by_images import compile_importing_by_images_graph
 
 __all__ = [
     "build_searching_by_text_graph",  # deprecated; raises on call
     "compile_searching_by_text_graph",  # Phiên Sx04-7 canonical builder
+    "compile_cart_by_text_graph",  # Phiên Sx05-2 S-05 T02
+    "compile_importing_by_images_graph",  # Phiên Sx07-D S-07 T01.D
 ]

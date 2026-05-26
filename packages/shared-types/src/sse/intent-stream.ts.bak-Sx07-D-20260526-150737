@@ -516,72 +516,6 @@ export const SseCartUpdatedEvent = z.object({}).passthrough();
 export const SseCartViewReadyEvent = z.object({}).passthrough();
 
 // ---------------------------------------------------------------------------
-// S-07 T01.F NEW 3 SSE schemas (Phiên Sx07-D per C-S07-D + C-S07-L)
-// ---------------------------------------------------------------------------
-
-/**
- * `form_prefill` — emitted ONCE after vision.analyze + enrich for Intent 01
- * import-by-image. FE renders state-B (prefilled form) using this payload.
- *
- * Per C-S07-L empirically validated (Phiên Sx07-B): includes
- * `confidence_per_field` map (state-F yellow badges trigger when any field
- * value < 0.7) and `alternatives` map (alt-chip suggestions).
- *
- * NOTE: emitted via `publish_form_prefill()` helper on RedisPublisher
- * (apps/ai/src/tools/redis_publisher.py — added in T01.D.D8).
- */
-export const SseFormPrefillEvent = z.object({
-  category: z.string(),
-  attributes: z.record(z.string(), z.unknown()),
-  ocr_text: z.string(),
-  confidence: z.number(),
-  confidence_per_field: z.record(z.string(), z.number()),
-  alternatives: z.record(z.string(), z.array(z.string())).optional(),
-  suggested_price: z.number().int().optional(),
-});
-
-/**
- * `market_trend` — emitted after enrich phase 3 (gtrends.interest_over_time).
- * FE state-B renders TrendCard molecule with rising/falling/stable trajectory.
- *
- * Per C-S07-A + C-S07-D: shape matches gtrends.interest_over_time tool returns.
- */
-export const SseMarketTrendEvent = z.object({
-  trajectory: z.enum(['rising', 'falling', 'stable']),
-  current_score: z.number(),
-  delta_pct: z.number(),
-  series: z.array(z.number()),
-  related_rising: z.array(z.string()),
-  insight: z.string().optional(),
-});
-
-/**
- * `shopee_compare` — emitted after enrich phase 3 (shopee.price_range).
- * FE state-B renders ShopeeCompareCard molecule with min/avg/max + 3 samples.
- *
- * Per C-S07-A + C-S07-D: shape matches shopee.price_range tool returns.
- */
-export const SseShopeeCompareEvent = z.object({
-  aggregates: z.object({
-    min_price: z.number().int(),
-    avg_price: z.number().int(),
-    max_price: z.number().int(),
-    sample_count: z.number().int(),
-    review_count: z.number().int(),
-  }),
-  samples: z.array(
-    z.object({
-      title: z.string(),
-      store: z.string(),
-      price: z.number().int(),
-      rating: z.number().nullable(),
-      sold_count: z.number().int(),
-    }),
-  ),
-  matched_via: z.enum(['specific', 'category_fallback', 'no_match']).optional(),
-});
-
-// ---------------------------------------------------------------------------
 // Type registry — handler signature lookup for `streamIntent()` wrapper
 // ---------------------------------------------------------------------------
 
@@ -623,10 +557,6 @@ export type IntentStreamEventMap = {
   stock_issue_summary: z.infer<typeof SseStockIssueSummaryEvent>;
   cart_updated: z.infer<typeof SseCartUpdatedEvent>;
   cart_view_ready: z.infer<typeof SseCartViewReadyEvent>;
-  // S-07 T01.F NEW 3 (Phiên Sx07-D per C-S07-D + C-S07-L)
-  form_prefill: z.infer<typeof SseFormPrefillEvent>;
-  market_trend: z.infer<typeof SseMarketTrendEvent>;
-  shopee_compare: z.infer<typeof SseShopeeCompareEvent>;
 };
 
 /** Union of typed event names — used in `streamIntent(handlers)` key constraint. */
@@ -661,8 +591,4 @@ export const IntentStreamSchemas = {
   stock_issue_summary: SseStockIssueSummaryEvent,
   cart_updated: SseCartUpdatedEvent,
   cart_view_ready: SseCartViewReadyEvent,
-  // S-07 T01.F NEW 3 (Phiên Sx07-D per C-S07-D + C-S07-L)
-  form_prefill: SseFormPrefillEvent,
-  market_trend: SseMarketTrendEvent,
-  shopee_compare: SseShopeeCompareEvent,
 } as const;

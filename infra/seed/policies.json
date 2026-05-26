@@ -37,5 +37,95 @@
     },
     "priority": 90,
     "enabled": true
+  },
+  {
+    "code": "WEAK_SEARCHABILITY_v1",
+    "description": "Cảnh báo khi product draft thiếu attributes searchable (brand, size, type) ≥ 2 fields — affect SEO và Vespa hybrid_search recall.",
+    "rule_dsl": {
+      "trigger": "ProductDraftSubmitted",
+      "condition": {
+        "field": "missing_attrs_count",
+        "op": ">=",
+        "value": 2
+      },
+      "action": {
+        "type": "SUGGEST_ATTRS",
+        "template": "weak_searchability_warn"
+      }
+    },
+    "priority": 95,
+    "enabled": true
+  },
+  {
+    "code": "TREND_FADING_v1",
+    "description": "Cảnh báo khi market trend cho category này đang giảm (delta_pct < -10%) — gợi ý merchant cân nhắc giảm giá hoặc chờ.",
+    "rule_dsl": {
+      "trigger": "ProductDraftSubmitted",
+      "condition": {
+        "field": "trend_delta_pct",
+        "op": "<",
+        "value": -10
+      },
+      "action": {
+        "type": "SUGGEST_WAIT_OR_REDUCE",
+        "template": "trend_fading_warn"
+      }
+    },
+    "priority": 80,
+    "enabled": true
+  },
+  {
+    "code": "MARKET_RISING_v1",
+    "description": "Phát hiện thị trường đang lên (delta_pct > 15%) — gợi ý merchant nhập thêm hàng để đón sóng.",
+    "rule_dsl": {
+      "trigger": "ProductDraftSubmitted",
+      "condition": {
+        "field": "trend_delta_pct",
+        "op": ">",
+        "value": 15
+      },
+      "action": {
+        "type": "SUGGEST_STOCK_UP",
+        "template": "market_rising_opportunity"
+      }
+    },
+    "priority": 75,
+    "enabled": true
+  },
+  {
+    "code": "MARKET_FALLING_v1",
+    "description": "Phát hiện thị trường giảm mạnh (delta_pct < -15%) — gợi ý merchant giảm giá hoặc tạm hoãn nhập.",
+    "rule_dsl": {
+      "trigger": "ProductDraftSubmitted",
+      "condition": {
+        "field": "trend_delta_pct",
+        "op": "<",
+        "value": -15
+      },
+      "action": {
+        "type": "SUGGEST_WAIT_OR_REDUCE",
+        "template": "market_falling_warn"
+      }
+    },
+    "priority": 78,
+    "enabled": true
+  },
+  {
+    "code": "SLOW_MOVING_v1",
+    "description": "Phát hiện sản phẩm không bán được trong ≥30 ngày (S-10 daily review) — gợi ý promotion hoặc clearance. Trigger DailyStockReview, không phải ProductDraftSubmitted.",
+    "rule_dsl": {
+      "trigger": "DailyStockReview",
+      "condition": {
+        "field": "days_since_last_sale",
+        "op": ">=",
+        "value": 30
+      },
+      "action": {
+        "type": "SUGGEST_PROMOTION",
+        "template": "slow_moving_warn"
+      }
+    },
+    "priority": 70,
+    "enabled": true
   }
 ]

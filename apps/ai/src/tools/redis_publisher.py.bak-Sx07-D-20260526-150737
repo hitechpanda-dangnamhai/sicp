@@ -305,43 +305,6 @@ class RedisPublisher:
             wall_clock_ms=int(time.time() * 1000),
         )
 
-    # --- S-07 T01.D NEW per C-S07-D + C-S07-L (Phiên Sx07-D) ---
-    # 3 thin helpers reusing publish_sse primitive for Intent 01 import flow.
-    # Per C-S07-D: 3 NEW SSE event types form_prefill/market_trend/shopee_compare
-    # added to IntentStreamEventMap (24 → 27 entries via T01.F shared-types
-    # patch). Per C-S07-L: form_prefill includes confidence_per_field +
-    # alternatives for state-F yellow badge + alt-chip rendering.
-
-    async def publish_form_prefill(self, request_id: str, data: dict) -> None:
-        """Publish form_prefill SSE event (Intent 01 state-B render trigger).
-
-        Per C-S07-D + C-S07-L: data shape matches SseFormPrefillEvent Zod schema
-        in packages/shared-types/src/sse/intent-stream.ts.
-        Required keys: category, attributes, ocr_text, confidence,
-        confidence_per_field. Optional: alternatives, suggested_price, title,
-        description (passthrough fields per z.record permissive shape).
-        """
-        await self.publish_sse(request_id, "form_prefill", data)
-
-    async def publish_market_trend(self, request_id: str, data: dict) -> None:
-        """Publish market_trend SSE event (Intent 01 state-B TrendCard render).
-
-        Per C-S07-D: data shape matches SseMarketTrendEvent Zod schema.
-        Required: trajectory (rising/falling/stable), current_score, delta_pct,
-        series (list[float]), related_rising (list[str]). Optional: insight.
-        """
-        await self.publish_sse(request_id, "market_trend", data)
-
-    async def publish_shopee_compare(self, request_id: str, data: dict) -> None:
-        """Publish shopee_compare SSE event (Intent 01 state-B ShopeeCompareCard render).
-
-        Per C-S07-D + C-S07-A: data shape matches SseShopeeCompareEvent Zod schema.
-        Required: aggregates {min_price, avg_price, max_price, sample_count,
-        review_count}, samples (list of {title, store, price, rating, sold_count}).
-        Optional: matched_via (specific/category_fallback/no_match).
-        """
-        await self.publish_sse(request_id, "shopee_compare", data)
-
     async def close(self) -> None:
         """Close underlying Redis async client. Safe to call multiple times."""
         if self._client is not None:

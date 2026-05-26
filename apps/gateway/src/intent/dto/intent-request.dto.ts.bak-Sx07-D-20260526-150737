@@ -24,20 +24,10 @@
  * classifier path. See decisions-log D-S05-01 LAW Hybrid Routing topology
  * + C-S05-F Path α resolution (Phiên Sx05-2-DISCOVER verify cmd #18-25).
  *
- * **S-07 T01.E amendment (Phiên Sx07-D per C-S07-G Option ❶):** BUMP `content`
- * max length 5000 → 10_000_000 to accept base64-encoded image bytes inline
- * for Intent 01 import-by-image flow (typical 50KB JPEG → ~67KB base64;
- * 10MB ceiling provides 150x safety margin for high-res phone camera
- * uploads up to ~7.5MB original). Multipart upload deferred per C-S07-G
- * rationale (reuse-max: zero changes to FE EventSource path, Gateway SSE
- * wrapper, AI Flask Werkzeug WSGI body handler). Paired with main.ts
- * `useBodyParser('json', {limit: '10mb'})` to lift NestJS default 100KB.
- *
- * @see docs/03_API_CONTRACTS.md §1.2 (`mode` field S-04 NEW per D-S04-03 LAW;
- *      `hint` enum S-05 extend per C-S05-F Path α + D-S05-01 LAW;
- *      `content` 10MB limit S-07 per C-S07-G Option ❶)
+ * @see docs/03_API_CONTRACTS.md §1.2 (multipart for image/voice deferred V-SLICE;
+ *      `mode` field S-04 NEW per D-S04-03 LAW; `hint` enum S-05 extend per
+ *      C-S05-F Path α + D-S05-01 LAW)
  * @see slices/S-05_decisions-log.md D-S05-01 LAW + C-S05-F resolution
- * @see slices/S-07_decisions-log.md C-S07-G Option ❶ (base64 in content + 10mb bodyparser)
  */
 
 import { createZodDto } from 'nestjs-zod';
@@ -45,16 +35,7 @@ import { z } from 'zod';
 
 export const IntentRequestSchema = z.object({
   modality: z.enum(['text', 'image', 'voice']),
-  /**
-   * Request content.
-   * - modality='text': user query string (1..5000 chars typical)
-   * - modality='image': base64-encoded image bytes (S-07 NEW — up to ~10MB
-   *   raw base64 string per C-S07-G Option ❶; data URI prefix
-   *   `data:image/jpeg;base64,` accepted and stripped server-side)
-   * - modality='voice': base64-encoded audio bytes (S-08 territory; same
-   *   10MB ceiling applies for forward-compat — no separate limit needed)
-   */
-  content: z.string().min(1).max(10_000_000).optional(),
+  content: z.string().min(1).max(5000).optional(),
   /**
    * Graph entry hint — extension of S-04 4-value enum per S-05 T02 C-S05-F
    * Path α LAW (Phiên Sx05-2).
@@ -68,11 +49,6 @@ export const IntentRequestSchema = z.object({
    *   override for AI dispatch to `cart_by_text.py`
    *   cart_view_with_stock_check subgraph per D-S05-04 LAW Vespa+LLM stock
    *   replacement.
-   *
-   * S-07 NOTE: Intent 01 import-by-image flow uses `hint='import'`
-   * (informational only); actual dispatch is keyed off `modality='image'`
-   * in AI main.py per C-S07-A. The `hint='import'` value remains valid
-   * for FE clarity but does not trigger any backend branch.
    *
    * Backward-compat: `hint=undefined` → AI dispatches default
    * `searching_by_text` per existing classifier (S-04 router_graph heuristic).

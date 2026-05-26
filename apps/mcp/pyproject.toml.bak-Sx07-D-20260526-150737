@@ -1,23 +1,27 @@
 # =============================================================================
-# apps/mcp/pyproject.toml — ICP MCP Tool Server
+# apps/mcp/pyproject.toml — ICP MCP Tool Server (T04 — C-21 fix Phiên 25)
 # =============================================================================
-# Phiên history:
-#   - T04 first emit (Phiên 25) — 3 first tools (auth/events/products)
-#   - S-04 T02 Phiên Sx04-5 — added httpx for vespa.hybrid_search
-#   - S-07 T01.C Phiên Sx07-D — added google-generativeai for vision.analyze
+# Replaces T04 first emit (Phiên 25). C-21 bug: original used
+# package-dir + packages.find combo → pip install editable reported success but
+# `mcp` module not importable (top_level.txt empty/wrong).
+#
+# Fix: Mirror T03 apps/ai/pyproject.toml pattern exactly (verified working
+# Phiên 24, 12/12 ACs PASS):
+#   - where=["."], include=["src", "src.*"]
+#   - NO package-dir rename
+#   - Import path: `src.server`, `src.tools`, `src.observability`
 #
 # Reference:
 #   - docs/phases/PHASE_01_INFRA.md Day 5 (MCP server scope)
 #   - docs/specs/03_API_CONTRACTS.md §5 (MCP tool specs LOCKED)
 #   - apps/ai/pyproject.toml (T03 working pattern — Phiên 24)
 #   - slices/S-02_decisions-log.md C-21 (Phiên 25 amendment)
-#   - slices/S-07_decisions-log.md C-S07-L (vision.analyze Gemini wrap)
 # =============================================================================
 
 [project]
 name = "icp-mcp"
 version = "0.0.1"
-description = "ICP MCP Tool Server — JSON-RPC 2.0 over HTTP with OTel auto-instrumentation."
+description = "ICP MCP Tool Server — JSON-RPC 2.0 over HTTP with OTel auto-instrumentation. 3 first tools: auth.verify_jwt, events.append, products.get."
 requires-python = ">=3.11,<3.13"
 dependencies = [
     # --- Web framework (mirror T03) ---
@@ -34,9 +38,6 @@ dependencies = [
 
     # --- S-04 T02 NEW: HTTP client for vespa.hybrid_search tool (D-S04-14 Q-Sx04-4-1 LAW sync HTTP) ---
     "httpx>=0.27,<0.28",
-
-    # --- S-07 T01.C NEW: Gemini SDK for vision.analyze tool (C-S07-L empirically validated) ---
-    "google-generativeai>=0.8,<1.0",
 
     # --- OpenTelemetry Python SDK (mirror T03 pin range >=1.27,<2.0) ---
     "opentelemetry-api>=1.27,<2.0",

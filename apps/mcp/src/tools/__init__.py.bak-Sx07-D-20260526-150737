@@ -13,23 +13,16 @@
 #     spans the tool itself creates, e.g. DB query via psycopg auto-instrument).
 #   - system.list_tools returns registered tool names sorted.
 #
-# S-05 T02 amendment (Phiên Sx05-2 per D-S05-02 LAW): ADD `cart` module.
-#
-# S-07 T01.C amendment (Phiên Sx07-D per C-S07-A): ADD 6 NEW tool modules:
-#   - cards (cards.create, cards.list_pending, cards.update_status)
-#   - gtrends (gtrends.interest_over_time)
-#   - policies (policies.find_matching)
-#   - shopee (shopee.price_range)
-#   - vision (vision.analyze)
-#   - products (products.create — was already imported, now also products.update
-#     per T01.E.G C-S07-N Option B — registered inside products.py module body)
+# S-05 T02 amendment (Phiên Sx05-2 per D-S05-02 LAW): ADD `cart` module to
+# auto-discover import list. cart.py registers 7 cart-domain tools:
+#   cart.get / cart.update_qty / cart.remove / cart.clear /
+#   cart.validate_stock / cart.apply_promo / cart.remove_promo
 #
 # Reference:
 #   - docs/specs/03_API_CONTRACTS.md §5 (MCP Tool Specs LOCKED — JSON-RPC 2.0)
 #   - docs/phases/PHASE_01_INFRA.md Day 5
-#   - slices/S-05_decisions-log.md D-S05-02 LAW
-#   - slices/S-07_decisions-log.md C-S07-A (9 NEW MCP tools)
-#   - slices/S-07_decisions-log.md C-S07-N Option B (products.update separate)
+#   - slices/S-05_decisions-log.md D-S05-02 LAW (7 MCP cart tools per
+#     C-S05-A resolution 4→7 reconcile)
 # =============================================================================
 
 from __future__ import annotations
@@ -51,11 +44,17 @@ JSONRPC_INVALID_PARAMS = -32602
 JSONRPC_INTERNAL_ERROR = -32603
 
 # Tool registry: method name (e.g. "products.get") → callable.
+# Callable signature: (params: dict) -> Any (result serialized to JSON by handler).
 _REGISTRY: dict[str, Callable[[dict[str, Any]], Any]] = {}
 
 
 def register(name: str, fn: Callable[[dict[str, Any]], Any]) -> None:
-    """Register a tool under JSON-RPC method name."""
+    """
+    Register a tool under JSON-RPC method name.
+
+    Called by tool modules at import time. Idempotent: re-registering same name
+    overwrites (acceptable for hot-reload dev scenarios).
+    """
     if name in _REGISTRY:
         _logger.warning("tool.duplicate_registration", name=name)
     _REGISTRY[name] = fn
@@ -67,8 +66,16 @@ def list_tools() -> list[str]:
 
 
 def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
-    """Dispatch a JSON-RPC method to its handler with OTel span wrap."""
-    # Built-in introspection — no span wrap needed.
+    """
+    Dispatch a JSON-RPC method to its handler with OTel span wrap.
+
+    Returns (result, error) tuple — exactly one is None.
+    Error dict shape: {"code": int, "message": str, "data": Optional[Any]}.
+
+    Span per AC-10: `mcp.tool.<name>` created here, parent of any deeper spans
+    the tool itself creates (psycopg auto-instrument query spans become children).
+    """
+    # Built-in introspection method — does NOT need span wrap (no I/O).
     if method == "system.list_tools":
         return list_tools(), None
 
@@ -81,6 +88,7 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
             "data": {"method": method},
         }
 
+    # AC-10: per-tool span. Name pattern `mcp.tool.<method>` matches PHASE_01 Day 5.
     with _tracer.start_as_current_span(f"mcp.tool.{method}") as span:
         span.set_attribute("mcp.tool.name", method)
         try:
@@ -88,6 +96,7 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
             span.set_attribute("mcp.tool.status", "ok")
             return result, None
         except ValueError as e:
+            # Validation failures → JSON-RPC invalid_params (caller error).
             _logger.warning("tool.invalid_params", method=method, error=str(e))
             span.set_attribute("mcp.tool.status", "invalid_params")
             span.record_exception(e)
@@ -97,6 +106,7 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
                 "data": {"detail": str(e)},
             }
         except Exception as e:  # noqa: BLE001
+            # Internal failures (DB down, etc.) → JSON-RPC internal_error.
             _logger.error("tool.internal_error", method=method, error=str(e))
             span.set_attribute("mcp.tool.status", "internal_error")
             span.record_exception(e)
@@ -108,21 +118,8 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
 
 
 # Auto-discover: import all tool modules so register() side-effects fire.
-# Sorted alphabetically for code review clarity.
-# S-05 T02 (Phiên Sx05-2): cart module added.
-# S-07 T01.C (Phiên Sx07-D): cards, gtrends, policies, shopee, vision modules added.
-# S-07 T01.E.G (Phiên Sx07-D): products module body now also registers products.update.
-from src.tools import (  # noqa: E402, F401
-    auth,
-    cards,
-    cart,
-    events,
-    gtrends,
-    policies,
-    products,
-    shopee,
-    vespa,
-    vision,
-)
+# Order matters only for consistent system.list_tools output (sorted anyway).
+# S-05 T02 amendment (Phiên Sx05-2 per D-S05-02 LAW): ADD `cart` module.
+from src.tools import auth, cart, events, products, vespa  # noqa: E402, F401
 
 __all__ = ["register", "list_tools", "dispatch"]

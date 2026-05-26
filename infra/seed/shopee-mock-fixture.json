@@ -1,0 +1,2279 @@
+[
+  {
+    "category": "nuoc_tuong",
+    "attributes": {
+      "brand": "Maggi",
+      "size": "700ml"
+    },
+    "min_price": 21675,
+    "avg_price": 25500,
+    "max_price": 30600,
+    "sample_count": 5,
+    "review_count": 216,
+    "samples": [
+      {
+        "title": "Nước tương Maggi đậm đặc 700ml",
+        "store": "Maggi Official",
+        "price": 21675,
+        "rating": 4.8,
+        "sold_count": 780
+      },
+      {
+        "title": "Nước tương Maggi đậm đặc 700ml - Chính hãng",
+        "store": "SiêuThị Online",
+        "price": 25500,
+        "rating": 4.7,
+        "sold_count": 300
+      },
+      {
+        "title": "Nước tương Maggi đậm đặc 700ml + tặng kèm quà",
+        "store": "Premium Store",
+        "price": 30600,
+        "rating": 4.8,
+        "sold_count": 120
+      }
+    ]
+  },
+  {
+    "category": "nuoc_tuong",
+    "attributes": {
+      "brand": "Chinsu",
+      "size": "500ml"
+    },
+    "min_price": 27200,
+    "avg_price": 32000,
+    "max_price": 38400,
+    "sample_count": 5,
+    "review_count": 177,
+    "samples": [
+      {
+        "title": "Nước tương Tam Thái Tử nâu 500ml",
+        "store": "Maggi Official",
+        "price": 27200,
+        "rating": 4.7,
+        "sold_count": 641
+      },
+      {
+        "title": "Nước tương Tam Thái Tử nâu 500ml - Chính hãng",
+        "store": "SiêuThị Online",
+        "price": 32000,
+        "rating": 4.6,
+        "sold_count": 246
+      },
+      {
+        "title": "Nước tương Tam Thái Tử nâu 500ml + tặng kèm quà",
+        "store": "Premium Store",
+        "price": 38400,
+        "rating": 4.8,
+        "sold_count": 98
+      }
+    ]
+  },
+  {
+    "category": "nuoc_tuong",
+    "attributes": {
+      "brand": "Nam Duong",
+      "size": "450ml"
+    },
+    "min_price": 17850,
+    "avg_price": 21000,
+    "max_price": 25200,
+    "sample_count": 5,
+    "review_count": 117,
+    "samples": [
+      {
+        "title": "Nước tương Nàng Dâu 450ml",
+        "store": "Maggi Official",
+        "price": 17850,
+        "rating": 4.5,
+        "sold_count": 425
+      },
+      {
+        "title": "Nước tương Nàng Dâu 450ml - Chính hãng",
+        "store": "SiêuThị Online",
+        "price": 21000,
+        "rating": 4.4,
+        "sold_count": 163
+      },
+      {
+        "title": "Nước tương Nàng Dâu 450ml + tặng kèm quà",
+        "store": "Premium Store",
+        "price": 25200,
+        "rating": 4.5,
+        "sold_count": 65
+      }
+    ]
+  },
+  {
+    "category": "nuoc_tuong",
+    "attributes": {
+      "brand": "Maggi",
+      "size": "300ml"
+    },
+    "min_price": 15300,
+    "avg_price": 18000,
+    "max_price": 21600,
+    "sample_count": 5,
+    "review_count": 154,
+    "samples": [
+      {
+        "title": "Nước tương Maggi tỏi ớt 300ml",
+        "store": "Maggi Official",
+        "price": 15300,
+        "rating": 4.6,
+        "sold_count": 556
+      },
+      {
+        "title": "Nước tương Maggi tỏi ớt 300ml - Chính hãng",
+        "store": "SiêuThị Online",
+        "price": 18000,
+        "rating": 4.5,
+        "sold_count": 214
+      },
+      {
+        "title": "Nước tương Maggi tỏi ớt 300ml + tặng kèm quà",
+        "store": "Premium Store",
+        "price": 21600,
+        "rating": 4.6,
+        "sold_count": 85
+      }
+    ]
+  },
+  {
+    "category": "nuoc_tuong",
+    "attributes": {
+      "brand": "Lee Kum Kee",
+      "size": "150ml"
+    },
+    "min_price": 46750,
+    "avg_price": 55000,
+    "max_price": 66000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Nước tương Lee Kum Kee Premium 150ml",
+        "store": "Maggi Official",
+        "price": 46750,
+        "rating": 4.4,
+        "sold_count": 61
+      },
+      {
+        "title": "Nước tương Lee Kum Kee Premium 150ml - Chính hãng",
+        "store": "SiêuThị Online",
+        "price": 55000,
+        "rating": 4.3,
+        "sold_count": 23
+      },
+      {
+        "title": "Nước tương Lee Kum Kee Premium 150ml + tặng kèm quà",
+        "store": "Premium Store",
+        "price": 66000,
+        "rating": 4.5,
+        "sold_count": 9
+      }
+    ]
+  },
+  {
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Chinsu",
+      "size": "250g"
+    },
+    "min_price": 14450,
+    "avg_price": 17000,
+    "max_price": 20400,
+    "sample_count": 5,
+    "review_count": 378,
+    "samples": [
+      {
+        "title": "Tương ớt Chin-su 250g",
+        "store": "Chinsu Official",
+        "price": 14450,
+        "rating": 4.8,
+        "sold_count": 1365
+      },
+      {
+        "title": "Tương ớt Chin-su 250g - Chính hãng",
+        "store": "SiêuThị Tốt",
+        "price": 17000,
+        "rating": 4.7,
+        "sold_count": 525
+      },
+      {
+        "title": "Tương ớt Chin-su 250g + tặng kèm quà",
+        "store": "Co.opmart Online",
+        "price": 20400,
+        "rating": 4.8,
+        "sold_count": 210
+      }
+    ]
+  },
+  {
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Cholimex",
+      "size": "270g"
+    },
+    "min_price": 11050,
+    "avg_price": 13000,
+    "max_price": 15600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Tương ớt Cholimex 270g",
+        "store": "Chinsu Official",
+        "price": 11050,
+        "rating": 4.4,
+        "sold_count": 227
+      },
+      {
+        "title": "Tương ớt Cholimex 270g - Chính hãng",
+        "store": "SiêuThị Tốt",
+        "price": 13000,
+        "rating": 4.3,
+        "sold_count": 87
+      },
+      {
+        "title": "Tương ớt Cholimex 270g + tặng kèm quà",
+        "store": "Co.opmart Online",
+        "price": 15600,
+        "rating": 4.5,
+        "sold_count": 35
+      }
+    ]
+  },
+  {
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Huy Fong",
+      "size": "482g"
+    },
+    "min_price": 55250,
+    "avg_price": 65000,
+    "max_price": 78000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Sriracha Huy Fong 482g",
+        "store": "Chinsu Official",
+        "price": 55250,
+        "rating": 4.6,
+        "sold_count": 149
+      },
+      {
+        "title": "Sriracha Huy Fong 482g - Chính hãng",
+        "store": "SiêuThị Tốt",
+        "price": 65000,
+        "rating": 4.5,
+        "sold_count": 57
+      },
+      {
+        "title": "Sriracha Huy Fong 482g + tặng kèm quà",
+        "store": "Co.opmart Online",
+        "price": 78000,
+        "rating": 4.6,
+        "sold_count": 23
+      }
+    ]
+  },
+  {
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Trung Thanh",
+      "size": "300g"
+    },
+    "min_price": 12325,
+    "avg_price": 14500,
+    "max_price": 17400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Tương ớt Trung Thành 300g",
+        "store": "Chinsu Official",
+        "price": 12325,
+        "rating": 4.2,
+        "sold_count": 94
+      },
+      {
+        "title": "Tương ớt Trung Thành 300g - Chính hãng",
+        "store": "SiêuThị Tốt",
+        "price": 14500,
+        "rating": 4.1,
+        "sold_count": 36
+      },
+      {
+        "title": "Tương ớt Trung Thành 300g + tặng kèm quà",
+        "store": "Co.opmart Online",
+        "price": 17400,
+        "rating": 4.2,
+        "sold_count": 14
+      }
+    ]
+  },
+  {
+    "category": "tuong_ot",
+    "attributes": {
+      "brand": "Ottogi",
+      "size": "250g"
+    },
+    "min_price": 18700,
+    "avg_price": 22000,
+    "max_price": 26400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Tương ớt sốt cay Ottogi 250g",
+        "store": "Chinsu Official",
+        "price": 18700,
+        "rating": 4.3,
+        "sold_count": 48
+      },
+      {
+        "title": "Tương ớt sốt cay Ottogi 250g - Chính hãng",
+        "store": "SiêuThị Tốt",
+        "price": 22000,
+        "rating": 4.2,
+        "sold_count": 18
+      },
+      {
+        "title": "Tương ớt sốt cay Ottogi 250g + tặng kèm quà",
+        "store": "Co.opmart Online",
+        "price": 26400,
+        "rating": 4.3,
+        "sold_count": 7
+      }
+    ]
+  },
+  {
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Tuong An",
+      "size": "1L"
+    },
+    "min_price": 44200,
+    "avg_price": 52000,
+    "max_price": 62400,
+    "sample_count": 5,
+    "review_count": 396,
+    "samples": [
+      {
+        "title": "Dầu ăn Tường An Cooking Oil 1L",
+        "store": "Cai Lan Official",
+        "price": 44200,
+        "rating": 4.6,
+        "sold_count": 1430
+      },
+      {
+        "title": "Dầu ăn Tường An Cooking Oil 1L - Chính hãng",
+        "store": "Tường An Store",
+        "price": 52000,
+        "rating": 4.5,
+        "sold_count": 550
+      },
+      {
+        "title": "Dầu ăn Tường An Cooking Oil 1L + tặng kèm quà",
+        "store": "SiêuThị Bình Dân",
+        "price": 62400,
+        "rating": 4.6,
+        "sold_count": 220
+      }
+    ]
+  },
+  {
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Neptune",
+      "size": "1L"
+    },
+    "min_price": 49300,
+    "avg_price": 58000,
+    "max_price": 69600,
+    "sample_count": 5,
+    "review_count": 297,
+    "samples": [
+      {
+        "title": "Dầu ăn Neptune Gold 1L",
+        "store": "Cai Lan Official",
+        "price": 49300,
+        "rating": 4.5,
+        "sold_count": 1072
+      },
+      {
+        "title": "Dầu ăn Neptune Gold 1L - Chính hãng",
+        "store": "Tường An Store",
+        "price": 58000,
+        "rating": 4.4,
+        "sold_count": 412
+      },
+      {
+        "title": "Dầu ăn Neptune Gold 1L + tặng kèm quà",
+        "store": "SiêuThị Bình Dân",
+        "price": 69600,
+        "rating": 4.5,
+        "sold_count": 165
+      }
+    ]
+  },
+  {
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Simply",
+      "size": "1L"
+    },
+    "min_price": 55250,
+    "avg_price": 65000,
+    "max_price": 78000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Dầu ăn Simply hướng dương 1L",
+        "store": "Cai Lan Official",
+        "price": 55250,
+        "rating": 4.4,
+        "sold_count": 221
+      },
+      {
+        "title": "Dầu ăn Simply hướng dương 1L - Chính hãng",
+        "store": "Tường An Store",
+        "price": 65000,
+        "rating": 4.3,
+        "sold_count": 85
+      },
+      {
+        "title": "Dầu ăn Simply hướng dương 1L + tặng kèm quà",
+        "store": "SiêuThị Bình Dân",
+        "price": 78000,
+        "rating": 4.5,
+        "sold_count": 34
+      }
+    ]
+  },
+  {
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Cai Lan",
+      "size": "1L"
+    },
+    "min_price": 40800,
+    "avg_price": 48000,
+    "max_price": 57600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Dầu ăn Cái Lân Cooking 1L",
+        "store": "Cai Lan Official",
+        "price": 40800,
+        "rating": 4.3,
+        "sold_count": 162
+      },
+      {
+        "title": "Dầu ăn Cái Lân Cooking 1L - Chính hãng",
+        "store": "Tường An Store",
+        "price": 48000,
+        "rating": 4.2,
+        "sold_count": 62
+      },
+      {
+        "title": "Dầu ăn Cái Lân Cooking 1L + tặng kèm quà",
+        "store": "SiêuThị Bình Dân",
+        "price": 57600,
+        "rating": 4.3,
+        "sold_count": 25
+      }
+    ]
+  },
+  {
+    "category": "dau_an",
+    "attributes": {
+      "brand": "Bertolli",
+      "size": "500ml"
+    },
+    "min_price": 157250,
+    "avg_price": 185000,
+    "max_price": 222000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Dầu olive Bertolli Extra Virgin 500ml",
+        "store": "Cai Lan Official",
+        "price": 157250,
+        "rating": 4.7,
+        "sold_count": 84
+      },
+      {
+        "title": "Dầu olive Bertolli Extra Virgin 500ml - Chính hãng",
+        "store": "Tường An Store",
+        "price": 185000,
+        "rating": 4.6,
+        "sold_count": 32
+      },
+      {
+        "title": "Dầu olive Bertolli Extra Virgin 500ml + tặng kèm quà",
+        "store": "SiêuThị Bình Dân",
+        "price": 222000,
+        "rating": 4.8,
+        "sold_count": 13
+      }
+    ]
+  },
+  {
+    "category": "mi_tom",
+    "attributes": {
+      "brand": "Hao Hao",
+      "size": "75g"
+    },
+    "min_price": 3825,
+    "avg_price": 4500,
+    "max_price": 5400,
+    "sample_count": 5,
+    "review_count": 522,
+    "samples": [
+      {
+        "title": "Mì tôm Hảo Hảo tôm chua cay 75g",
+        "store": "Hảo Hảo Official",
+        "price": 3825,
+        "rating": 4.7,
+        "sold_count": 1885
+      },
+      {
+        "title": "Mì tôm Hảo Hảo tôm chua cay 75g - Chính hãng",
+        "store": "Acecook Store",
+        "price": 4500,
+        "rating": 4.6,
+        "sold_count": 725
+      },
+      {
+        "title": "Mì tôm Hảo Hảo tôm chua cay 75g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 5400,
+        "rating": 4.8,
+        "sold_count": 290
+      }
+    ]
+  },
+  {
+    "category": "mi_tom",
+    "attributes": {
+      "brand": "Acecook",
+      "size": "65g"
+    },
+    "min_price": 5780,
+    "avg_price": 6800,
+    "max_price": 8160,
+    "sample_count": 5,
+    "review_count": 333,
+    "samples": [
+      {
+        "title": "Mì Phở Bò Acecook Đệ Nhất 65g",
+        "store": "Hảo Hảo Official",
+        "price": 5780,
+        "rating": 4.5,
+        "sold_count": 1202
+      },
+      {
+        "title": "Mì Phở Bò Acecook Đệ Nhất 65g - Chính hãng",
+        "store": "Acecook Store",
+        "price": 6800,
+        "rating": 4.4,
+        "sold_count": 462
+      },
+      {
+        "title": "Mì Phở Bò Acecook Đệ Nhất 65g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 8160,
+        "rating": 4.5,
+        "sold_count": 185
+      }
+    ]
+  },
+  {
+    "category": "mi_tom",
+    "attributes": {
+      "brand": "Omachi",
+      "size": "80g"
+    },
+    "min_price": 8075,
+    "avg_price": 9500,
+    "max_price": 11400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Mì Omachi sườn hầm ngũ quả 80g",
+        "store": "Hảo Hảo Official",
+        "price": 8075,
+        "rating": 4.4,
+        "sold_count": 247
+      },
+      {
+        "title": "Mì Omachi sườn hầm ngũ quả 80g - Chính hãng",
+        "store": "Acecook Store",
+        "price": 9500,
+        "rating": 4.3,
+        "sold_count": 95
+      },
+      {
+        "title": "Mì Omachi sườn hầm ngũ quả 80g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 11400,
+        "rating": 4.5,
+        "sold_count": 38
+      }
+    ]
+  },
+  {
+    "category": "mi_tom",
+    "attributes": {
+      "brand": "Cung Dinh",
+      "size": "80g"
+    },
+    "min_price": 5270,
+    "avg_price": 6200,
+    "max_price": 7440,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Mì Cung Đình lẩu thái tôm 80g",
+        "store": "Hảo Hảo Official",
+        "price": 5270,
+        "rating": 4.2,
+        "sold_count": 152
+      },
+      {
+        "title": "Mì Cung Đình lẩu thái tôm 80g - Chính hãng",
+        "store": "Acecook Store",
+        "price": 6200,
+        "rating": 4.1,
+        "sold_count": 58
+      },
+      {
+        "title": "Mì Cung Đình lẩu thái tôm 80g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 7440,
+        "rating": 4.2,
+        "sold_count": 23
+      }
+    ]
+  },
+  {
+    "category": "mi_tom",
+    "attributes": {
+      "brand": "Nongshim",
+      "size": "120g"
+    },
+    "min_price": 15300,
+    "avg_price": 18000,
+    "max_price": 21600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Mì Shin Ramyun Hàn Quốc 120g",
+        "store": "Hảo Hảo Official",
+        "price": 15300,
+        "rating": 4.6,
+        "sold_count": 94
+      },
+      {
+        "title": "Mì Shin Ramyun Hàn Quốc 120g - Chính hãng",
+        "store": "Acecook Store",
+        "price": 18000,
+        "rating": 4.5,
+        "sold_count": 36
+      },
+      {
+        "title": "Mì Shin Ramyun Hàn Quốc 120g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 21600,
+        "rating": 4.6,
+        "sold_count": 14
+      }
+    ]
+  },
+  {
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Knorr",
+      "size": "900g"
+    },
+    "min_price": 49300,
+    "avg_price": 58000,
+    "max_price": 69600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Hạt nêm Knorr Hảo Vị 900g",
+        "store": "Knorr Official",
+        "price": 49300,
+        "rating": 4.5,
+        "sold_count": 351
+      },
+      {
+        "title": "Hạt nêm Knorr Hảo Vị 900g - Chính hãng",
+        "store": "Maggi Store",
+        "price": 58000,
+        "rating": 4.4,
+        "sold_count": 135
+      },
+      {
+        "title": "Hạt nêm Knorr Hảo Vị 900g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 69600,
+        "rating": 4.5,
+        "sold_count": 54
+      }
+    ]
+  },
+  {
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Ajinomoto",
+      "size": "454g"
+    },
+    "min_price": 27200,
+    "avg_price": 32000,
+    "max_price": 38400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bột ngọt Ajinomoto 454g",
+        "store": "Knorr Official",
+        "price": 27200,
+        "rating": 4.4,
+        "sold_count": 234
+      },
+      {
+        "title": "Bột ngọt Ajinomoto 454g - Chính hãng",
+        "store": "Maggi Store",
+        "price": 32000,
+        "rating": 4.3,
+        "sold_count": 90
+      },
+      {
+        "title": "Bột ngọt Ajinomoto 454g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 38400,
+        "rating": 4.5,
+        "sold_count": 36
+      }
+    ]
+  },
+  {
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Phu Quoc",
+      "size": "50g"
+    },
+    "min_price": 23800,
+    "avg_price": 28000,
+    "max_price": 33600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Tiêu đen xay Phú Quốc 50g",
+        "store": "Knorr Official",
+        "price": 23800,
+        "rating": 4.6,
+        "sold_count": 120
+      },
+      {
+        "title": "Tiêu đen xay Phú Quốc 50g - Chính hãng",
+        "store": "Maggi Store",
+        "price": 28000,
+        "rating": 4.5,
+        "sold_count": 46
+      },
+      {
+        "title": "Tiêu đen xay Phú Quốc 50g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 33600,
+        "rating": 4.6,
+        "sold_count": 18
+      }
+    ]
+  },
+  {
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Bac Lieu",
+      "size": "1kg"
+    },
+    "min_price": 7225,
+    "avg_price": 8500,
+    "max_price": 10200,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Muối tinh I-ốt Bạc Liêu 1kg",
+        "store": "Knorr Official",
+        "price": 7225,
+        "rating": 4.3,
+        "sold_count": 156
+      },
+      {
+        "title": "Muối tinh I-ốt Bạc Liêu 1kg - Chính hãng",
+        "store": "Maggi Store",
+        "price": 8500,
+        "rating": 4.2,
+        "sold_count": 60
+      },
+      {
+        "title": "Muối tinh I-ốt Bạc Liêu 1kg + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 10200,
+        "rating": 4.3,
+        "sold_count": 24
+      }
+    ]
+  },
+  {
+    "category": "gia_vi",
+    "attributes": {
+      "brand": "Knorr",
+      "size": "170g"
+    },
+    "min_price": 12750,
+    "avg_price": 15000,
+    "max_price": 18000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bột canh Knorr xương heo 170g",
+        "store": "Knorr Official",
+        "price": 12750,
+        "rating": 4.4,
+        "sold_count": 208
+      },
+      {
+        "title": "Bột canh Knorr xương heo 170g - Chính hãng",
+        "store": "Maggi Store",
+        "price": 15000,
+        "rating": 4.3,
+        "sold_count": 80
+      },
+      {
+        "title": "Bột canh Knorr xương heo 170g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 18000,
+        "rating": 4.5,
+        "sold_count": 32
+      }
+    ]
+  },
+  {
+    "category": "sua",
+    "attributes": {
+      "brand": "Vinamilk",
+      "size": "1L"
+    },
+    "min_price": 27200,
+    "avg_price": 32000,
+    "max_price": 38400,
+    "sample_count": 5,
+    "review_count": 486,
+    "samples": [
+      {
+        "title": "Sữa tươi Vinamilk 100% không đường 1L",
+        "store": "Vinamilk Official",
+        "price": 27200,
+        "rating": 4.6,
+        "sold_count": 1755
+      },
+      {
+        "title": "Sữa tươi Vinamilk 100% không đường 1L - Chính hãng",
+        "store": "TH True Milk Store",
+        "price": 32000,
+        "rating": 4.5,
+        "sold_count": 675
+      },
+      {
+        "title": "Sữa tươi Vinamilk 100% không đường 1L + tặng kèm quà",
+        "store": "SiêuThị Mom&Baby",
+        "price": 38400,
+        "rating": 4.6,
+        "sold_count": 270
+      }
+    ]
+  },
+  {
+    "category": "sua",
+    "attributes": {
+      "brand": "TH True Milk",
+      "size": "1L"
+    },
+    "min_price": 28900,
+    "avg_price": 34000,
+    "max_price": 40800,
+    "sample_count": 5,
+    "review_count": 387,
+    "samples": [
+      {
+        "title": "Sữa tươi TH True Milk có đường 1L",
+        "store": "Vinamilk Official",
+        "price": 28900,
+        "rating": 4.7,
+        "sold_count": 1397
+      },
+      {
+        "title": "Sữa tươi TH True Milk có đường 1L - Chính hãng",
+        "store": "TH True Milk Store",
+        "price": 34000,
+        "rating": 4.6,
+        "sold_count": 537
+      },
+      {
+        "title": "Sữa tươi TH True Milk có đường 1L + tặng kèm quà",
+        "store": "SiêuThị Mom&Baby",
+        "price": 40800,
+        "rating": 4.8,
+        "sold_count": 215
+      }
+    ]
+  },
+  {
+    "category": "sua",
+    "attributes": {
+      "brand": "Vinamilk",
+      "size": "65ml x4"
+    },
+    "min_price": 18700,
+    "avg_price": 22000,
+    "max_price": 26400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Sữa chua Vinamilk Probi nha đam 65ml × 4",
+        "store": "Vinamilk Official",
+        "price": 18700,
+        "rating": 4.5,
+        "sold_count": 305
+      },
+      {
+        "title": "Sữa chua Vinamilk Probi nha đam 65ml × 4 - Chính hãng",
+        "store": "TH True Milk Store",
+        "price": 22000,
+        "rating": 4.4,
+        "sold_count": 117
+      },
+      {
+        "title": "Sữa chua Vinamilk Probi nha đam 65ml × 4 + tặng kèm quà",
+        "store": "SiêuThị Mom&Baby",
+        "price": 26400,
+        "rating": 4.5,
+        "sold_count": 47
+      }
+    ]
+  },
+  {
+    "category": "sua",
+    "attributes": {
+      "brand": "Ong Tho",
+      "size": "380g"
+    },
+    "min_price": 20400,
+    "avg_price": 24000,
+    "max_price": 28800,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Sữa đặc Ông Thọ trắng nhãn xanh 380g",
+        "store": "Vinamilk Official",
+        "price": 20400,
+        "rating": 4.4,
+        "sold_count": 227
+      },
+      {
+        "title": "Sữa đặc Ông Thọ trắng nhãn xanh 380g - Chính hãng",
+        "store": "TH True Milk Store",
+        "price": 24000,
+        "rating": 4.3,
+        "sold_count": 87
+      },
+      {
+        "title": "Sữa đặc Ông Thọ trắng nhãn xanh 380g + tặng kèm quà",
+        "store": "SiêuThị Mom&Baby",
+        "price": 28800,
+        "rating": 4.5,
+        "sold_count": 35
+      }
+    ]
+  },
+  {
+    "category": "sua",
+    "attributes": {
+      "brand": "Vinasoy",
+      "size": "1L"
+    },
+    "min_price": 23800,
+    "avg_price": 28000,
+    "max_price": 33600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Sữa hạt Vinasoy nguyên chất 1L",
+        "store": "Vinamilk Official",
+        "price": 23800,
+        "rating": 4.3,
+        "sold_count": 107
+      },
+      {
+        "title": "Sữa hạt Vinasoy nguyên chất 1L - Chính hãng",
+        "store": "TH True Milk Store",
+        "price": 28000,
+        "rating": 4.2,
+        "sold_count": 41
+      },
+      {
+        "title": "Sữa hạt Vinasoy nguyên chất 1L + tặng kèm quà",
+        "store": "SiêuThị Mom&Baby",
+        "price": 33600,
+        "rating": 4.3,
+        "sold_count": 16
+      }
+    ]
+  },
+  {
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Bibica",
+      "size": "200g"
+    },
+    "min_price": 32300,
+    "avg_price": 38000,
+    "max_price": 45600,
+    "sample_count": 5,
+    "review_count": 225,
+    "samples": [
+      {
+        "title": "Bánh trung thu Bibica đậu xanh 200g",
+        "store": "Bibica Official",
+        "price": 32300,
+        "rating": 4.4,
+        "sold_count": 812
+      },
+      {
+        "title": "Bánh trung thu Bibica đậu xanh 200g - Chính hãng",
+        "store": "Kinh Đô Store",
+        "price": 38000,
+        "rating": 4.3,
+        "sold_count": 312
+      },
+      {
+        "title": "Bánh trung thu Bibica đậu xanh 200g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 45600,
+        "rating": 4.5,
+        "sold_count": 125
+      }
+    ]
+  },
+  {
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Cosy",
+      "size": "240g"
+    },
+    "min_price": 18700,
+    "avg_price": 22000,
+    "max_price": 26400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bánh quy Cosy Marie 240g",
+        "store": "Bibica Official",
+        "price": 18700,
+        "rating": 4.3,
+        "sold_count": 234
+      },
+      {
+        "title": "Bánh quy Cosy Marie 240g - Chính hãng",
+        "store": "Kinh Đô Store",
+        "price": 22000,
+        "rating": 4.2,
+        "sold_count": 90
+      },
+      {
+        "title": "Bánh quy Cosy Marie 240g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 26400,
+        "rating": 4.3,
+        "sold_count": 36
+      }
+    ]
+  },
+  {
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Haribo",
+      "size": "200g"
+    },
+    "min_price": 55250,
+    "avg_price": 65000,
+    "max_price": 78000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Kẹo dẻo Haribo Goldbears 200g",
+        "store": "Bibica Official",
+        "price": 55250,
+        "rating": 4.7,
+        "sold_count": 156
+      },
+      {
+        "title": "Kẹo dẻo Haribo Goldbears 200g - Chính hãng",
+        "store": "Kinh Đô Store",
+        "price": 65000,
+        "rating": 4.6,
+        "sold_count": 60
+      },
+      {
+        "title": "Kẹo dẻo Haribo Goldbears 200g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 78000,
+        "rating": 4.8,
+        "sold_count": 24
+      }
+    ]
+  },
+  {
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Orion",
+      "size": "360g"
+    },
+    "min_price": 49300,
+    "avg_price": 58000,
+    "max_price": 69600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bánh chocopie Orion 360g hộp 12 cái",
+        "store": "Bibica Official",
+        "price": 49300,
+        "rating": 4.5,
+        "sold_count": 331
+      },
+      {
+        "title": "Bánh chocopie Orion 360g hộp 12 cái - Chính hãng",
+        "store": "Kinh Đô Store",
+        "price": 58000,
+        "rating": 4.4,
+        "sold_count": 127
+      },
+      {
+        "title": "Bánh chocopie Orion 360g hộp 12 cái + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 69600,
+        "rating": 4.5,
+        "sold_count": 51
+      }
+    ]
+  },
+  {
+    "category": "banh_keo",
+    "attributes": {
+      "brand": "Lays",
+      "size": "95g"
+    },
+    "min_price": 15300,
+    "avg_price": 18000,
+    "max_price": 21600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Snack khoai tây Lay's vị muối 95g",
+        "store": "Bibica Official",
+        "price": 15300,
+        "rating": 4.4,
+        "sold_count": 201
+      },
+      {
+        "title": "Snack khoai tây Lay's vị muối 95g - Chính hãng",
+        "store": "Kinh Đô Store",
+        "price": 18000,
+        "rating": 4.3,
+        "sold_count": 77
+      },
+      {
+        "title": "Snack khoai tây Lay's vị muối 95g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 21600,
+        "rating": 4.5,
+        "sold_count": 31
+      }
+    ]
+  },
+  {
+    "category": "nuoc_giai_khat",
+    "attributes": {
+      "brand": "Coca-Cola",
+      "size": "330ml x24"
+    },
+    "min_price": 187000,
+    "avg_price": 220000,
+    "max_price": 264000,
+    "sample_count": 5,
+    "review_count": 459,
+    "samples": [
+      {
+        "title": "Coca-Cola lon 330ml lốc 24 lon",
+        "store": "Coca Cola Official",
+        "price": 187000,
+        "rating": 4.6,
+        "sold_count": 1657
+      },
+      {
+        "title": "Coca-Cola lon 330ml lốc 24 lon - Chính hãng",
+        "store": "Pepsi Store",
+        "price": 220000,
+        "rating": 4.5,
+        "sold_count": 637
+      },
+      {
+        "title": "Coca-Cola lon 330ml lốc 24 lon + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 264000,
+        "rating": 4.6,
+        "sold_count": 255
+      }
+    ]
+  },
+  {
+    "category": "nuoc_giai_khat",
+    "attributes": {
+      "brand": "Khong Do",
+      "size": "500ml x24"
+    },
+    "min_price": 123250,
+    "avg_price": 145000,
+    "max_price": 174000,
+    "sample_count": 5,
+    "review_count": 111,
+    "samples": [
+      {
+        "title": "Trà xanh không độ chai 500ml lốc 24",
+        "store": "Coca Cola Official",
+        "price": 123250,
+        "rating": 4.4,
+        "sold_count": 403
+      },
+      {
+        "title": "Trà xanh không độ chai 500ml lốc 24 - Chính hãng",
+        "store": "Pepsi Store",
+        "price": 145000,
+        "rating": 4.3,
+        "sold_count": 155
+      },
+      {
+        "title": "Trà xanh không độ chai 500ml lốc 24 + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 174000,
+        "rating": 4.5,
+        "sold_count": 62
+      }
+    ]
+  },
+  {
+    "category": "nuoc_giai_khat",
+    "attributes": {
+      "brand": "Pepsi",
+      "size": "330ml x6"
+    },
+    "min_price": 55250,
+    "avg_price": 65000,
+    "max_price": 78000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Pepsi lon 330ml lốc 6 lon",
+        "store": "Coca Cola Official",
+        "price": 55250,
+        "rating": 4.5,
+        "sold_count": 299
+      },
+      {
+        "title": "Pepsi lon 330ml lốc 6 lon - Chính hãng",
+        "store": "Pepsi Store",
+        "price": 65000,
+        "rating": 4.4,
+        "sold_count": 115
+      },
+      {
+        "title": "Pepsi lon 330ml lốc 6 lon + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 78000,
+        "rating": 4.5,
+        "sold_count": 46
+      }
+    ]
+  },
+  {
+    "category": "nuoc_giai_khat",
+    "attributes": {
+      "brand": "Lavie",
+      "size": "500ml x24"
+    },
+    "min_price": 80750,
+    "avg_price": 95000,
+    "max_price": 114000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Nước suối Lavie chai 500ml lốc 24",
+        "store": "Coca Cola Official",
+        "price": 80750,
+        "rating": 4.5,
+        "sold_count": 253
+      },
+      {
+        "title": "Nước suối Lavie chai 500ml lốc 24 - Chính hãng",
+        "store": "Pepsi Store",
+        "price": 95000,
+        "rating": 4.4,
+        "sold_count": 97
+      },
+      {
+        "title": "Nước suối Lavie chai 500ml lốc 24 + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 114000,
+        "rating": 4.5,
+        "sold_count": 39
+      }
+    ]
+  },
+  {
+    "category": "nuoc_giai_khat",
+    "attributes": {
+      "brand": "Sting",
+      "size": "330ml x6"
+    },
+    "min_price": 49300,
+    "avg_price": 58000,
+    "max_price": 69600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Sting nước tăng lực vị dâu lốc 6 lon",
+        "store": "Coca Cola Official",
+        "price": 49300,
+        "rating": 4.3,
+        "sold_count": 156
+      },
+      {
+        "title": "Sting nước tăng lực vị dâu lốc 6 lon - Chính hãng",
+        "store": "Pepsi Store",
+        "price": 58000,
+        "rating": 4.2,
+        "sold_count": 60
+      },
+      {
+        "title": "Sting nước tăng lực vị dâu lốc 6 lon + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 69600,
+        "rating": 4.3,
+        "sold_count": 24
+      }
+    ]
+  },
+  {
+    "category": "do_dong_hop",
+    "attributes": {
+      "brand": "Three Lady",
+      "size": "185g"
+    },
+    "min_price": 27200,
+    "avg_price": 32000,
+    "max_price": 38400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Cá ngừ đóng hộp Three Lady ngâm dầu 185g",
+        "store": "Vissan Official",
+        "price": 27200,
+        "rating": 4.4,
+        "sold_count": 221
+      },
+      {
+        "title": "Cá ngừ đóng hộp Three Lady ngâm dầu 185g - Chính hãng",
+        "store": "Hạ Long Store",
+        "price": 32000,
+        "rating": 4.3,
+        "sold_count": 85
+      },
+      {
+        "title": "Cá ngừ đóng hộp Three Lady ngâm dầu 185g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 38400,
+        "rating": 4.5,
+        "sold_count": 34
+      }
+    ]
+  },
+  {
+    "category": "do_dong_hop",
+    "attributes": {
+      "brand": "Ha Long",
+      "size": "170g"
+    },
+    "min_price": 23800,
+    "avg_price": 28000,
+    "max_price": 33600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Pate gan Hạ Long 170g",
+        "store": "Vissan Official",
+        "price": 23800,
+        "rating": 4.3,
+        "sold_count": 175
+      },
+      {
+        "title": "Pate gan Hạ Long 170g - Chính hãng",
+        "store": "Hạ Long Store",
+        "price": 28000,
+        "rating": 4.2,
+        "sold_count": 67
+      },
+      {
+        "title": "Pate gan Hạ Long 170g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 33600,
+        "rating": 4.3,
+        "sold_count": 27
+      }
+    ]
+  },
+  {
+    "category": "do_dong_hop",
+    "attributes": {
+      "brand": "Vissan",
+      "size": "175g"
+    },
+    "min_price": 29750,
+    "avg_price": 35000,
+    "max_price": 42000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Xúc xích Vissan Heo 175g",
+        "store": "Vissan Official",
+        "price": 29750,
+        "rating": 4.4,
+        "sold_count": 208
+      },
+      {
+        "title": "Xúc xích Vissan Heo 175g - Chính hãng",
+        "store": "Hạ Long Store",
+        "price": 35000,
+        "rating": 4.3,
+        "sold_count": 80
+      },
+      {
+        "title": "Xúc xích Vissan Heo 175g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 42000,
+        "rating": 4.5,
+        "sold_count": 32
+      }
+    ]
+  },
+  {
+    "category": "do_dong_hop",
+    "attributes": {
+      "brand": "Heinz",
+      "size": "415g"
+    },
+    "min_price": 40800,
+    "avg_price": 48000,
+    "max_price": 57600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Đậu hộp Heinz Beans 415g",
+        "store": "Vissan Official",
+        "price": 40800,
+        "rating": 4.5,
+        "sold_count": 100
+      },
+      {
+        "title": "Đậu hộp Heinz Beans 415g - Chính hãng",
+        "store": "Hạ Long Store",
+        "price": 48000,
+        "rating": 4.4,
+        "sold_count": 38
+      },
+      {
+        "title": "Đậu hộp Heinz Beans 415g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 57600,
+        "rating": 4.5,
+        "sold_count": 15
+      }
+    ]
+  },
+  {
+    "category": "do_dong_hop",
+    "attributes": {
+      "brand": "John West",
+      "size": "213g"
+    },
+    "min_price": 72250,
+    "avg_price": 85000,
+    "max_price": 102000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Cá hồi đóng hộp John West tự nhiên 213g",
+        "store": "Vissan Official",
+        "price": 72250,
+        "rating": 4.6,
+        "sold_count": 68
+      },
+      {
+        "title": "Cá hồi đóng hộp John West tự nhiên 213g - Chính hãng",
+        "store": "Hạ Long Store",
+        "price": 85000,
+        "rating": 4.5,
+        "sold_count": 26
+      },
+      {
+        "title": "Cá hồi đóng hộp John West tự nhiên 213g + tặng kèm quà",
+        "store": "SiêuThị Tốt",
+        "price": 102000,
+        "rating": 4.6,
+        "sold_count": 10
+      }
+    ]
+  },
+  {
+    "category": "gao",
+    "attributes": {
+      "brand": "ST25",
+      "size": "5kg"
+    },
+    "min_price": 123250,
+    "avg_price": 145000,
+    "max_price": 174000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Gạo ST25 Sóc Trăng 5kg",
+        "store": "Vinaseed Official",
+        "price": 123250,
+        "rating": 4.7,
+        "sold_count": 351
+      },
+      {
+        "title": "Gạo ST25 Sóc Trăng 5kg - Chính hãng",
+        "store": "ST25 Store",
+        "price": 145000,
+        "rating": 4.6,
+        "sold_count": 135
+      },
+      {
+        "title": "Gạo ST25 Sóc Trăng 5kg + tặng kèm quà",
+        "store": "SiêuThị Gạo",
+        "price": 174000,
+        "rating": 4.8,
+        "sold_count": 54
+      }
+    ]
+  },
+  {
+    "category": "gao",
+    "attributes": {
+      "brand": "Vinaseed",
+      "size": "5kg"
+    },
+    "min_price": 97750,
+    "avg_price": 115000,
+    "max_price": 138000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Gạo Jasmine Vinaseed 5kg",
+        "store": "Vinaseed Official",
+        "price": 97750,
+        "rating": 4.5,
+        "sold_count": 253
+      },
+      {
+        "title": "Gạo Jasmine Vinaseed 5kg - Chính hãng",
+        "store": "ST25 Store",
+        "price": 115000,
+        "rating": 4.4,
+        "sold_count": 97
+      },
+      {
+        "title": "Gạo Jasmine Vinaseed 5kg + tặng kèm quà",
+        "store": "SiêuThị Gạo",
+        "price": 138000,
+        "rating": 4.5,
+        "sold_count": 39
+      }
+    ]
+  },
+  {
+    "category": "gao",
+    "attributes": {
+      "brand": "Long An",
+      "size": "2kg"
+    },
+    "min_price": 57800,
+    "avg_price": 68000,
+    "max_price": 81600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Gạo lứt huyết rồng Long An 2kg",
+        "store": "Vinaseed Official",
+        "price": 57800,
+        "rating": 4.4,
+        "sold_count": 126
+      },
+      {
+        "title": "Gạo lứt huyết rồng Long An 2kg - Chính hãng",
+        "store": "ST25 Store",
+        "price": 68000,
+        "rating": 4.3,
+        "sold_count": 48
+      },
+      {
+        "title": "Gạo lứt huyết rồng Long An 2kg + tặng kèm quà",
+        "store": "SiêuThị Gạo",
+        "price": 81600,
+        "rating": 4.5,
+        "sold_count": 19
+      }
+    ]
+  },
+  {
+    "category": "gao",
+    "attributes": {
+      "brand": "Hoa Vang",
+      "size": "2kg"
+    },
+    "min_price": 49300,
+    "avg_price": 58000,
+    "max_price": 69600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Gạo nếp cái hoa vàng 2kg",
+        "store": "Vinaseed Official",
+        "price": 49300,
+        "rating": 4.4,
+        "sold_count": 156
+      },
+      {
+        "title": "Gạo nếp cái hoa vàng 2kg - Chính hãng",
+        "store": "ST25 Store",
+        "price": 58000,
+        "rating": 4.3,
+        "sold_count": 60
+      },
+      {
+        "title": "Gạo nếp cái hoa vàng 2kg + tặng kèm quà",
+        "store": "SiêuThị Gạo",
+        "price": 69600,
+        "rating": 4.5,
+        "sold_count": 24
+      }
+    ]
+  },
+  {
+    "category": "gao",
+    "attributes": {
+      "brand": "Niigata",
+      "size": "2kg"
+    },
+    "min_price": 157250,
+    "avg_price": 185000,
+    "max_price": 222000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Gạo Japonica Niigata 2kg",
+        "store": "Vinaseed Official",
+        "price": 157250,
+        "rating": 4.7,
+        "sold_count": 58
+      },
+      {
+        "title": "Gạo Japonica Niigata 2kg - Chính hãng",
+        "store": "ST25 Store",
+        "price": 185000,
+        "rating": 4.6,
+        "sold_count": 22
+      },
+      {
+        "title": "Gạo Japonica Niigata 2kg + tặng kèm quà",
+        "store": "SiêuThị Gạo",
+        "price": 222000,
+        "rating": 4.8,
+        "sold_count": 9
+      }
+    ]
+  },
+  {
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Kinh Do",
+      "size": "350g"
+    },
+    "min_price": 18700,
+    "avg_price": 22000,
+    "max_price": 26400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bánh mì sandwich Kinh Đô 350g",
+        "store": "Kinh Đô Official",
+        "price": 18700,
+        "rating": 4.4,
+        "sold_count": 247
+      },
+      {
+        "title": "Bánh mì sandwich Kinh Đô 350g - Chính hãng",
+        "store": "Orion Store",
+        "price": 22000,
+        "rating": 4.3,
+        "sold_count": 95
+      },
+      {
+        "title": "Bánh mì sandwich Kinh Đô 350g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 26400,
+        "rating": 4.5,
+        "sold_count": 38
+      }
+    ]
+  },
+  {
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Duc Phat",
+      "size": "250g x5"
+    },
+    "min_price": 15300,
+    "avg_price": 18000,
+    "max_price": 21600,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bánh mì lạt Đức Phát 5 ổ 250g",
+        "store": "Kinh Đô Official",
+        "price": 15300,
+        "rating": 4.3,
+        "sold_count": 201
+      },
+      {
+        "title": "Bánh mì lạt Đức Phát 5 ổ 250g - Chính hãng",
+        "store": "Orion Store",
+        "price": 18000,
+        "rating": 4.2,
+        "sold_count": 77
+      },
+      {
+        "title": "Bánh mì lạt Đức Phát 5 ổ 250g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 21600,
+        "rating": 4.3,
+        "sold_count": 31
+      }
+    ]
+  },
+  {
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Bibica",
+      "size": "90g x6"
+    },
+    "min_price": 29750,
+    "avg_price": 35000,
+    "max_price": 42000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bánh mì ngọt nhân kem Bibica 90g x6",
+        "store": "Kinh Đô Official",
+        "price": 29750,
+        "rating": 4.4,
+        "sold_count": 130
+      },
+      {
+        "title": "Bánh mì ngọt nhân kem Bibica 90g x6 - Chính hãng",
+        "store": "Orion Store",
+        "price": 35000,
+        "rating": 4.3,
+        "sold_count": 50
+      },
+      {
+        "title": "Bánh mì ngọt nhân kem Bibica 90g x6 + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 42000,
+        "rating": 4.5,
+        "sold_count": 20
+      }
+    ]
+  },
+  {
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Brioche",
+      "size": "200g x4"
+    },
+    "min_price": 35700,
+    "avg_price": 42000,
+    "max_price": 50400,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bánh mì bơ sữa Brioche 4 ổ 200g",
+        "store": "Kinh Đô Official",
+        "price": 35700,
+        "rating": 4.5,
+        "sold_count": 107
+      },
+      {
+        "title": "Bánh mì bơ sữa Brioche 4 ổ 200g - Chính hãng",
+        "store": "Orion Store",
+        "price": 42000,
+        "rating": 4.4,
+        "sold_count": 41
+      },
+      {
+        "title": "Bánh mì bơ sữa Brioche 4 ổ 200g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 50400,
+        "rating": 4.5,
+        "sold_count": 16
+      }
+    ]
+  },
+  {
+    "category": "banh_mi",
+    "attributes": {
+      "brand": "Hovis",
+      "size": "400g"
+    },
+    "min_price": 46750,
+    "avg_price": 55000,
+    "max_price": 66000,
+    "sample_count": 5,
+    "review_count": 100,
+    "samples": [
+      {
+        "title": "Bánh mì nguyên cám Hovis 400g",
+        "store": "Kinh Đô Official",
+        "price": 46750,
+        "rating": 4.6,
+        "sold_count": 71
+      },
+      {
+        "title": "Bánh mì nguyên cám Hovis 400g - Chính hãng",
+        "store": "Orion Store",
+        "price": 55000,
+        "rating": 4.5,
+        "sold_count": 27
+      },
+      {
+        "title": "Bánh mì nguyên cám Hovis 400g + tặng kèm quà",
+        "store": "SiêuThị Online",
+        "price": 66000,
+        "rating": 4.6,
+        "sold_count": 11
+      }
+    ]
+  },
+  {
+    "category": "banh_keo",
+    "attributes": {},
+    "min_price": 34170,
+    "avg_price": 40200,
+    "max_price": 48240,
+    "sample_count": 5,
+    "review_count": 200,
+    "samples": [
+      {
+        "title": "Bánh trung thu Bibica đậu xanh 200g",
+        "store": "Bibica Official",
+        "price": 34170,
+        "rating": 4.6,
+        "sold_count": 267
+      },
+      {
+        "title": "Bánh quy Cosy Marie 240g",
+        "store": "Kinh Đô Store",
+        "price": 40200,
+        "rating": 4.5,
+        "sold_count": 160
+      },
+      {
+        "title": "Kẹo dẻo Haribo Goldbears 200g",
+        "store": "SiêuThị Online",
+        "price": 48240,
+        "rating": 4.4,
+        "sold_count": 80
+      }
+    ]
+  },
+  {
+    "category": "banh_mi",
+    "attributes": {},
+    "min_price": 29240,
+    "avg_price": 34400,
+    "max_price": 41280,
+    "sample_count": 5,
+    "review_count": 200,
+    "samples": [
+      {
+        "title": "Bánh mì sandwich Kinh Đô 350g",
+        "store": "Kinh Đô Official",
+        "price": 29240,
+        "rating": 4.6,
+        "sold_count": 116
+      },
+      {
+        "title": "Bánh mì lạt Đức Phát 5 ổ 250g",
+        "store": "Orion Store",
+        "price": 34400,
+        "rating": 4.5,
+        "sold_count": 69
+      },
+      {
+        "title": "Bánh mì ngọt nhân kem Bibica 90g x6",
+        "store": "SiêuThị Online",
+        "price": 41280,
+        "rating": 4.4,
+        "sold_count": 34
+      }
+    ]
+  },
+  {
+    "category": "dau_an",
+    "attributes": {},
+    "min_price": 69360,
+    "avg_price": 81600,
+    "max_price": 97920,
+    "sample_count": 5,
+    "review_count": 201,
+    "samples": [
+      {
+        "title": "Dầu ăn Tường An Cooking Oil 1L",
+        "store": "Cai Lan Official",
+        "price": 69360,
+        "rating": 4.6,
+        "sold_count": 457
+      },
+      {
+        "title": "Dầu ăn Neptune Gold 1L",
+        "store": "Tường An Store",
+        "price": 81600,
+        "rating": 4.5,
+        "sold_count": 274
+      },
+      {
+        "title": "Dầu ăn Simply hướng dương 1L",
+        "store": "SiêuThị Bình Dân",
+        "price": 97920,
+        "rating": 4.4,
+        "sold_count": 137
+      }
+    ]
+  },
+  {
+    "category": "do_dong_hop",
+    "attributes": {},
+    "min_price": 38760,
+    "avg_price": 45600,
+    "max_price": 54720,
+    "sample_count": 5,
+    "review_count": 200,
+    "samples": [
+      {
+        "title": "Cá ngừ đóng hộp Three Lady ngâm dầu 185g",
+        "store": "Vissan Official",
+        "price": 38760,
+        "rating": 4.6,
+        "sold_count": 119
+      },
+      {
+        "title": "Pate gan Hạ Long 170g",
+        "store": "Hạ Long Store",
+        "price": 45600,
+        "rating": 4.5,
+        "sold_count": 71
+      },
+      {
+        "title": "Xúc xích Vissan Heo 175g",
+        "store": "SiêuThị Tốt",
+        "price": 54720,
+        "rating": 4.4,
+        "sold_count": 35
+      }
+    ]
+  },
+  {
+    "category": "gao",
+    "attributes": {},
+    "min_price": 97070,
+    "avg_price": 114200,
+    "max_price": 137040,
+    "sample_count": 5,
+    "review_count": 200,
+    "samples": [
+      {
+        "title": "Gạo ST25 Sóc Trăng 5kg",
+        "store": "Vinaseed Official",
+        "price": 97070,
+        "rating": 4.6,
+        "sold_count": 145
+      },
+      {
+        "title": "Gạo Jasmine Vinaseed 5kg",
+        "store": "ST25 Store",
+        "price": 114200,
+        "rating": 4.5,
+        "sold_count": 87
+      },
+      {
+        "title": "Gạo lứt huyết rồng Long An 2kg",
+        "store": "SiêuThị Gạo",
+        "price": 137040,
+        "rating": 4.4,
+        "sold_count": 43
+      }
+    ]
+  },
+  {
+    "category": "gia_vi",
+    "attributes": {},
+    "min_price": 24055,
+    "avg_price": 28300,
+    "max_price": 33960,
+    "sample_count": 5,
+    "review_count": 200,
+    "samples": [
+      {
+        "title": "Hạt nêm Knorr Hảo Vị 900g",
+        "store": "Knorr Official",
+        "price": 24055,
+        "rating": 4.6,
+        "sold_count": 164
+      },
+      {
+        "title": "Bột ngọt Ajinomoto 454g",
+        "store": "Maggi Store",
+        "price": 28300,
+        "rating": 4.5,
+        "sold_count": 98
+      },
+      {
+        "title": "Tiêu đen xay Phú Quốc 50g",
+        "store": "SiêuThị Tốt",
+        "price": 33960,
+        "rating": 4.4,
+        "sold_count": 49
+      }
+    ]
+  },
+  {
+    "category": "mi_tom",
+    "attributes": {},
+    "min_price": 7650,
+    "avg_price": 9000,
+    "max_price": 10800,
+    "sample_count": 5,
+    "review_count": 242,
+    "samples": [
+      {
+        "title": "Mì tôm Hảo Hảo tôm chua cay 75g",
+        "store": "Hảo Hảo Official",
+        "price": 7650,
+        "rating": 4.6,
+        "sold_count": 551
+      },
+      {
+        "title": "Mì Phở Bò Acecook Đệ Nhất 65g",
+        "store": "Acecook Store",
+        "price": 9000,
+        "rating": 4.5,
+        "sold_count": 330
+      },
+      {
+        "title": "Mì Omachi sườn hầm ngũ quả 80g",
+        "store": "SiêuThị Online",
+        "price": 10800,
+        "rating": 4.4,
+        "sold_count": 165
+      }
+    ]
+  },
+  {
+    "category": "nuoc_giai_khat",
+    "attributes": {},
+    "min_price": 99110,
+    "avg_price": 116600,
+    "max_price": 139920,
+    "sample_count": 5,
+    "review_count": 200,
+    "samples": [
+      {
+        "title": "Coca-Cola lon 330ml lốc 24 lon",
+        "store": "Coca Cola Official",
+        "price": 99110,
+        "rating": 4.6,
+        "sold_count": 426
+      },
+      {
+        "title": "Trà xanh không độ chai 500ml lốc 24",
+        "store": "Pepsi Store",
+        "price": 116600,
+        "rating": 4.5,
+        "sold_count": 255
+      },
+      {
+        "title": "Pepsi lon 330ml lốc 6 lon",
+        "store": "SiêuThị Online",
+        "price": 139920,
+        "rating": 4.4,
+        "sold_count": 127
+      }
+    ]
+  },
+  {
+    "category": "nuoc_tuong",
+    "attributes": {},
+    "min_price": 25755,
+    "avg_price": 30300,
+    "max_price": 36360,
+    "sample_count": 5,
+    "review_count": 200,
+    "samples": [
+      {
+        "title": "Nước tương Maggi đậm đặc 700ml",
+        "store": "Maggi Official",
+        "price": 25755,
+        "rating": 4.6,
+        "sold_count": 379
+      },
+      {
+        "title": "Nước tương Tam Thái Tử nâu 500ml",
+        "store": "SiêuThị Online",
+        "price": 30300,
+        "rating": 4.5,
+        "sold_count": 227
+      },
+      {
+        "title": "Nước tương Nàng Dâu 450ml",
+        "store": "Premium Store",
+        "price": 36360,
+        "rating": 4.4,
+        "sold_count": 113
+      }
+    ]
+  },
+  {
+    "category": "sua",
+    "attributes": {},
+    "min_price": 23800,
+    "avg_price": 28000,
+    "max_price": 33600,
+    "sample_count": 5,
+    "review_count": 256,
+    "samples": [
+      {
+        "title": "Sữa tươi Vinamilk 100% không đường 1L",
+        "store": "Vinamilk Official",
+        "price": 23800,
+        "rating": 4.6,
+        "sold_count": 583
+      },
+      {
+        "title": "Sữa tươi TH True Milk có đường 1L",
+        "store": "TH True Milk Store",
+        "price": 28000,
+        "rating": 4.5,
+        "sold_count": 350
+      },
+      {
+        "title": "Sữa chua Vinamilk Probi nha đam 65ml × 4",
+        "store": "SiêuThị Mom&Baby",
+        "price": 33600,
+        "rating": 4.4,
+        "sold_count": 175
+      }
+    ]
+  },
+  {
+    "category": "tuong_ot",
+    "attributes": {},
+    "min_price": 22355,
+    "avg_price": 26300,
+    "max_price": 31560,
+    "sample_count": 5,
+    "review_count": 200,
+    "samples": [
+      {
+        "title": "Tương ớt Chin-su 250g",
+        "store": "Chinsu Official",
+        "price": 22355,
+        "rating": 4.6,
+        "sold_count": 290
+      },
+      {
+        "title": "Tương ớt Cholimex 270g",
+        "store": "SiêuThị Tốt",
+        "price": 26300,
+        "rating": 4.5,
+        "sold_count": 174
+      },
+      {
+        "title": "Sriracha Huy Fong 482g",
+        "store": "Co.opmart Online",
+        "price": 31560,
+        "rating": 4.4,
+        "sold_count": 87
+      }
+    ]
+  }
+]

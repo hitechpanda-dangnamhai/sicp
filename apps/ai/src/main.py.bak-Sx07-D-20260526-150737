@@ -298,23 +298,10 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                         await asyncio.sleep(0.05)  # 50ms poll interval
                     # ─── End fix ───
 
-                    # S-07 T01.D NEW per C-S07-A/C/D + C-S07-M Option ❸:
-                    # Image modality → Intent 01 importing_by_images graph.
-                    # Checked BEFORE entry_intent so /intent body
-                    # {"modality":"image","content":"<base64>"} routes
-                    # correctly regardless of hint field.
-                    modality_dispatch = initial_state.get("modality")
                     # S-05 T02 NEW per C-S05-F Path α LAW + D-S05-01 LAW:
                     # Dispatch graph compile target by entry_intent.
                     entry_intent_dispatch = initial_state.get("entry_intent")
-                    if modality_dispatch == "image":
-                        # Lazy import — defers importing_by_images module load
-                        # until first image-modality request fires.
-                        from .graphs.intents.importing_by_images import (
-                            compile_importing_by_images_graph,
-                        )
-                        graph = compile_importing_by_images_graph(saver, publisher)
-                    elif entry_intent_dispatch in (
+                    if entry_intent_dispatch in (
                         "cart_clear_confirm", "cart_view_with_stock_check"
                     ):
                         # Lazy import — defers cart_by_text module load until
@@ -434,26 +421,13 @@ def _drive_graph_resume_async(request_id: str, resume_value: Any) -> None:
                             entry_intent_dispatch = channel_values.get(
                                 "entry_intent"
                             )
-                            # S-07 T01.D NEW: also peek modality for image dispatch on resume.
-                            modality_dispatch_resume = channel_values.get(
-                                "modality"
-                            )
                     except Exception as peek_err:  # noqa: BLE001
                         structlog.get_logger().warning(
                             "intent.resume_peek_failed",
                             request_id=request_id,
                             error=str(peek_err),
                         )
-                        modality_dispatch_resume = None
-                    if modality_dispatch_resume == "image":
-                        # S-07 T01.D NEW per C-S07-A/C/D — resume importing_by_images
-                        # graph (preserves saver-checkpointed image_b64 + vision_result
-                        # across INTERRUPT #1 submit_draft + INTERRUPT #2 commit).
-                        from .graphs.intents.importing_by_images import (
-                            compile_importing_by_images_graph,
-                        )
-                        graph = compile_importing_by_images_graph(saver, publisher)
-                    elif entry_intent_dispatch in (
+                    if entry_intent_dispatch in (
                         "cart_clear_confirm", "cart_view_with_stock_check"
                     ):
                         from .graphs.intents.cart_by_text import (

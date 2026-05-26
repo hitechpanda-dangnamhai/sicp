@@ -217,25 +217,3 @@ class IcpState(TypedDict, total=False):
     _cart_data: dict
     _cart_out_of_stock_ids: list
     _cart_stock_replacements: dict
-
-    # --- S-07 T01.D D-S04-13 LAW Pattern A 2-interrupt fields (Phiên Sx07-D
-    #     per C-S07-A/C/D/J/L/M). Intent 01 importing_by_images graph uses
-    #     these 6 internal transient fields to carry state across vision →
-    #     enrich → describe → emit_prefill → INTERRUPT #1 → emit_draft_event →
-    #     find_policies → create_cards → INTERRUPT #2 → commit_product. All
-    #     underscore-prefixed per Phiên Sx04-7 declare-or-drop pattern
-    #     (NOT surfaced to SSE; FE/Gateway never sees these). ---
-    image_b64: str
-    _vision_result: dict
-    _enrich_data: dict
-    _description: dict
-    _submitted_form: dict
-    _draft_id: str
-    _draft_event_id: str
-    _matched_policies: list
-    _policy_context: dict
-    _cards_created: list
-    _commit_confirmed: bool
-    _product_id: str
-    _committed: bool
-    _terminated: bool

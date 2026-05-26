@@ -2,15 +2,12 @@
  * apps/gateway/src/clients/index.ts
  *
  * Barrel for upstream service HTTP clients. See clients.module.ts for DI wiring.
- *
- * S-07 T01.E amend (Phiên Sx07-D per C-S07-A): + McpClient + McpError export.
  */
+
 export { AiClient } from './ai.client';
 export type {
   AiHealthResponse,
   AiIntentResponse,
   PostIntentBody,
 } from './ai.client';
-export { McpClient, McpError } from './mcp.client';
-export type { JsonRpcError } from './mcp.client';
 export { ClientsModule } from './clients.module';

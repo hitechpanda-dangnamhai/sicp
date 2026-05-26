@@ -10,13 +10,11 @@
  *   - IntentModule (POST /api/v1/intent + GET /api/v1/intent/stream, S-02 T07)
  *   - AuthModule (S-03 T02 — 4 endpoints + JwtAuthGuard exported for V-SLICE consumers)
  *   - DashboardModule (S-03 T03b — GET /api/v1/dashboard/stats stub per D-10)
- *   - CartModule (S-05 T02 — 7 cart endpoints per D-S05-01/02 LAW)
- *   - CardsModule (S-07 T01.E — 3 cards endpoints per C-S07-A)
- *   - **ProductsModule (S-07 T01.E.G — 1 PATCH endpoint per C-S07-N Option B)**
+ *   - **CartModule (S-05 T02 — 7 cart endpoints per D-S05-01/02 LAW)**
  *
  * NOT in scope (defer to V-SLICE+):
- *   - ProductsModule POST/DELETE (V-SLICE — currently only PATCH for update)
- *   - OrdersModule (V-SLICE)
+ *   - ProductsModule, OrdersModule (V-SLICEs)
+ *   - CartModule: S-05 T02 fulfilled per D-S05-01 LAW (Phiên Sx05-2b).
  *   - KafkaModule (producer for events)
  */
 
@@ -30,8 +28,6 @@ import { IntentModule } from './intent';
 import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { CartModule } from './cart';
-import { CardsModule } from './cards/cards.module';
-import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -41,9 +37,7 @@ import { ProductsModule } from './products/products.module';
     DatabaseModule,
     TrackingModule,
     IntentModule,
-    CartModule, // ← S-05 T02 per D-S05-01 LAW
-    CardsModule, // ← S-07 T01.E per C-S07-A
-    ProductsModule, // ← S-07 T01.E.G per C-S07-N Option B (Phiên Sx07-D)
+    CartModule, // ← S-05 T02 NEW per D-S05-01 LAW (Phiên Sx05-2b)
     AuthModule,
     DashboardModule,
   ],

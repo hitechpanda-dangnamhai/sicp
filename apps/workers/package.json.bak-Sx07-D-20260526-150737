@@ -7,17 +7,10 @@
     "start": "node dist/index.js",
     "dev": "tsc --watch & node --watch dist/index.js",
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "seed-shopee": "tsx src/shopee-mock-seed-worker.ts"
-  },
-  "dependencies": {
-    "pg": "^8.11.0",
-    "dotenv": "^16.4.0"
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "typescript": "^5.4.0",
-    "tsx": "^4.7.0",
-    "@types/node": "^20.0.0",
-    "@types/pg": "^8.11.0"
+    "@types/node": "^20.0.0"
   }
 }

@@ -711,37 +711,3 @@ logs-cart:
 	@docker logs icp-gateway 2>&1 | grep -E "cart\.|gateway\.cart" | tail -30
 	@docker logs icp-ai 2>&1 | grep -E "intent\.(received|classified|interrupted|resumed)|cart_by_text|cart\." | tail -30
 	@docker logs icp-mcp 2>&1 | grep -E "tool\.|cart\." | tail -30
-
-# =============================================================================
-# S-07 T01.B — seed-shopee (Phiên Sx07-D) — APPEND-ONLY block
-# =============================================================================
-# Source: S-07-T01 handoff §T01.B + C-S07-A LOCKED (Phiên Sx07-B).
-# Pattern: `seed-<purpose>` per C-23 LOCKED — mirrors `seed-vespa:` existing
-# chained data ingestion semantics.
-#
-# Worker location: apps/workers/src/shopee-mock-seed-worker.ts per C-S07-A
-# Pattern A rationale (BACKLOG line 470 + ADR-032 line 301 + workers/index.ts
-# comment 3-sources consensus; NOT extension of infra/seed/seed.ts which is
-# CLI per C14 amend Phiên 8).
-#
-# Idempotent: ON CONFLICT (category, attributes) DO NOTHING per V008 UNIQUE
-# constraint (V008 line ~78). First run: 66 fixture rows INSERTed (1 V008
-# inline Maggi 200ml coexists, no conflict → total 67). Second run: 0
-# INSERTs, all 66 skipped.
-#
-# Dependency: `seed-shopee: seed` ensures PG `products` table populated (55
-# products) before worker logs post-state count (worker doesn't query products
-# to build fixture — fixture is pre-built static JSON — but the chain matches
-# the seed-vespa precedent for ordering hygiene).
-#
-# Safety: additive only. Verified no name collision via:
-#   grep -nE "seed-shopee|shopee-seed" Makefile   # empty (Phiên Sx07-D verify)
-# =============================================================================
-
-.PHONY: seed-shopee logs-shopee-seed
-
-seed-shopee: seed
-	pnpm --filter @icp/workers run seed-shopee
-
-logs-shopee-seed:
-	@docker logs icp-postgres 2>&1 | grep -iE "shopee_prices_mock|INSERT INTO shopee" | tail -30
