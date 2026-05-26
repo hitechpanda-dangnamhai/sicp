@@ -341,7 +341,7 @@
         </div>
         <div class="phase-text">
           <div class="phase-label">Sinh dấu vân tay sản phẩm</div>
-          <div class="phase-meta">Embedding 512 chiều...</div>
+          <div class="phase-meta">Embedding 1024 chiều...</div>
         </div>
         <span class="phase-status active">ĐANG</span>
       </div>
