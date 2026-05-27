@@ -823,14 +823,20 @@ async def _node_emit_cards_interrupt(
         return {}
 
     rid = state["request_id"]
-    await publisher.publish_sse(rid, "status", {"phase": "awaiting_user_input"})
+    cards = state.get("_cards_created") or []
+    cards_count = len(cards)
 
     _logger.info(
         "import.cards_emitted_awaiting_commit",
         request_id=rid,
-        cards_count=len(state.get("_cards_created") or []),
+        cards_count=cards_count,
     )
+    # Sx07-F-debug Phien 2026-05-27 - Auto-commit if cards empty.
+    if cards_count == 0:
+        _logger.info("import.auto_commit_no_cards", request_id=rid)
+        return {"_commit_confirmed": True}
 
+    await publisher.publish_sse(rid, "status", {"phase": "awaiting_user_input"})
     action = interrupt({"awaiting": "commit"})
 
     if not isinstance(action, dict):
@@ -890,7 +896,15 @@ async def _node_commit_product(
         "price": int(submitted.get("price") or 0),
         "stock": int(submitted.get("stock") or 0),
         "image_data": image_b64 if image_b64 else None,
-        "brand": attrs.get("brand") if isinstance(attrs, dict) else None,
+        # Sx07-F-debug Phiên 2026-05-26 — Brand from TOP-LEVEL submit field
+        # per D-S04-11 LAW. PrefillForm FE lifts brand out of attributes →
+        # submit payload has `brand` at top-level. Previous code read
+        # `attrs.get("brand")` which is empty after FE remap → Vespa stored
+        # empty brand → search brand_filter recall fails (verified Phiên
+        # Sx07-F-debug — product e24fba95 created without brand top-level →
+        # query "cholimex" with brand_filter="CHOLIMEX" returned only legacy
+        # products that still had brand in attributes).
+        "brand": submitted.get("brand") or (attrs.get("brand") if isinstance(attrs, dict) else None),
         "trend_score": 0.5,
         "idempotency_key": f"intent:{rid}",
     }
@@ -1007,7 +1021,7 @@ def compile_importing_by_images_graph(
 
     Pattern A 2-interrupt per D-S04-13 LAW reuse.
     """
-    mcp_client = McpClient(_mcp_url())
+    mcp_client = McpClient(_mcp_url(), timeout_s=30.0)
 
     # Wrap async nodes as closures binding publisher + mcp_client.
     async def n_vision(s: IcpState) -> Any:

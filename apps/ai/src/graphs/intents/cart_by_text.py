@@ -700,7 +700,7 @@ def compile_cart_by_text_graph(
         Compiled LangGraph ready for `.astream(initial_state, config)`.
     """
     # MCP client construction is cheap (lazy httpx client); one per request.
-    mcp_client = McpClient(_mcp_url())
+    mcp_client = McpClient(_mcp_url(), timeout_s=30.0)
 
     # Wrap each node closure binding publisher + mcp_client (+ saver for final).
     async def n_clear_prompt(s: IcpState) -> dict[str, Any]:

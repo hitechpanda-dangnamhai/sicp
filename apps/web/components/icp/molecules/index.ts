@@ -6,12 +6,14 @@
  *          + S-03 T03b (3 Dashboard hub molecules)
  *          + S-04 T04 (5 V-SLICE Search molecules per Phiên Sx04-9a)
  *          + S-05 T03 (9 V-SLICE Cart molecules per Phiên Sx05-3 — C-S05-I Path A)
+ *          + S-07 T02 (9 V-SLICE Image AI Import molecules per Phiên Sx07-F)
  *
- * Total: 22 + 9 (S-05) = 31 molecule components + type exports + 2 ProductCard
- * presets + 2 CVA exports.
+ * Total: 22 + 9 (S-05) + 9 (S-07) = 40 molecule components + type exports +
+ *        2 ProductCard presets + 2 CVA exports.
  *
  * Compact-only for TrendCard + ShopeeCompareCard per C-21 (expanded modes
- * defer S-07 V-SLICE as page composition).
+ * shipped as separate molecules `TrendCardExpanded` + `ShopeeCompareCardExpanded`
+ * in S-07 T02 — fulfilling the C-21 expanded deferral).
  *
  * Family B molecules added in T05 (Phiên 17) per Concern 2 (ProductCard
  * single-component with width preset exports I03A_138 + I04_172) and
@@ -23,6 +25,25 @@
  * 9 NEW supporting molecules: CartSummary + CartAIHintBubble + StockIssueAlert +
  * StockReplacementCard + ClearConfirmModal + PromoSuccessBanner + UndoRemoveToast +
  * PendingSyncToast + SwipeableCartItem.
+ *
+ * S-07 NEW V-SLICE Image AI Import molecules (Phiên Sx07-F) per T02.A scope:
+ * 9 NEW molecules covering 10 mockup states (state-0/A/B/C-rising/C-falling/D/E/F/G/H):
+ * - PrefillForm + LowConfidenceWarningBanner (state-B + state-F)
+ * - SuccessTransition + BrainCheckBadge (state-G + sub-component)
+ * - ImageDropZone (state-0) + AnalyzingPhasesCard (state-A)
+ * - ShopeeCompareCardExpanded (state-D) + TrendCardExpanded (state-H)
+ * - BlurErrorCard (state-E)
+ *
+ * Decisions for S-07 batch:
+ * - **Q2 option 2 LOCK** (Sx07-F): BrainCheckBadge tách riêng làm sub-molecule
+ *   (reusable: SuccessTransition consumer + future S-09 reco-confirm)
+ * - **C-21 deferral fulfilled**: TrendCardExpanded + ShopeeCompareCardExpanded
+ *   are the long-awaited expanded modes from S-01 T04 scope cut
+ * - **C-S07-O option iii-a** (Sx07-G hotfix): PrefillForm consumes optional
+ *   `onRequestSuggestAttrs` callback for on-demand AI chip suggestions
+ *
+ * @see slices/S-07_decisions-log.md C-S07-O + C-S07-Q (NEW Phiên Sx07-F)
+ * @see docs/mockups/intent-01/intent-01-state-*.html (10 mockup states)
  */
 
 // ─── T04 Family A (9 molecules) ─────────────────────────────────────────────
@@ -219,3 +240,59 @@ export {
   SwipeableCartItem,
   type SwipeableCartItemProps,
 } from './SwipeableCartItem';
+
+// ─── S-07 T02 NEW V-SLICE Image AI Import molecules (Phiên Sx07-F) ──────────
+// 9 molecules covering 10 mockup states for Intent 01 import-by-image flow.
+// Sub-component BrainCheckBadge consumed by SuccessTransition (+ future S-09 reco).
+// ShopeeCompareCardExpanded + TrendCardExpanded fulfill C-21 expanded deferral.
+
+export {
+  BrainCheckBadge,
+  type BrainCheckBadgeProps,
+} from './BrainCheckBadge';
+
+export {
+  SuccessTransition,
+  type SuccessTransitionProps,
+} from './SuccessTransition';
+
+export {
+  PrefillForm,
+  type PrefillFormProps,
+  type FormPrefillPayload,
+  type SuggestedAttributeChip,
+} from './PrefillForm';
+
+export {
+  ImageDropZone,
+  type ImageDropZoneProps,
+} from './ImageDropZone';
+
+export {
+  AnalyzingPhasesCard,
+  type AnalyzingPhasesCardProps,
+  type AnalyzingPhaseSlot,
+} from './AnalyzingPhasesCard';
+
+export {
+  ShopeeCompareCardExpanded,
+  type ShopeeCompareCardExpandedProps,
+  type ShopeeCompareSample,
+  type ShopeeCompareAggregates,
+} from './ShopeeCompareCardExpanded';
+
+export {
+  TrendCardExpanded,
+  type TrendCardExpandedProps,
+  type TrendData,
+} from './TrendCardExpanded';
+
+export {
+  BlurErrorCard,
+  type BlurErrorCardProps,
+} from './BlurErrorCard';
+
+export {
+  LowConfidenceWarningBanner,
+  type LowConfidenceWarningBannerProps,
+} from './LowConfidenceWarningBanner';

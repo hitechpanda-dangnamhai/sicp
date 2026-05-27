@@ -80,6 +80,25 @@ export interface ProductCardSearchBProps
   onAdd?: () => void;
   /** Opacity-85 for deprioritized cards (per S-01 ProductCard precedent) */
   muted?: boolean;
+  /**
+   * Sx07-F-debug Phiên 2026-05-26 — Brand click handler (chip re-search A1).
+   * When provided, brand text becomes a clickable button → caller triggers
+   * filter-locked re-search via use-search-stream with filters.brand.
+   */
+  onBrandClick?: (brand: string) => void;
+  /**
+   * Sx07-F-debug Phiên 2026-05-26 — Product attributes (from Vespa hit).
+   * Key-value map (size/color/taste_profile/usage/...). Top 2 priority
+   * attrs (size + type) rendered as clickable chips below reason when
+   * `onAttributeClick` provided.
+   */
+  attributes?: Record<string, string>;
+  /**
+   * Sx07-F-debug Phiên 2026-05-26 — Attribute chip click handler (A1).
+   * Receives (key, value) e.g. ('size', '500ml'). Caller triggers
+   * re-search via use-search-stream with filters.attributes.
+   */
+  onAttributeClick?: (key: string, value: string) => void;
 }
 
 // ─── PRIVATE: pure functions per Sx04-9a-discover Q-T04-2 Option B3 LOCK ─────
@@ -132,6 +151,9 @@ export const ProductCardSearchB = React.forwardRef<HTMLDivElement, ProductCardSe
   (
     {
       brand,
+      onBrandClick,
+      attributes,
+      onAttributeClick,
       name,
       price,
       originalPrice,
@@ -203,9 +225,20 @@ export const ProductCardSearchB = React.forwardRef<HTMLDivElement, ProductCardSe
 
         {/* Body — brand uppercase + name line-clamp-2 + REQUIRED reason pink chip + price row */}
         <div className="px-[11px] pt-[9px] pb-2.5 flex flex-col gap-[5px]">
-          <div className="text-[9px] text-icp-pink-700 font-semibold uppercase tracking-[0.3px]">
-            {brand}
-          </div>
+          {onBrandClick ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onBrandClick(brand); }}
+              className="text-[9px] text-icp-pink-700 font-semibold uppercase tracking-[0.3px] hover:text-icp-pink-900 hover:underline cursor-pointer text-left transition-colors"
+              aria-label={`Lọc theo thương hiệu ${brand}`}
+            >
+              {brand}
+            </button>
+          ) : (
+            <div className="text-[9px] text-icp-pink-700 font-semibold uppercase tracking-[0.3px]">
+              {brand}
+            </div>
+          )}
           <div className="text-[13px] text-icp-pink-900 font-semibold leading-[1.3] tracking-[-0.1px] line-clamp-2 min-h-[34px]">
             {name}
           </div>
@@ -221,6 +254,34 @@ export const ProductCardSearchB = React.forwardRef<HTMLDivElement, ProductCardSe
               {reason}
             </span>
           </div>
+
+          {/* Sx07-F-debug Phiên 2026-05-26 — Attribute chips (chip re-search A1).
+              Top 2 attrs (priority: size, type) rendered as clickable mini-pills
+              between reason chip and price row. Click → onAttributeClick(key,value)
+              triggers filter-locked re-search. Hidden when no handler. */}
+          {onAttributeClick && attributes && Object.keys(attributes).length > 0 && (() => {
+            const PRIORITY_KEYS = ['size', 'type', 'taste_profile', 'color'];
+            const entries = PRIORITY_KEYS
+              .filter((k) => attributes[k])
+              .slice(0, 2)
+              .map((k) => [k, attributes[k]] as [string, string]);
+            if (entries.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-1">
+                {entries.map(([key, value]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onAttributeClick(key, value); }}
+                    className="text-[9px] px-1.5 py-[1px] rounded-full bg-icp-pink-50 hover:bg-icp-pink-100 text-icp-pink-700 font-medium transition-colors border-[0.5px] border-icp-pink-200"
+                    aria-label={`Lọc theo ${key}: ${value}`}
+                  >
+                    {value}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Price row */}
           <div className="flex items-baseline gap-[5px] mt-1">

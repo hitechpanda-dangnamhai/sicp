@@ -60,7 +60,11 @@ import { trackSearchFirstCardRendered } from './tracking-hooks';
 export interface UseSearchStreamReturn {
   state: SearchState;
   /** POST /intent + open EventSource. Closes prior stream first if open. */
-  submitQuery: (query: string, mode?: SearchMode) => Promise<void>;
+  /**
+   * Sx07-F-debug Phiên 2026-05-26 — Added optional filters param (A1 design).
+   * When chip clicked, caller passes {brand} → BE skips LLM parse_filters node.
+   */
+  submitQuery: (query: string, mode?: SearchMode, filters?: { brand?: string; category?: string; attributes?: Record<string, string> }) => Promise<void>;
   /** Escape hatch for state machine actions (retry_ai / continue_basic / reset / etc.). */
   dispatch: (action: SearchAction) => void;
   setAddToCartConfirm: (item: AddToCartConfirmSummary | null) => void;
@@ -163,13 +167,19 @@ export function useSearchStream(): UseSearchStreamReturn {
   );
 
   const submitQuery = useCallback(
-    async (query: string, mode: SearchMode = 'ai_augmented') => {
+    async (query: string, mode: SearchMode = 'ai_augmented', filters?: { brand?: string; category?: string; attributes?: Record<string, string> }) => {
       // 1. Close any prior EventSource (new query supersedes).
       esCloseRef.current?.();
       esCloseRef.current = null;
 
       // 2. POST /api/v1/intent — raw UUID Idempotency-Key (W1 LOCK).
+      // Sx07-F-debug Phiên 2026-05-26 — When filters present, BE skips LLM
+      // parse_filters call → ~2-3s faster + exact filter (no LLM hallucination).
       const idempotencyKey = crypto.randomUUID();
+      const body: Record<string, unknown> = { modality: 'text', content: query, mode };
+      if (filters && (filters.brand || filters.category || (filters.attributes && Object.keys(filters.attributes).length > 0))) {
+        body.filters = filters;
+      }
       const res = await fetch('/api/v1/intent', {
         method: 'POST',
         credentials: 'include',
@@ -177,7 +187,7 @@ export function useSearchStream(): UseSearchStreamReturn {
           'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey,
         },
-        body: JSON.stringify({ modality: 'text', content: query, mode }),
+        body: JSON.stringify(body),
       });
 
       if (!res.ok) {

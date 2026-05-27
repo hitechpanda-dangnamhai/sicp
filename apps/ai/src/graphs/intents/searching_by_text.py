@@ -150,10 +150,18 @@ async def _node_detect_typo(state: IcpState, publisher: RedisPublisher) -> IcpSt
     if state.get("mode") != "ai_augmented":
         return {}  # Variant A skips
 
+    # Sx07-F-debug Phiên 2026-05-26 — Skip LLM call for multi-word queries.
+    # Typos are statistically near-zero for queries with spaces (users do not
+    # misspell while typing space). Saves ~2-5s LLM RTT for ~80% of queries.
+    query_text = state.get("content", "")
+    if " " in query_text.strip() and len(query_text.strip()) >= 6:
+        _logger.info("typo.skipped_multiword", request_id=rid, query_len=len(query_text))
+        return {}
+
     llm = get_llm_client()
     prompt = load_prompt("detect_typo").format(query=state["content"])
     try:
-        result = await llm.generate_json(prompt, timeout_s=5.0, model=LITE_MODEL)
+        result = await llm.generate_json(prompt, timeout_s=3.0, model=LITE_MODEL)
     except LLMTimeout:
         # Variant B detect_typo timeout = NOT critical → skip (no interrupt);
         # continue to generate_understanding with original query.
@@ -321,6 +329,34 @@ async def _node_parse_filters(state: IcpState, publisher: RedisPublisher) -> Icp
     """
     rid = state["request_id"]
     query = state["content"]
+
+    # Sx07-F-debug Phiên 2026-05-26 — Explicit filter override short-circuit.
+    # FE passes chip-driven filters → skip LLM call entirely (~2-3s saved +
+    # exact match, no LLM hallucination on brand/category guess).
+    override = state.get("_filters_override")  # type: ignore[typeddict-item]
+    if isinstance(override, dict) and override:
+        category = override.get("category")
+        brand = override.get("brand")
+        attributes = override.get("attributes")
+        extra: dict = {}
+        if brand:
+            extra["brand"] = brand
+        if isinstance(attributes, dict) and attributes:
+            extra["attributes"] = attributes
+        _logger.info(
+            "parse_filters.override_used",
+            request_id=rid,
+            category=category,
+            brand=brand,
+            attribute_count=len(attributes) if isinstance(attributes, dict) else 0,
+        )
+        return {  # type: ignore[typeddict-unknown-key]
+            "_filters": {
+                "category": category,
+                "extra": extra,
+            }
+        }
+
     if state.get("mode") != "ai_augmented":
         # Variant A: regex/keyword fallback. Trivial heuristic — match
         # category name verbatim in query.
@@ -335,7 +371,7 @@ async def _node_parse_filters(state: IcpState, publisher: RedisPublisher) -> Icp
     llm = get_llm_client()
     prompt = load_prompt("parse_filters").format(query=query)
     try:
-        result = await llm.generate_json(prompt, timeout_s=5.0, model=LITE_MODEL)
+        result = await llm.generate_json(prompt, timeout_s=3.0, model=LITE_MODEL)
         category = result.get("category")
         filters = result.get("filters", {})
         _logger.info(
@@ -380,7 +416,12 @@ async def _node_hybrid_search(state: IcpState, publisher: RedisPublisher) -> dic
         rid, "phase_progress", {"phase_id": _PHASE_IDS["search"], "status": "active"}
     )
 
-    rank_profile = "ai_augmented" if mode == "ai_augmented" else "baseline"
+    # Sx07-F-debug Phiên 2026-05-27 — Use Vespa native ONNX cross-encoder rerank
+    # for ai_augmented mode (replaces brittle LLM rerank Gemini). Top 30 retrieved
+    # via BM25+vector, then ONNX cross-encoder global-phase rerank → top 8.
+    # Production-grade pattern (Spotify/Etsy/Pinterest). See infra/vespa/schemas/
+    # product.sd rank-profile cross_encoder_rerank + services.xml.
+    rank_profile = "cross_encoder_rerank" if mode == "ai_augmented" else "baseline"
     params = {
         "query": state["content"],
         "rank_profile": rank_profile,
@@ -399,8 +440,13 @@ async def _node_hybrid_search(state: IcpState, publisher: RedisPublisher) -> dic
         # Phiên Sx04-12 fix — brand filter propagation
         if "brand" in extra and extra["brand"]:
             params["brand_filter"] = extra["brand"]
+        # Sx07-F-debug Phiên 2026-05-26 — attribute filter propagation (chip
+        # re-search A1). Dict {key: value} forwarded to MCP, which builds
+        # YQL `attributes contains sameElement(...)` clause per key-value pair.
+        if "attributes" in extra and extra["attributes"]:
+            params["attribute_filter"] = extra["attributes"]
 
-    mcp = McpClient(_mcp_url())
+    mcp = McpClient(_mcp_url(), timeout_s=30.0)
     t0 = time.monotonic()
     try:
         result = await mcp.call("vespa.hybrid_search", params)
@@ -469,7 +515,7 @@ async def _per_product_reason(
     item = dict(product)  # shallow copy so we can augment
     try:
         prompt = prompt_template.format(query=query, product=json.dumps(product, ensure_ascii=False))
-        result = await llm.generate_json(prompt, timeout_s=10.0)
+        result = await llm.generate_json(prompt, timeout_s=15.0)
         item["reason"] = result.get("reason", "")
         return {"item": item, "success": True}
     except LLMTimeout:
@@ -872,6 +918,7 @@ def compile_searching_by_text_graph(
 
     async def n_hybrid_search(s: IcpState) -> IcpState:
         return await _node_hybrid_search(s, publisher)
+
 
     async def n_generate_reasons(s: IcpState) -> IcpState:
         return await _node_generate_reasons(s, publisher)

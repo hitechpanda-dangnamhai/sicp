@@ -62,7 +62,7 @@ _propagator = TraceContextTextMapPropagator()
 _DEFAULT_TIMEOUT_S = 5.0
 
 # Allowed rank profiles per Vespa schema (product.sd lines 226-254).
-_ALLOWED_RANK_PROFILES = {"baseline", "ai_augmented", "hybrid"}
+_ALLOWED_RANK_PROFILES = {"baseline", "ai_augmented", "hybrid", "cross_encoder_rerank"}
 
 
 def _vespa_url() -> str:
@@ -73,7 +73,8 @@ def _vespa_url() -> str:
 def _build_yql(
     query: str, rank_profile: str, limit: int, category_filter: str | None,
     price_min: int | None = None, price_max: int | None = None,
-    brand_filter: str | None = None
+    brand_filter: str | None = None,
+    attribute_filter: dict[str, str] | None = None,
 ) -> str:
     """Build YQL string with embed(@query, clip_multilingual) per D-S04-10 LAW.
 
@@ -122,6 +123,23 @@ def _build_yql(
         safe_brand = brand_filter.upper().replace('"', '\\"')
         where_parts.append(f'brand contains "{safe_brand}"')
 
+    # Sx07-F-debug Phiên 2026-05-26 — Attribute filter (chip re-search A1).
+    # Vespa map<string,string> with struct-field key/value attribute indexing
+    # (Session 16 schema) enables: attributes contains sameElement(
+    #   key contains "size", value contains "500ml")
+    # Multiple attrs combined with AND (each chip click adds clause).
+    if attribute_filter:
+        for k, v in attribute_filter.items():
+            if not k or not v:
+                continue
+            safe_k = str(k).replace('"', '\\"')
+            safe_v = str(v).replace('"', '\\"')
+            where_parts.append(
+                f'attributes contains sameElement('
+                f'key contains "{safe_k}", value contains "{safe_v}"'
+                f')'
+            )
+
     where_clause = " and ".join(where_parts)
     return f"select * from product where {where_clause} limit {int(limit)}"
 
@@ -129,7 +147,8 @@ def _build_yql(
 def _build_request_body(
     query: str, rank_profile: str, limit: int, category_filter: str | None,
     price_min: int | None = None, price_max: int | None = None,
-    brand_filter: str | None = None
+    brand_filter: str | None = None,
+    attribute_filter: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Build Vespa search request body per Vespa search REST API spec.
 
@@ -153,7 +172,7 @@ def _build_request_body(
     rank-profile (verified empirically Phiên Sx04-7 smoke test).
     """
     body: dict[str, Any] = {
-        "yql": _build_yql(query, rank_profile, limit, category_filter, price_min, price_max, brand_filter),
+        "yql": _build_yql(query, rank_profile, limit, category_filter, price_min, price_max, brand_filter, attribute_filter),
         "query": query,
         "ranking.profile": rank_profile,
         # Phiên Sx04-7 fix: use default summary class to include all document
@@ -162,10 +181,20 @@ def _build_request_body(
         # `"presentation.summaryFields": "*"` which was a no-op for the
         # ai_augmented rank-profile.
         "presentation.summary": "default",
-        # Per D-S04-10 LAW: Vespa native embedder reads @query for CLIP encoding.
-        # Embedder mapping: input query=@query → output query_embedding (compiled
-        # by Vespa at search-time, not pre-embedded by AI service).
-        "input.query(query_embedding)": f'embed(query)',
+        # Sx07-F-debug Phiên 2026-05-27 — Two embedders registered in Vespa
+        # (clip_multilingual for vector retrieval + cross_encoder_tokenizer for
+        # cross-encoder rerank). Must use EXPLICIT embedder ID syntax with @query
+        # — bare `embed(query)` ambiguous between 2 embedders, Vespa errors:
+        #   "Multiple embedders are provided but the string to embed is not quoted.
+        #    Usage: embed(embedder-id, 'text')."
+        # See infra/vespa/services.xml component declarations.
+        "input.query(query_embedding)": "embed(clip_multilingual, @query)",
+        "input.query(query_tokens)": "embed(cross_encoder_tokenizer, @query)",
+        # Cross-encoder ONNX rerank inference ~500-800ms on CPU for 30 docs.
+        # Vespa default query timeout 500ms times out at summary fetch step
+        # ("No time left to get summaries"). 5s upper bound safe for hackathon
+        # scale; production with batched/GPU inference can lower this.
+        "timeout": "5s",
     }
     return body
 
@@ -267,6 +296,7 @@ def _call_vespa_once(
     brand_filter: str | None,
     price_min: int | None,
     price_max: int | None,
+    attribute_filter: dict[str, str] | None,
     level: str,
 ) -> tuple[list[dict[str, Any]], int, bool]:
     """Execute a single Vespa search call and parse the response.
@@ -291,6 +321,7 @@ def _call_vespa_once(
     body = _build_request_body(
         query, rank_profile, limit,
         category_filter, price_min, price_max, brand_filter,
+        attribute_filter,
     )
 
     span_name = "vespa.hybrid_search" if level == "primary" else f"vespa.hybrid_search.{level}"
@@ -307,6 +338,8 @@ def _call_vespa_once(
             span.set_attribute("vespa.price_min", price_min)
         if price_max is not None:
             span.set_attribute("vespa.price_max", price_max)
+        if attribute_filter:
+            span.set_attribute("vespa.attribute_filter_count", len(attribute_filter))
 
         try:
             with httpx.Client(timeout=_DEFAULT_TIMEOUT_S) as client:
@@ -407,6 +440,20 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
         except (TypeError, ValueError) as e:
             raise ValueError(f"'price_max' must be int or null; got {params.get('price_max')!r}") from e
 
+    # Sx07-F-debug Phiên 2026-05-26 — Accept attribute_filter param (chip
+    # re-search A1). Dict {key: value} string pairs. Vespa map<string,string>
+    # struct-field attribute indexing (Session 16 schema) makes this queryable.
+    attribute_filter = params.get("attribute_filter")
+    if attribute_filter is not None:
+        if not isinstance(attribute_filter, dict):
+            raise ValueError("'attribute_filter' must be dict or null")
+        for k, v in attribute_filter.items():
+            if not isinstance(k, str) or not isinstance(v, str):
+                raise ValueError(
+                    f"'attribute_filter' keys/values must be str; "
+                    f"got key={type(k).__name__} value={type(v).__name__}"
+                )
+
     url = _vespa_url()
     headers = _build_headers()
 
@@ -420,6 +467,7 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
         brand_filter=brand_filter,
         price_min=price_min,
         price_max=price_max,
+        attribute_filter_keys=list(attribute_filter.keys()) if attribute_filter else None,
     )
 
     # ========================================================================
@@ -461,6 +509,7 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
         brand_filter=brand_filter,
         price_min=price_min,
         price_max=price_max,
+        attribute_filter=attribute_filter,
         level="primary",
     )
     if not ok:
@@ -494,6 +543,7 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
             brand_filter=None,                # DROP value filter
             price_min=None,                   # DROP value filter
             price_max=None,                   # DROP value filter
+            attribute_filter=None,            # DROP value filter (Sx07-F)
             level="retry_drop_value",
         )
         if l2_ok and l2_total > 0:
@@ -502,6 +552,8 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
                 degraded_filters.append("brand")
             if price_min is not None or price_max is not None:
                 degraded_filters.append("price")
+            if attribute_filter:
+                degraded_filters.append("attributes")
             _logger.info(
                 "vespa.search.retry_drop_value_response",
                 query=query,
@@ -531,6 +583,7 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
             brand_filter=None,
             price_min=None,
             price_max=None,
+            attribute_filter=None,
             level="retry_drop_all",
         )
         if l3_ok and l3_total > 0:
@@ -542,6 +595,8 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
                 degraded_filters.append("brand")
             if (price_min is not None or price_max is not None) and "price" not in degraded_filters:
                 degraded_filters.append("price")
+            if attribute_filter and "attributes" not in degraded_filters:
+                degraded_filters.append("attributes")
             _logger.info(
                 "vespa.search.retry_drop_all_response",
                 query=query,

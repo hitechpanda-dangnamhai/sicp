@@ -29,6 +29,10 @@
  *   `cart.qty_changed`, `cart.cleared`, `cart.promo_applied`, `cart.promo_removed`
  *   per W1 LOCK FE-emit architecture + C-S05-H Conflict #1 SKIP (NO
  *   `cart.stock_resolved` — Layer 1 docs no schema). Total: 20 types.
+ * - **T02 (S-07 Phiên Sx07-F):** +6 types — `product.import_started`,
+ *   `product.import_completed`, `product.import_abandoned`, `card.shown`,
+ *   `card.accepted`, `card.rejected` — per 07_BEHAVIOR §3.5 LOCKED Phiên Sx07-B.
+ *   `card.expired` deferred (no UI surface in T02 scope). Total: 26 types.
  *
  * @see docs/07_BEHAVIOR_LOGS.md §3 (event catalog) + §8 (type safety)
  * @see LOG_CATALOG.md Section B (behavior event types — append-only registry)
@@ -37,6 +41,7 @@
  * Extended S-03 T03b Phiên 36 (+1 schema `nav.tile_clicked` per D-11 + C-23).
  * Extended S-04 T06 Phiên Sx04-12 (+5 schemas Search* per D-S04-07/08/13/14 LAW).
  * Extended S-05 T03 Phiên Sx05-3 (+6 schemas Cart* per C-S05-H Path A — FE-emit).
+ * Extended S-07 T02 Phiên Sx07-F (+6 schemas Import* per 07_BEHAVIOR §3.5).
  */
 
 import { z } from 'zod';
@@ -65,6 +70,14 @@ import {
   CartPromoAppliedPropertiesSchema,
   CartPromoRemovedPropertiesSchema,
 } from './cart-events.js';
+import {
+  ProductImportStartedPropertiesSchema,
+  ProductImportCompletedPropertiesSchema,
+  ProductImportAbandonedPropertiesSchema,
+  CardShownPropertiesSchema,
+  CardAcceptedPropertiesSchema,
+  CardRejectedPropertiesSchema,
+} from './import-events.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Properties schemas (Zod runtime validation per event type)
@@ -111,7 +124,7 @@ export const CartItemAddedPropertiesSchema = z
  *
  * **Discriminated union note:** `BehaviorEventSchema` in `./tracker.ts`
  * auto-extends as this map grows — Zod 3.x `discriminatedUnion` requires
- * ≥2 variants; 20 variants for S-05 T03 fully supported.
+ * ≥2 variants; 26 variants for S-07 T02 fully supported.
  */
 export const PROPERTIES_SCHEMA_MAP = {
   // S-02 T06 — baseline 3 types
@@ -139,12 +152,19 @@ export const PROPERTIES_SCHEMA_MAP = {
   'cart.cleared': CartClearedPropertiesSchema,
   'cart.promo_applied': CartPromoAppliedPropertiesSchema,
   'cart.promo_removed': CartPromoRemovedPropertiesSchema,
+  // S-07 T02 — +6 types (Import subset per 07_BEHAVIOR §3.5; Phiên Sx07-F)
+  'product.import_started': ProductImportStartedPropertiesSchema,
+  'product.import_completed': ProductImportCompletedPropertiesSchema,
+  'product.import_abandoned': ProductImportAbandonedPropertiesSchema,
+  'card.shown': CardShownPropertiesSchema,
+  'card.accepted': CardAcceptedPropertiesSchema,
+  'card.rejected': CardRejectedPropertiesSchema,
 } as const;
 
 /**
  * Union of all registered behavior event types — keys of
  * `PROPERTIES_SCHEMA_MAP`. T06 = 3 types; T03 = 8 types; T03b = 9 types;
- * S-04 T06 = 14 types; S-05 T03 = 20 types; expands per V-SLICE.
+ * S-04 T06 = 14 types; S-05 T03 = 20 types; S-07 T02 = 26 types; expands per V-SLICE.
  */
 export type BehaviorEventType = keyof typeof PROPERTIES_SCHEMA_MAP;
 
@@ -165,11 +185,8 @@ export type PropertiesMap = {
  * type CartProps = PropertiesFor<'cart.item_added'>;
  * // { product_id: string; qty: number; unit_price: number; source: ...; from_query?: string }
  *
- * type CartQtyProps = PropertiesFor<'cart.qty_changed'>;
- * // { product_id: string; old_qty: number; new_qty: number }
- *
- * type AuthInProps = PropertiesFor<'auth.signed_in'>;
- * // { method: 'password' }
+ * type ImportStartedProps = PropertiesFor<'product.import_started'>;
+ * // { source: 'home_tile' | 'direct_url' | 'chat_cta'; referrer?: string }
  * ```
  */
 export type PropertiesFor<T extends BehaviorEventType> = PropertiesMap[T];

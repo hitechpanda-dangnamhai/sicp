@@ -148,6 +148,16 @@ services:
     volumes:
       - vespa_data:/opt/vespa/var
     networks: [icp]
+    # Sx07-F-debug Phiên 2026-05-26 — Tăng JVM heap cho Vespa config server +
+    # stateless container để handle 858MB+ app package zip (CLIP 516MB +
+    # cross-encoder 449MB ONNX models). Default heap 1.5GB → OOM khi validate
+    # app package. 6GB heap đủ thoải mái cho dev (host machine có 31GB RAM).
+    environment:
+      VESPA_CONFIGSERVER_JVMARGS: "-Xms2g -Xmx6g"
+      VESPA_CONTAINER_JVMARGS: "-Xms2g -Xmx6g"
+    # Tăng memory limit explicit để protect host nếu Vespa leak/OOM
+    mem_limit: 12g
+    memswap_limit: 12g
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:19071/state/v1/health || exit 1"]
       interval: 30s

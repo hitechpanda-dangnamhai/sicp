@@ -135,6 +135,17 @@ export interface PostIntentBody {
    * Optional for backward-compat with non-authed smoke test callers.
    */
   user_id?: string;
+  /**
+   * Sx07-F-debug Phiên 2026-05-26 — Explicit filter override (A1 design).
+   * Forwarded verbatim to AI service POST /intent body. When present, AI
+   * search graph skips LLM parse_filters node.
+   */
+  filters?: {
+    brand?: string;
+    category?: string;
+    /** Sx07-F-debug Phiên 2026-05-26 — Attribute chip filter (A1 design). */
+    attributes?: Record<string, string>;
+  };
 }
 
 /**

@@ -158,6 +158,60 @@ export default function Intent03Page() {
     void stream.submitQuery(trimmed);
   }, [inputValue, stream]);
 
+  // Sx07-F-debug Phiên 2026-05-26 — Chip re-search (A1 design).
+  // Click brand on ProductCardSearchB → re-submit query with brand filter
+  // override. BE skips LLM parse_filters → faster + precise.
+  const [activeBrandFilter, setActiveBrandFilter] = useState<string | null>(null);
+  // Sx07-F-debug Phiên 2026-05-26 — Attribute filter state (Hướng A).
+  // Map {key: value} updated by handleAttributeClick / cleared by handleClearAllFilters
+  // or per-chip via banner ✕. Declared HERE (before handleClearBrandFilter) to
+  // avoid temporal dead zone — handleClearBrandFilter callback references it.
+  const [activeAttributes, setActiveAttributes] = useState<Record<string, string>>({});
+  const handleBrandClick = useCallback(
+    (brand: string) => {
+      const trimmedBrand = brand.trim();
+      if (!trimmedBrand) return;
+      setActiveBrandFilter(trimmedBrand);
+      const queryToUse = stream.state.query || trimmedBrand;
+      void stream.submitQuery(queryToUse, 'ai_augmented', { brand: trimmedBrand });
+    },
+    [stream],
+  );
+  const handleClearBrandFilter = useCallback(() => {
+    setActiveBrandFilter(null);
+    // Re-submit with attribute filter only (if any) when clearing brand
+    if (stream.state.query) {
+      const remaining = Object.keys(activeAttributes).length > 0
+        ? { attributes: activeAttributes }
+        : undefined;
+      void stream.submitQuery(stream.state.query, 'ai_augmented', remaining);
+    }
+  }, [stream, activeAttributes]);
+
+  // Sx07-F-debug Phiên 2026-05-26 — Attribute chip handler (Hướng A).
+  // User clicks attribute pill (e.g. "500ml") → add to active filter map →
+  // re-submit query with combined brand + attribute filters. BE Vespa builds
+  // attributes contains sameElement(...) clause AND-combined with brand.
+  const handleAttributeClick = useCallback(
+    (key: string, value: string) => {
+      const next = { ...activeAttributes, [key]: value };
+      setActiveAttributes(next);
+      const queryToUse = stream.state.query || value;
+      void stream.submitQuery(queryToUse, 'ai_augmented', {
+        brand: activeBrandFilter ?? undefined,
+        attributes: next,
+      });
+    },
+    [activeAttributes, activeBrandFilter, stream],
+  );
+  const handleClearAllFilters = useCallback(() => {
+    setActiveBrandFilter(null);
+    setActiveAttributes({});
+    if (stream.state.query) {
+      void stream.submitQuery(stream.state.query);
+    }
+  }, [stream]);
+
   /** Add-to-cart "+" handler — Variant B + Variant A unified. */
   const handleAdd = useCallback(
     (product: {
@@ -450,6 +504,9 @@ export default function Intent03Page() {
                               : 0
                           }
                           reason={item.reason ?? ''}
+                          onBrandClick={handleBrandClick}
+                          attributes={(item.attributes as Record<string, string>) ?? undefined}
+                          onAttributeClick={handleAttributeClick}
                           onAdd={() =>
                             handleAdd({
                               brand: item.brand,
@@ -508,6 +565,63 @@ export default function Intent03Page() {
                       Tìm thấy <b className="ml-1">{tierCounts.all} sản phẩm</b> phù hợp
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Sx07-F-debug Phiên 2026-05-26 — Active brand filter banner (chip re-search A1).
+                  Shows when user clicked brand chip on ProductCardSearchB → re-search locked.
+                  Pink-glass styling matches phone-frame palette. Clear ✕ resets to query-only search. */}
+              {/* Sx07-F-debug Phiên 2026-05-26 — Combined filter banner (Hướng A).
+                  Shows ALL active filters (brand + attributes) chip-style with
+                  individual clear buttons + "Bỏ tất cả" master clear. */}
+              {(activeBrandFilter || Object.keys(activeAttributes).length > 0) && (
+                <div className="flex flex-wrap items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-pink-50 to-rose-50 border-[0.5px] border-pink-200 mb-2">
+                  <Icon name="sparkles" size={12} className="text-pink-600 flex-shrink-0" />
+                  <span className="text-[11px] text-pink-900 font-medium">Đang lọc:</span>
+                  {activeBrandFilter && (
+                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white border border-pink-300 text-pink-900">
+                      <strong className="font-semibold">{activeBrandFilter}</strong>
+                      <button
+                        type="button"
+                        onClick={handleClearBrandFilter}
+                        className="text-pink-500 hover:text-pink-900"
+                        aria-label={`Bỏ lọc thương hiệu ${activeBrandFilter}`}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  )}
+                  {Object.entries(activeAttributes).map(([key, value]) => (
+                    <span key={key} className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-white border border-pink-300 text-pink-900">
+                      <strong className="font-semibold">{value}</strong>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = { ...activeAttributes };
+                          delete next[key];
+                          setActiveAttributes(next);
+                          if (stream.state.query) {
+                            const remaining = Object.keys(next).length > 0 || activeBrandFilter
+                              ? { brand: activeBrandFilter ?? undefined, attributes: Object.keys(next).length > 0 ? next : undefined }
+                              : undefined;
+                            void stream.submitQuery(stream.state.query, 'ai_augmented', remaining);
+                          }
+                        }}
+                        className="text-pink-500 hover:text-pink-900"
+                        aria-label={`Bỏ lọc ${key}: ${value}`}
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleClearAllFilters}
+                    className="ml-auto text-[10px] text-pink-600 hover:text-pink-900 font-semibold px-2 py-0.5 rounded hover:bg-pink-100 transition-colors"
+                    aria-label="Bỏ tất cả filter"
+                  >
+                    Bỏ tất cả
+                  </button>
                 </div>
               )}
 
@@ -582,6 +696,9 @@ export default function Intent03Page() {
                           badges={item.badges}
                           rating={item.rating}
                           soldCount={item.sold_count}
+                          onBrandClick={handleBrandClick}
+                          attributes={(item.attributes as Record<string, string>) ?? undefined}
+                          onAttributeClick={handleAttributeClick}
                           onAdd={() =>
                             handleAdd({
                               brand: item.brand,

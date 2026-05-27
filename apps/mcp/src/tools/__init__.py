@@ -24,12 +24,21 @@
 #   - products (products.create — was already imported, now also products.update
 #     per T01.E.G C-S07-N Option B — registered inside products.py module body)
 #
+# S-07 T02 amendment (Phiên Sx07-F per C-S07-O option iii-a Sx07-G hotfix):
+#   The `vision` module body now ALSO registers `vision.suggest_attributes` at
+#   the bottom of `vision.py` (alongside the existing `vision.analyze` register
+#   call). Auto-discovery via `from src.tools import vision` below already
+#   triggers both registrations — NO import-line edit needed here. This file
+#   is therefore documentation-only AMEND for Sx07-F (per Rule 7 — surface the
+#   decision in code comments where consumers will look for it).
+#
 # Reference:
 #   - docs/specs/03_API_CONTRACTS.md §5 (MCP Tool Specs LOCKED — JSON-RPC 2.0)
 #   - docs/phases/PHASE_01_INFRA.md Day 5
 #   - slices/S-05_decisions-log.md D-S05-02 LAW
 #   - slices/S-07_decisions-log.md C-S07-A (9 NEW MCP tools)
 #   - slices/S-07_decisions-log.md C-S07-N Option B (products.update separate)
+#   - slices/S-07_decisions-log.md C-S07-O Sx07-G hotfix (NEW Phiên Sx07-F)
 # =============================================================================
 
 from __future__ import annotations
@@ -112,6 +121,10 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
 # S-05 T02 (Phiên Sx05-2): cart module added.
 # S-07 T01.C (Phiên Sx07-D): cards, gtrends, policies, shopee, vision modules added.
 # S-07 T01.E.G (Phiên Sx07-D): products module body now also registers products.update.
+# S-07 T02 (Phiên Sx07-F): vision module body now ALSO registers vision.suggest_attributes
+#   per C-S07-O Sx07-G hotfix (NO import-line change here — vision import below
+#   auto-triggers BOTH `vision.analyze` AND `vision.suggest_attributes` register calls
+#   from the bottom of vision.py).
 from src.tools import (  # noqa: E402, F401
     auth,
     cards,

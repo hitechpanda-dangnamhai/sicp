@@ -564,6 +564,13 @@ def create_app() -> Flask:
             user_id = payload.get("user_id") if isinstance(
                 payload.get("user_id"), str
             ) else "anon"
+            # Sx07-F-debug Phiên 2026-05-26 — Explicit filter override (A1).
+            # FE-injected chip filters (brand/category) propagated verbatim to
+            # IcpState._filters. searching_by_text.parse_filters node detects
+            # this and SKIPS LLM call → faster + precise.
+            filters_override = payload.get("filters") if isinstance(
+                payload.get("filters"), dict
+            ) else None
             span.set_attribute("ai.modality", modality)
             span.set_attribute("ai.mode", mode)
             span.set_attribute("ai.user_id", user_id)
@@ -598,6 +605,10 @@ def create_app() -> Flask:
                 # persisted in checkpointed state — survives interrupt/resume
                 # boundary so resume nodes still operate on correct user cart.
                 "user_id": user_id,
+                # Sx07-F-debug Phiên 2026-05-26 — Filter override (A1).
+                # When dict non-empty, parse_filters node uses these instead
+                # of calling LLM. Shape: {category?: str, extra: {brand?: str}}.
+                "_filters_override": filters_override,
             }
 
             # Drive search graph async in background thread.

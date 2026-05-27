@@ -197,6 +197,12 @@ class IcpState(TypedDict, total=False):
     _filters: dict
     _search_items: list
     _search_total: int
+    # Sx07-F-debug Phiên 2026-05-26 — Explicit filter override from FE (A1
+    # design). Must be declared here (same lesson as _search_items above):
+    # LangGraph TypedDict total=False schema drops undeclared keys between
+    # node transitions, so parse_filters node would see None even when
+    # main.py set the value in initial_state. Shape: {brand?, category?} or None.
+    _filters_override: Optional[dict]
 
     # --- S-05 T02 D-S05-01/03 LAW fields (Phiên Sx05-2 — Pattern A cart entry
     #     intents per C-S05-F Path α resolution). 5 user-facing fields drive

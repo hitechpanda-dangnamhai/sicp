@@ -94,6 +94,31 @@ export const IntentRequestSchema = z.object({
    * Auto-degrade trigger (LLM timeout) handled server-side, NOT via this field.
    */
   mode: z.enum(['ai_augmented', 'basic_fallback']).optional().default('ai_augmented'),
+  /**
+   * Sx07-F-debug Phiên 2026-05-26 — Explicit filter override per A1 design.
+   * FE injects chip-driven filters (clickable brand/category chips on
+   * ProductCardSearchB). When present, AI search graph SKIPS LLM
+   * parse_filters node and uses these values directly → faster (no LLM
+   * call) + precise (no LLM hallucination).
+   * - `brand`: case-insensitive string, will be UPPER-cased by MCP YQL builder
+   * - `category`: must match 11-category taxonomy (nuoc_tuong/tuong_ot/...)
+   * Backward-compat: undefined → LLM parse_filters runs as before.
+   */
+  filters: z
+    .object({
+      brand: z.string().min(1).max(100).optional(),
+      category: z.string().min(1).max(50).optional(),
+      /**
+       * Sx07-F-debug Phiên 2026-05-26 — Attribute chip filter (A1 design).
+       * Map of {attribute_key: attribute_value} string pairs. Each pair
+       * becomes a Vespa YQL `attributes contains sameElement(...)` clause
+       * AND-combined with brand/category. Example: {"size": "500ml"}.
+       * BE MCP requires Vespa schema struct-field attribute indexing
+       * (Session 16 deploy on product.sd).
+       */
+      attributes: z.record(z.string().min(1).max(50), z.string().min(1).max(100)).optional(),
+    })
+    .optional(),
 });
 
 export class IntentRequestDto extends createZodDto(IntentRequestSchema) {}

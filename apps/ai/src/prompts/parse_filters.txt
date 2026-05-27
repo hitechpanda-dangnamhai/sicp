@@ -31,8 +31,13 @@ CROSS-LANGUAGE EXAMPLES (Q-Sx04-3-1 LAW):
   "nước cam tươi"              → category="nuoc_giai_khat"
 
 INSTRUCTIONS:
-1. Pick the SINGLE best-fitting category_id. If ambiguous, prefer the
-   more-specific category. If absolutely no category fits, set category=null.
+1. Pick category_id ONLY when query contains EXPLICIT category keywords from
+   the taxonomy above (Vietnamese, English, or hyphenated). DO NOT infer
+   category from brand names alone (e.g. "Cholimex" makes many products
+   across nuoc_tuong/tuong_ot/gia_vi → category=null when no other hint).
+   When query is ambiguous, brand-only, or contains only adjectives
+   ("ngon", "rẻ", "Việt"), set category=null. Better to have null and rely
+   on BM25+vector ranking than to wrongly filter out matching products.
 2. Extract any structural filter hints into `filters` dict:
    - use_case: free text like "pho", "breakfast", "baby" — for downstream
      ranking context (NOT a hard filter on Vespa)

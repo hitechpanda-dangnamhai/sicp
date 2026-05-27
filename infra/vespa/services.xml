@@ -67,6 +67,16 @@
       <normalize>true</normalize>
     </component>
 
+    <!-- Sx07-F-debug Phiên 2026-05-26 — Cross-encoder rerank tokenizer.
+         Tokenizes (title + description) at feed time into cross_encoder_tokens
+         tensor field. Same tokenizer used by ONNX cross-encoder model for
+         input_ids/attention_mask generation in rank-profile cross_encoder_rerank.
+         Model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1 (multilingual,
+         Vietnamese-capable). See infra/vespa/models/cross_encoder_rerank/. -->
+    <component id="cross_encoder_tokenizer" type="hugging-face-tokenizer">
+      <model path="models/cross_encoder_rerank/tokenizer.json"/>
+    </component>
+
     <nodes>
       <node hostalias="node0"/>
     </nodes>

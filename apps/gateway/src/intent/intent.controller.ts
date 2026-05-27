@@ -94,7 +94,7 @@ const HEARTBEAT_INTERVAL_MS = 15_000;
  *
  * Reset on each Redis message forwarded — only fires after true idleness.
  */
-const CART_IDLE_TIMEOUT_MS = 60_000;
+const CART_IDLE_TIMEOUT_MS = 300_000; // 5 min — accommodates S-07 Intent 01 import form fill time (Sx07-F fix)
 
 /** Redis pub/sub channel template per `02_DATA_MODEL.md §5`. */
 const SSE_PUBSUB_CHANNEL_PREFIX = 'sse:pubsub:';

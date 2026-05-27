@@ -17,6 +17,8 @@
  *   NavSettingsSectionOpenedPropertiesSchema,
  *   NavTileClickedPropertiesSchema,
  *   CartViewedPropertiesSchema,
+ *   ProductImportStartedPropertiesSchema,
+ *   CardShownPropertiesSchema,
  *   type BehaviorEvent,
  *   type BehaviorEventType,
  *   type PropertiesFor,
@@ -32,6 +34,7 @@
  * Phiên 36 (+1 re-export NavTileClickedPropertiesSchema per D-11 + C-23 R1).
  * Extended S-04 T06 Phiên Sx04-12 (+5 re-exports Search* per D-S04-07/08/13/14 LAW).
  * Extended S-05 T03 Phiên Sx05-3 (+6 re-exports Cart* per C-S05-H Path A FE-emit).
+ * Extended S-07 T02 Phiên Sx07-F (+6 re-exports Import* per 07_BEHAVIOR §3.5).
  */
 
 // Tracker contracts (canonical BehaviorEvent + batch request/response)
@@ -95,3 +98,14 @@ export {
   CartPromoAppliedPropertiesSchema,
   CartPromoRemovedPropertiesSchema,
 } from './cart-events.js';
+
+// S-07 T02 (Phiên Sx07-F) — Import subset (6 schemas per 07_BEHAVIOR §3.5)
+// NOT included: card.expired (deferred — no T02 UI surface; post-MVP TTL worker).
+export {
+  ProductImportStartedPropertiesSchema,
+  ProductImportCompletedPropertiesSchema,
+  ProductImportAbandonedPropertiesSchema,
+  CardShownPropertiesSchema,
+  CardAcceptedPropertiesSchema,
+  CardRejectedPropertiesSchema,
+} from './import-events.js';
