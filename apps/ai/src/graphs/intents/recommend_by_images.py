@@ -366,7 +366,7 @@ async def _node_parallel_fetch(
     # Visual + collab queries fired in parallel with corpus_size.
     visual_task = mcp_client.call(
         "vespa.image_nearest_neighbor",
-        {"query_desc": query_desc, "limit": _BLEND_MAX_HITS},
+        {"query_desc": query_desc, "limit": _BLEND_MAX_HITS, "category_filter": (state.get("_detected") or {}).get("category") or None},
     )
     collab_task = mcp_client.call(
         "analytics.co_purchased",
@@ -437,6 +437,7 @@ async def _node_blend_and_rank(
     visual_hits = state.get("_visual_hits") or []
     co_purchased = state.get("_co_purchased") or []
 
+
     # Build collab freq lookup by product_id
     collab_freq_by_id: dict[str, int] = {}
     for item in co_purchased:
@@ -463,6 +464,7 @@ async def _node_blend_and_rank(
             + weights["c"] * sub_collab_norm
             + weights["t"] * sub_trend
         )
+
 
         # Determine dominant signal (match_type) — which one contributed most?
         contributions = {

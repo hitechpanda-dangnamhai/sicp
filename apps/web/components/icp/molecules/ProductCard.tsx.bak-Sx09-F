@@ -5,8 +5,8 @@
  *
  * Molecule: <ProductCard> — Family B product display card, 2 width variants
  *
- * Slice:    S-01 UI Foundation (original) + S-09 EXTEND (Phiên Sx09-F per C-S09-AO)
- * Task:     T05 AC-1, AC-6 (dev preview) + S-09 T02 AC31 amended
+ * Slice:    S-01 UI Foundation
+ * Task:     T05 AC-1, AC-6 (dev preview)
  *
  * Source:   Family B mockup HTML (per C-03 structural inference + Tailwind translation rebuild):
  *           - intent-03/intent-03A-state-0-happy.html line 167-300 (width=138 carousel)
@@ -23,12 +23,6 @@
  * - C-18 Tier 4 Tailwind utility inline + CVA (no @layer components classes added)
  * - C-22 atom interface verified DISCOVER (Button.tsx + ChipPill.tsx +
  *   icon-map.ts + atoms/index.ts inspected) — T05 bypasses Button/ChipPill
- * - **C-S09-AO NEW (Phiên Sx09-F)**: Extend 2 props additive `confidenceIcon?` +
- *   `reasonChipIcon?` (defaults `'search'` + `'sparkles'` for backward-compat
- *   S-04 Intent 03 + S-05 Intent 05). S-09 Intent 04 passes dynamic per
- *   `SIGNAL_MATCH_ICON_MAP[item.match_type]` + `SIGNAL_REASON_ICON_MAP[activeSignalFilter]`
- *   to swap match badge (eye/users/trending-up) + reason chip (sparkles/users/trending-up)
- *   per mockup state-0 (visual default) vs state-D (collab active) ground truth.
  *
  * Structure: 1 main component <ProductCard> + 3 PRIVATE helpers (NOT exported):
  *   - ProductImageSection — image wrapper + badges/confidence/cornerBadge/overlay-btn
@@ -84,20 +78,8 @@ export interface ProductCardProps
   imageIcon?: IconName;
   badge?: ProductCardBadge | [ProductCardBadge, ProductCardBadge];
   confidence?: number;
-  /**
-   * S-09 C-S09-AO (Phiên Sx09-F): dynamic match-badge icon swap per
-   * match_type (eye for visual / users for collab / trending-up for trending).
-   * Default `'search'` for S-04 backward-compat (Intent 03 + S-05 dev pages).
-   */
-  confidenceIcon?: IconName;
   cornerBadge?: ProductCardBadge;
   aiReason?: string;
-  /**
-   * S-09 C-S09-AO (Phiên Sx09-F): dynamic reason-chip prefix icon swap per
-   * `activeSignalFilter` (sparkles default decorative / users for collab /
-   * trending-up for trending). Default `'sparkles'` for S-04 backward-compat.
-   */
-  reasonChipIcon?: IconName;
   rating?: number;
   soldCount?: string;
   addButton?: ProductCardAddButton;
@@ -134,25 +116,13 @@ interface ProductImageSectionProps {
   imageIcon: IconName;
   badges: ProductCardBadge[];
   confidence?: number;
-  /** S-09 C-S09-AO additive — defaults to 'search' (S-04 backward-compat). */
-  confidenceIcon?: IconName;
   cornerBadge?: ProductCardBadge;
   addButton?: ProductCardAddButton;
   onAdd?: () => void;
 }
 
 function ProductImageSection(props: ProductImageSectionProps): React.ReactElement {
-  const {
-    isCarousel,
-    imageGradient,
-    imageIcon,
-    badges,
-    confidence,
-    confidenceIcon = 'search',
-    cornerBadge,
-    addButton,
-    onAdd,
-  } = props;
+  const { isCarousel, imageGradient, imageIcon, badges, confidence, cornerBadge, addButton, onAdd } = props;
   const wrapperClass = isCarousel
     ? 'relative w-full aspect-square flex items-center justify-center'
     : 'relative w-full h-[148px] flex items-center justify-center';
@@ -168,7 +138,7 @@ function ProductImageSection(props: ProductImageSectionProps): React.ReactElemen
       <Icon name={imageIcon} size={isCarousel ? 46 : 54} className="text-icp-amber-800/65" />
       {confidence !== undefined ? (
         <div className="absolute top-[7px] left-[7px] inline-flex items-center gap-[3px] bg-white/95 backdrop-blur-sm text-icp-pink-900 text-[10px] font-bold px-[7px] py-[3px] rounded-[7px] shadow-[0_4px_10px_rgba(0,0,0,0.15)]">
-          <Icon name={confidenceIcon} size={11} className="text-icp-pink-700" />
+          <Icon name="search" size={11} className="text-icp-pink-700" />
           {confidence}%
         </div>
       ) : badges.length > 0 ? (
@@ -236,25 +206,13 @@ interface ProductBodyGridProps {
   price: number;
   originalPrice?: number;
   aiReason?: string;
-  /** S-09 C-S09-AO additive — defaults to 'sparkles' (S-04 backward-compat). */
-  reasonChipIcon?: IconName;
   soldCount?: string;
   addButton?: ProductCardAddButton;
   onAdd?: () => void;
 }
 
 function ProductBodyGrid(props: ProductBodyGridProps): React.ReactElement {
-  const {
-    brand,
-    name,
-    price,
-    originalPrice,
-    aiReason,
-    reasonChipIcon = 'sparkles',
-    soldCount,
-    addButton,
-    onAdd,
-  } = props;
+  const { brand, name, price, originalPrice, aiReason, soldCount, addButton, onAdd } = props;
   const inlineBtnClass = cn(
     'w-[30px] h-[30px] rounded-full flex items-center justify-center border-0',
     addButton?.variant === 'pink' &&
@@ -270,7 +228,7 @@ function ProductBodyGrid(props: ProductBodyGridProps): React.ReactElement {
       </div>
       {aiReason ? (
         <div className="flex items-start gap-[5px] px-2 py-1.5 bg-gradient-to-br from-icp-pink-50 to-icp-orange-50 border-[0.5px] border-dashed border-icp-pink-200 rounded-[9px]">
-          <Icon name={reasonChipIcon} size={10} className="text-icp-pink-500 mt-[1px]" />
+          <Icon name="sparkles" size={10} className="text-icp-pink-500 mt-[1px]" />
           <div className="text-[10px] text-icp-pink-700 font-medium leading-[1.35]">{aiReason}</div>
         </div>
       ) : null}
@@ -306,10 +264,8 @@ export const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
       imageIcon = 'package',
       badge,
       confidence,
-      confidenceIcon,
       cornerBadge,
       aiReason,
-      reasonChipIcon,
       rating,
       soldCount,
       addButton,
@@ -336,7 +292,6 @@ export const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
           imageIcon={imageIcon}
           badges={badges}
           confidence={confidence}
-          confidenceIcon={confidenceIcon}
           cornerBadge={cornerBadge}
           addButton={addButton}
           onAdd={onAdd}
@@ -357,7 +312,6 @@ export const ProductCard = React.forwardRef<HTMLDivElement, ProductCardProps>(
             price={price}
             originalPrice={originalPrice}
             aiReason={aiReason}
-            reasonChipIcon={reasonChipIcon}
             soldCount={soldCount}
             addButton={addButton}
             onAdd={onAdd}

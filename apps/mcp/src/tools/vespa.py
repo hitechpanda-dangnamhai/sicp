@@ -1114,11 +1114,18 @@ def image_nearest_neighbor(params: dict[str, Any]) -> dict[str, Any]:
     # YQL: nearestNeighbor(image_embedding, query_embedding)
     # input.query(query_embedding) = embed(@desc, clip_multilingual)
     where_parts: list[str] = []
+    # Patch Phiên Sx09-F Defect 2 final: when category_filter present, use
+    # approximate:false for nearestNeighbor — HNSW approximate prune candidates
+    # BEFORE structural filter, causing 0-hits combo bug (verified Vespa direct
+    # query). Exact search ensures all candidates visible to filter.
+    # Trade-off: ~50-100ms slower for 68-product corpus (acceptable).
+    nn_params = "targetHits:%d" % limit
     if category_filter and isinstance(category_filter, str):
         safe_cat = category_filter.replace('"', '\\"')
         where_parts.append(f'category contains "{safe_cat}"')
+        nn_params += ",approximate:false"
     where_parts.append(
-        f'({{targetHits:{limit}}}nearestNeighbor(image_embedding, query_embedding))'
+        f'({{{nn_params}}}nearestNeighbor(image_embedding, query_embedding))'
     )
     yql = f"select * from product where {' and '.join(where_parts)} limit {limit}"
 

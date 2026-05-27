@@ -126,6 +126,13 @@ export const CartItemAddedPropertiesSchema = z
  * auto-extends as this map grows — Zod 3.x `discriminatedUnion` requires
  * ≥2 variants; 26 variants for S-07 T02 fully supported.
  */
+import {
+  RecommendationShownPropertiesSchema,
+  RecommendationClickedPropertiesSchema,
+  RecommendationDismissedPropertiesSchema,
+  IntentFirstCardEmittedPropertiesSchema,
+} from './recommend-events.js';
+
 export const PROPERTIES_SCHEMA_MAP = {
   // S-02 T06 — baseline 3 types
   'session.started': SessionStartedPropertiesSchema,
@@ -159,6 +166,11 @@ export const PROPERTIES_SCHEMA_MAP = {
   'card.shown': CardShownPropertiesSchema,
   'card.accepted': CardAcceptedPropertiesSchema,
   'card.rejected': CardRejectedPropertiesSchema,
+  // S-09 T02 — +4 types (Recommend subset per Phiên Sx09-F Defect 3 hotfix)
+  'recommendation.shown': RecommendationShownPropertiesSchema,
+  'recommendation.clicked': RecommendationClickedPropertiesSchema,
+  'recommendation.dismissed': RecommendationDismissedPropertiesSchema,
+  'intent.first_card_emitted': IntentFirstCardEmittedPropertiesSchema,
 } as const;
 
 /**

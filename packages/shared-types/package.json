@@ -24,6 +24,14 @@
       "types": "./dist/cart.d.ts",
       "default": "./dist/cart.js"
     },
+    "./products": {
+      "types": "./dist/products.d.ts",
+      "default": "./dist/products.js"
+    },
+    "./recommendations": {
+      "types": "./dist/recommendations.d.ts",
+      "default": "./dist/recommendations.js"
+    },
     "./api": {
       "types": "./dist/api/index.d.ts",
       "default": "./dist/api/index.js"

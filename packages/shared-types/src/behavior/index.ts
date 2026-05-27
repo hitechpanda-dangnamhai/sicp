@@ -109,3 +109,12 @@ export {
   CardAcceptedPropertiesSchema,
   CardRejectedPropertiesSchema,
 } from './import-events.js';
+
+// S-09 T02 (Phiên Sx09-F mid-task) — Recommend subset (4 schemas per PHASE_05 §I)
+// Added during Defect 3 hotfix — gateway tracker 500 validateProperties fail.
+export {
+  RecommendationShownPropertiesSchema,
+  RecommendationClickedPropertiesSchema,
+  RecommendationDismissedPropertiesSchema,
+  IntentFirstCardEmittedPropertiesSchema,
+} from './recommend-events.js';
