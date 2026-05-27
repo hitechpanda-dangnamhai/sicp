@@ -308,12 +308,34 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                     # Dispatch graph compile target by entry_intent.
                     entry_intent_dispatch = initial_state.get("entry_intent")
                     if modality_dispatch == "image":
-                        # Lazy import — defers importing_by_images module load
-                        # until first image-modality request fires.
-                        from .graphs.intents.importing_by_images import (
-                            compile_importing_by_images_graph,
-                        )
-                        graph = compile_importing_by_images_graph(saver, publisher)
+                        # S-09 T01 NEW per C-S09-S + D-S09-NN-C LAW: image-modality
+                        # dispatch refinement by hint field. Default behavior (no hint
+                        # OR hint != 'recommend') preserves S-07 importing_by_images
+                        # graph (merchant import flow, backward-compat 100% per line
+                        # 304-305 comment "regardless of hint field" — semantic now
+                        # narrowed to default branch only).
+                        #
+                        # TODO(S-08/S-11 polish): When voice modality lands (Intent 02/07
+                        # S-08/S-10), consider refactoring this whole dispatch block to
+                        # lookup table DISPATCH_TABLE[(modality, hint)] for table-driven
+                        # scalability. Current 4-graph scale = if/elif sweet spot per
+                        # industry convention (per C-S09-S Câu hỏi 4 Option A confirmed).
+                        if entry_intent_dispatch == "recommend":
+                            # S-09 Intent 04 image recommendation flow (customer upload
+                            # photo → 10 similar products + reasons). Per D-S09-NN-A/B/C
+                            # LAW + C-S09-O/P/Q/R/S amendments.
+                            from .graphs.intents.recommend_by_images import (
+                                compile_recommend_by_images_graph,
+                            )
+                            graph = compile_recommend_by_images_graph(saver, publisher)
+                        else:
+                            # S-07 Intent 01 import flow (merchant photo → product draft).
+                            # Lazy import — defers importing_by_images module load
+                            # until first image-modality request fires.
+                            from .graphs.intents.importing_by_images import (
+                                compile_importing_by_images_graph,
+                            )
+                            graph = compile_importing_by_images_graph(saver, publisher)
                     elif entry_intent_dispatch in (
                         "cart_clear_confirm", "cart_view_with_stock_check"
                     ):
@@ -446,13 +468,26 @@ def _drive_graph_resume_async(request_id: str, resume_value: Any) -> None:
                         )
                         modality_dispatch_resume = None
                     if modality_dispatch_resume == "image":
-                        # S-07 T01.D NEW per C-S07-A/C/D — resume importing_by_images
-                        # graph (preserves saver-checkpointed image_b64 + vision_result
-                        # across INTERRUPT #1 submit_draft + INTERRUPT #2 commit).
-                        from .graphs.intents.importing_by_images import (
-                            compile_importing_by_images_graph,
-                        )
-                        graph = compile_importing_by_images_graph(saver, publisher)
+                        # S-09 T01 NEW per C-S09-S — mirror initial dispatch nested
+                        # branch on resume (preserves saver-checkpointed entry_intent
+                        # so re-routing on resume picks the SAME graph as initial run).
+                        if entry_intent_dispatch == "recommend":
+                            # S-09 resume recommend_by_images (rare for Intent 04
+                            # since current 5-node graph has NO interrupts; resume
+                            # path mostly defensive forward-compat for future
+                            # interrupt additions e.g. low-confidence clarify).
+                            from .graphs.intents.recommend_by_images import (
+                                compile_recommend_by_images_graph,
+                            )
+                            graph = compile_recommend_by_images_graph(saver, publisher)
+                        else:
+                            # S-07 T01.D NEW per C-S07-A/C/D — resume importing_by_images
+                            # graph (preserves saver-checkpointed image_b64 + vision_result
+                            # across INTERRUPT #1 submit_draft + INTERRUPT #2 commit).
+                            from .graphs.intents.importing_by_images import (
+                                compile_importing_by_images_graph,
+                            )
+                            graph = compile_importing_by_images_graph(saver, publisher)
                     elif entry_intent_dispatch in (
                         "cart_clear_confirm", "cart_view_with_stock_check"
                     ):

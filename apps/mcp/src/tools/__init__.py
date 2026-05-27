@@ -125,7 +125,11 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
 #   per C-S07-O Sx07-G hotfix (NO import-line change here — vision import below
 #   auto-triggers BOTH `vision.analyze` AND `vision.suggest_attributes` register calls
 #   from the bottom of vision.py).
+# S-09 T01 (Phiên Sx09-C): analytics module added per C-S09-B + C-S09-Q.
+#   Registers `analytics.co_purchased` (PHASE_05 §C SQL) + `analytics.product_corpus_size`
+#   (Redis-cached COUNT for dynamic phase_progress.meta per mockup C-S09-O).
 from src.tools import (  # noqa: E402, F401
+    analytics,
     auth,
     cards,
     cart,

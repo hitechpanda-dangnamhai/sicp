@@ -1,0 +1,274 @@
+#!/usr/bin/env tsx
+/**
+ * scripts/seed-historical-orders.ts — S-09 historical purchase data seeder.
+ *
+ * Slice: S-09 First Image-Based Product Recommendation (Intent 04 V-SLICE).
+ * Task:  T01 Block 4 — Seed historical orders for co-purchase analytics.
+ *
+ * Purpose: seed 50 paid orders + ~150 order_items spread across 6 months
+ * with Pareto category distribution so `analytics.co_purchased(category)`
+ * returns meaningful top-N results (driving the collab_count sub-score in
+ * AI graph blend_and_rank node per D-S09-NN-A LAW).
+ *
+ * Pareto category distribution (per PHASE_05 §G "trend nước tương giảm dần,
+ * nước giải khát tăng dần"):
+ *   - 40% mì cay / mì ăn liền
+ *   - 20% nước tương / gia vị nước
+ *   - 20% đồ uống / nước giải khát
+ *   - 10% đồ ngọt / bánh kẹo
+ *   - 10% gia vị khô
+ *
+ * Idempotency contract (per Rule 4):
+ *   - Each order uses deterministic `idempotency_key = seed-historical-{N}`
+ *   - V001 schema declares `idempotency_key VARCHAR(64) UNIQUE NOT NULL`
+ *   - ON CONFLICT (idempotency_key) DO NOTHING — re-run is no-op
+ *   - Re-run after DB reset will re-create cleanly
+ *
+ * Usage:
+ *   pnpm tsx scripts/seed-historical-orders.ts
+ *
+ * Decision references:
+ *   - PHASE_05_RECO_ANALYTICS.md §G (Mock Data Augmentation — 200 orders)
+ *   - PHASE_05_RECO_ANALYTICS.md §C (co_purchased SQL — needs status='paid')
+ *   - D-S09-NN-E LAW v2.0 — effort 6.1d budget T01 3.7d
+ *   - V001__init.sql:197-222 (orders + order_items DDL)
+ *   - C-S09-I (NO mat view — inline SQL per Hackathon scope)
+ *
+ * NOTE: PHASE_05 §G nói 200 orders, nhưng S-09 Hackathon scope giảm còn 50
+ * orders + ~150 order_items để T01 budget 3.7d fit. Đủ cho co_purchased
+ * smoke (AC14 >=50 orders). 200 orders defer to S-11 polish.
+ */
+
+import { Client } from 'pg';
+import { config as loadEnv } from 'dotenv';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Env + path setup
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+loadEnv({ path: join(__dirname, '../.env') });
+
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL not set.');
+  process.exit(1);
+}
+
+const TARGET_ORDER_COUNT = 50;
+const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
+
+// Pareto category distribution (sums to 1.0 per PHASE_05 §G)
+const CATEGORY_DISTRIBUTION: Array<{ patterns: string[]; weight: number }> = [
+  { patterns: ['mi_an_lien', 'mi_cay', 'mì', 'instant_noodle'], weight: 0.40 },
+  { patterns: ['nuoc_tuong', 'gia_vi_nuoc', 'sauce'], weight: 0.20 },
+  { patterns: ['nuoc_giai_khat', 'do_uong', 'beverage'], weight: 0.20 },
+  { patterns: ['do_ngot', 'banh_keo', 'snack', 'candy'], weight: 0.10 },
+  { patterns: ['gia_vi', 'spice', 'seasoning'], weight: 0.10 },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Deterministic PRNG (per idempotency contract: same seed → same orders)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Use seeded hash-based RNG so re-running script produces same orders
+// (idempotency_key collisions on re-run → ON CONFLICT skip).
+
+function makeSeededRandom(seed: string): () => number {
+  let state = parseInt(createHash('sha256').update(seed).digest('hex').slice(0, 8), 16);
+  return () => {
+    // Linear congruential generator — sufficient for seed determinism
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 0xffffffff;
+  };
+}
+
+function pickCategory(rng: () => number): string {
+  const roll = rng();
+  let cum = 0;
+  for (const bucket of CATEGORY_DISTRIBUTION) {
+    cum += bucket.weight;
+    if (roll < cum) {
+      // Return first pattern as canonical lookup (script will fuzzy-match)
+      return bucket.patterns[0];
+    }
+  }
+  return CATEGORY_DISTRIBUTION[0].patterns[0]; // Fallback
+}
+
+function pickProductFromBucket(
+  rng: () => number,
+  productsByCategory: Map<string, Array<{ id: string; price: number }>>,
+  bucketPatterns: string[],
+): { id: string; price: number } | null {
+  // Try each pattern; pool matching products
+  const pool: Array<{ id: string; price: number }> = [];
+  for (const pattern of bucketPatterns) {
+    for (const [cat, products] of productsByCategory) {
+      if (cat.toLowerCase().includes(pattern.toLowerCase())) {
+        pool.push(...products);
+      }
+    }
+  }
+  if (pool.length === 0) return null;
+  return pool[Math.floor(rng() * pool.length)];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main loop
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function main(): Promise<void> {
+  const client = new Client({ connectionString: DATABASE_URL });
+  await client.connect();
+
+  console.log('📦 S-09 T01 seed-historical-orders — Pareto distribution 6 months');
+  console.log(`   Target: ${TARGET_ORDER_COUNT} orders + ~${TARGET_ORDER_COUNT * 3} order_items`);
+  console.log('');
+
+  try {
+    // 1. Load products grouped by category (for Pareto pick)
+    const productsRes = await client.query<{
+      id: string;
+      category: string;
+      price: number;
+    }>(`SELECT id::text, category, price FROM products WHERE status = 'active'`);
+
+    const productsByCategory = new Map<string, Array<{ id: string; price: number }>>();
+    for (const p of productsRes.rows) {
+      if (!productsByCategory.has(p.category)) {
+        productsByCategory.set(p.category, []);
+      }
+      productsByCategory.get(p.category)!.push({ id: p.id, price: Number(p.price) });
+    }
+    console.log(`   Loaded ${productsRes.rows.length} active products across ${productsByCategory.size} categories`);
+
+    // 2. Load a customer user_id (any user role='customer' eligible)
+    const userRes = await client.query<{ id: string }>(
+      `SELECT id::text FROM users WHERE role = 'customer' LIMIT 1`,
+    );
+    if (userRes.rows.length === 0) {
+      throw new Error('No customer user found. Run base seed first: pnpm --filter @icp/seed run seed');
+    }
+    const customerUserId = userRes.rows[0].id;
+    console.log(`   Using customer user_id: ${customerUserId}`);
+
+    // 3. Generate orders deterministically
+    const rng = makeSeededRandom('S-09-T01-historical-seed-v1');
+    const nowMs = Date.now();
+    let ordersCreated = 0;
+    let itemsCreated = 0;
+    let skipped = 0;
+
+    for (let i = 1; i <= TARGET_ORDER_COUNT; i++) {
+      const idempotencyKey = `seed-historical-${i}`;
+
+      // Random timestamp in last 6 months
+      const ageMs = Math.floor(rng() * SIX_MONTHS_MS);
+      const createdAt = new Date(nowMs - ageMs);
+
+      // Order has 2-5 items (per typical cart)
+      const itemCount = 2 + Math.floor(rng() * 4);
+      const items: Array<{ product_id: string; qty: number; unit_price: number }> = [];
+      const seedCategory = pickCategory(rng); // Anchor category for this order
+      const anchorBucket = CATEGORY_DISTRIBUTION.find(b =>
+        b.patterns.includes(seedCategory),
+      ) || CATEGORY_DISTRIBUTION[0];
+
+      // First item: anchor category (drives co_purchase clustering)
+      const anchorProduct = pickProductFromBucket(
+        rng, productsByCategory, anchorBucket.patterns,
+      );
+      if (anchorProduct) {
+        items.push({
+          product_id: anchorProduct.id,
+          qty: 1 + Math.floor(rng() * 3),
+          unit_price: anchorProduct.price,
+        });
+      }
+
+      // Subsequent items: weighted random per Pareto (co-purchase signal)
+      for (let j = 1; j < itemCount; j++) {
+        const otherCat = pickCategory(rng);
+        const otherBucket = CATEGORY_DISTRIBUTION.find(b =>
+          b.patterns.includes(otherCat),
+        ) || CATEGORY_DISTRIBUTION[0];
+        const otherProduct = pickProductFromBucket(
+          rng, productsByCategory, otherBucket.patterns,
+        );
+        if (otherProduct && !items.find(it => it.product_id === otherProduct.id)) {
+          items.push({
+            product_id: otherProduct.id,
+            qty: 1 + Math.floor(rng() * 2),
+            unit_price: otherProduct.price,
+          });
+        }
+      }
+
+      if (items.length === 0) continue;
+
+      const total = items.reduce((sum, it) => sum + it.qty * it.unit_price, 0);
+
+      // Insert order with ON CONFLICT idempotency
+      await client.query('BEGIN');
+      try {
+        const orderRes = await client.query<{ id: string }>(
+          `INSERT INTO orders (user_id, status, total, idempotency_key, created_at, updated_at)
+           VALUES ($1, 'paid', $2, $3, $4, $4)
+           ON CONFLICT (idempotency_key) DO NOTHING
+           RETURNING id`,
+          [customerUserId, total, idempotencyKey, createdAt.toISOString()],
+        );
+
+        if (orderRes.rows.length === 0) {
+          skipped++;
+          await client.query('COMMIT');
+          continue;
+        }
+
+        const orderId = orderRes.rows[0].id;
+
+        for (const it of items) {
+          await client.query(
+            `INSERT INTO order_items (order_id, product_id, qty, unit_price)
+             VALUES ($1, $2, $3, $4)`,
+            [orderId, it.product_id, it.qty, it.unit_price],
+          );
+          itemsCreated++;
+        }
+
+        ordersCreated++;
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        console.warn(`   ⚠️  Failed order #${i}: ${err}`);
+      }
+
+      if (ordersCreated % 10 === 0 && ordersCreated > 0) {
+        console.log(`   ... ${ordersCreated}/${TARGET_ORDER_COUNT} orders, ${itemsCreated} items`);
+      }
+    }
+
+    console.log('');
+    console.log(`✅ Created ${ordersCreated} orders + ${itemsCreated} order_items`);
+    if (skipped > 0) {
+      console.log(`   Skipped ${skipped} (idempotency_key conflicts — re-run is no-op)`);
+    }
+    console.log('');
+    console.log('Verify via:');
+    console.log(`   psql -h localhost -U icp -d icp -c "SELECT COUNT(*) FROM orders WHERE status='paid'"`);
+    console.log(`   psql -h localhost -U icp -d icp -c "SELECT COUNT(*) FROM order_items"`);
+    console.log(`   Smoke co_purchased: python -c "from src.tools.analytics import co_purchased; print(co_purchased({'category':'mi_an_lien'}))"`);
+  } finally {
+    await client.end();
+  }
+}
+
+main().catch((err) => {
+  console.error('💥 FATAL:', err);
+  process.exit(1);
+});

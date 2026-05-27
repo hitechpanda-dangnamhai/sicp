@@ -1,0 +1,754 @@
+"""Intent 04 recommendation_products_by_images — 5-node LangGraph image recommendation.
+
+S-09 V-SLICE Phiên Sx09-C per D-S09-NN-A LAW + D-S09-NN-B LAW + D-S09-NN-C LAW
+(cornerstone) + 5 mid-task amendments C-S09-O/P/Q/R/S.
+
+Customer chụp ảnh sản phẩm → ICP trả 10 sản phẩm gợi ý kèm reason per item
+trong ~3 giây. Cross-modal CLIP-multilingual shared space pathway (image_description
+→ embed → image_embedding) eliminates separate image encoder per D-S09-NN-C LAW.
+
+Graph topology (5 nodes sequential per Pattern A reuse + S-04 D-S04-13 LAW):
+
+    START
+      ├─► vision_analyze       (Node 1)
+      │       └─► MCP vision.analyze (Gemini 2.5 Flash multimodal)
+      │           emit phase_progress {phase_id:1, label:"Đọc nội dung sản phẩm",
+      │                                meta:"Gemini Vision", status:"active"}
+      │           3-threshold blur check Ω₂ per C-S07-J reuse
+      │           → on blur/error: emit error E_VISION_BLUR → END
+      ├─► build_query_desc     (Node 2)
+      │       └─► template f"{category} {attrs} {ocr_text} brand:... flavor:..."
+      ├─► parallel_fetch       (Node 3 — asyncio.gather)
+      │       ├─► MCP vespa.image_nearest_neighbor (top 30 visual_sim + trend)
+      │       ├─► MCP analytics.co_purchased (top 20 collab freq per category)
+      │       └─► MCP analytics.product_corpus_size (dynamic N per C-S09-Q)
+      │           emit phase_progress {phase_id:2, label:"Tìm sản phẩm tương tự",
+      │                                meta:f"Đang so khớp với {N} sản phẩm shop..."}
+      ├─► blend_and_rank       (Node 4 — Python composite per D-S09-NN-A LAW)
+      │       composite_per_hit = 0.5*visual_sim + 0.3*collab_norm + 0.2*trending
+      │       attach sub_scores + match_type ∈ {visual, collab, trending}
+      │       top 30 sort, take top 10 for response
+      └─► attach_reasons       (Node 5 — parallel LLM Gemini 2.5 Flash)
+              emit phase_progress {phase_id:3, label:"Xếp hạng + sinh lý do gợi ý"}
+              asyncio.gather LLM calls 5s timeout (D-S04-15 LAW)
+              emit product_ready PER product (D-S04-14 LAW progressive)
+              emit products final canonical list + final event {detected, co_purchase_hint}
+              await saver.adelete_thread(rid)  (Strategy β fast-path cleanup)
+              → END
+
+Phase mapping LOCKED per C-S09-P + Rule 6 LAW (mockup intent-04-state-A-loading.html):
+    0 = upload    → "Tải ảnh lên"
+    1 = vision    → "Đọc nội dung sản phẩm" + meta "Gemini Vision"
+    2 = embed     → "Tìm sản phẩm tương tự" + DYNAMIC meta "Đang so khớp với {N} sản phẩm shop..."
+    3 = rank      → "Xếp hạng + sinh lý do gợi ý"
+
+NOTE: S-09 uses 0-indexed convention (S-04 canonical), NOT S-07 1-indexed.
+
+Signal blend weights per D-S09-NN-A LAW (default visual since uploaded image):
+    visual:   {v: 0.5, c: 0.3, t: 0.2}    (this graph default for BE composite)
+    collab:   {v: 0.2, c: 0.7, t: 0.1}    (FE client-side re-rank when chip toggled)
+    trending: {v: 0.2, c: 0.1, t: 0.7}
+
+Reuses 100% from S-04/S-07 emit per session handoff §6.4:
+    - state.IcpState — extended +4 S-09 transient fields per state.py B2 amendment
+    - tools.llm_client.get_llm_client + LLMTimeout — 5s default per D-S04-15 LAW
+    - tools.mcp_client.McpClient + McpError — JSON-RPC 2.0 client
+    - tools.redis_publisher.RedisPublisher — publish_sse helper
+    - prompts.load_prompt — for 3 NEW recommend_*.txt prompts
+    - importing_by_images.py:97-134 is_vision_blur_error — 3-threshold Ω₂ reuse
+    - importing_by_images.py:141-147 _current_trace_id — OTel trace helper reuse
+    - searching_by_text.py:878-1020 compile_X_graph pattern + Strategy β cleanup
+
+Reference:
+    - slices/S-09_decisions-log.md D-S09-NN-A/B/C/D/E LAW + C-S09-A..S
+    - slices/S-09_BRIEF.md Sections 3-6
+    - docs/phases/PHASE_05_RECO_ANALYTICS.md §B/C (image embedding + co_purchased)
+    - docs/mockups/intent-04/intent-04-state-A-loading.html lines 185-265
+    - apps/ai/src/graphs/intents/searching_by_text.py (Pattern A reference)
+    - apps/ai/src/graphs/intents/importing_by_images.py (image flow precedent)
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+from typing import Any
+
+import structlog
+from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command
+from opentelemetry import trace
+
+from ...state import IcpState
+from ...tools.llm_client import LLMError, LLMTimeout, get_llm_client
+from ...tools.mcp_client import McpClient, McpError
+from ...tools.redis_publisher import RedisPublisher
+from ...prompts import load_prompt
+
+_tracer = trace.get_tracer(__name__)
+_logger = structlog.get_logger()
+
+
+# ---------------------------------------------------------------------------
+# Constants per C-S09-P Rule 6 LAW + D-S09-NN-A LAW signal weights
+# ---------------------------------------------------------------------------
+
+# Phase ID mapping LOCKED per C-S09-P (mockup banner "4 phases: upload → vision
+# → embed → rank"). S-09 uses 0-indexed S-04 canonical (NOT S-07 1-indexed).
+_PHASE_IDS = {
+    "upload": 0,
+    "vision": 1,
+    "embed": 2,
+    "rank": 3,
+}
+
+# Mockup-literal phase labels per Rule 6 LAW + C-S09-P (intent-04-state-A-loading.html
+# lines 185-225 designer-locked). BE emits these literally; FE renders trustfully.
+_PHASE_LABELS = {
+    1: "Đọc nội dung sản phẩm",
+    2: "Tìm sản phẩm tương tự",
+    3: "Xếp hạng + sinh lý do gợi ý",
+}
+
+# Default signal weights per D-S09-NN-A LAW — visual mode (uploaded image).
+# FE composeBySignal() helper re-ranks client-side with same SIGNAL_WEIGHTS
+# constants when user toggles collab/trending chips.
+_SIGNAL_WEIGHTS = {
+    "visual":   {"v": 0.5, "c": 0.3, "t": 0.2},
+    "collab":   {"v": 0.2, "c": 0.7, "t": 0.1},
+    "trending": {"v": 0.2, "c": 0.1, "t": 0.7},
+}
+_DEFAULT_SIGNAL = "visual"
+
+# LLM timeouts per D-S04-15 LAW Sub-fix 4 calibration:
+_VISION_TIMEOUT_S = 15.0   # vision.analyze (mirrors importing_by_images.py:188)
+_REASON_TIMEOUT_S = 5.0    # attach_reasons per LLM call (D-S04-15 LAW)
+_BLEND_MAX_HITS = 30       # top N from visual_hits to blend
+_FINAL_MAX_PRODUCTS = 10   # top N for response per mockup state-0
+
+
+def _mcp_url() -> str:
+    """Resolve MCP service JSON-RPC endpoint from env."""
+    return os.getenv("MCP_URL", "http://mcp:5050/rpc")
+
+
+# ---------------------------------------------------------------------------
+# Helpers — reuse from importing_by_images.py per session handoff §6.4
+# ---------------------------------------------------------------------------
+
+def is_vision_blur_error(result: dict[str, Any]) -> bool:
+    """3-threshold blur detection per C-S07-J Ω₂ — reused from importing_by_images.py.
+
+    Triggers (ANY fires → blur error):
+      1. Overall confidence < 0.3
+      2. category in ('unknown', 'unreadable', '')
+      3. max(confidence_per_field.values()) < 0.4
+    """
+    if not isinstance(result, dict):
+        return True
+
+    overall = result.get("confidence", 0.0)
+    try:
+        if float(overall) < 0.3:
+            return True
+    except (TypeError, ValueError):
+        return True
+
+    category = str(result.get("category") or "").strip().lower()
+    if category in ("unknown", "unreadable", ""):
+        return True
+
+    field_confs = result.get("confidence_per_field") or {}
+    if isinstance(field_confs, dict) and field_confs:
+        try:
+            max_field_conf = max(float(v) for v in field_confs.values())
+            if max_field_conf < 0.4:
+                return True
+        except (TypeError, ValueError):
+            return True
+
+    return False
+
+
+def _current_trace_id() -> str:
+    """Get current OTel trace_id as 32-char hex string."""
+    span = trace.get_current_span()
+    ctx = span.get_span_context()
+    if ctx and ctx.is_valid:
+        return f"{ctx.trace_id:032x}"
+    return ""
+
+
+def _safe_gather(res: Any, default: Any, rid: str, tool: str) -> Any:
+    """Graceful degrade for asyncio.gather return_exceptions=True results.
+
+    Pattern reused from importing_by_images.py:303-309 `_safe()` helper.
+    """
+    if isinstance(res, Exception):
+        _logger.warning(
+            "recommend.tool_error",
+            request_id=rid,
+            tool=tool,
+            error=str(res),
+        )
+        return default
+    return res if res is not None else default
+
+
+# ===========================================================================
+# Node 1: vision_analyze — Gemini multimodal + blur check (reuses S-07 pattern)
+# ===========================================================================
+
+async def _node_vision_analyze(
+    state: IcpState,
+    publisher: RedisPublisher,
+    mcp_client: McpClient,
+) -> dict[str, Any] | Command:
+    """Call MCP vision.analyze on uploaded image → store _detected.
+
+    On blur/error: emit phase_progress error + error event → terminate graph.
+    """
+    rid = state["request_id"]
+    image_b64 = state.get("image_b64") or state.get("content", "")
+
+    if not image_b64:
+        _logger.error("recommend.vision.no_image", request_id=rid)
+        await publisher.publish_sse(rid, "error", {
+            "code": "VALIDATION_FAILED",
+            "message": "Thiếu dữ liệu ảnh (image_b64)",
+            "request_id": rid,
+            "trace_id": _current_trace_id(),
+        })
+        return Command(goto=END)
+
+    # Phase 1 active per C-S09-P + mockup state-A line 200
+    await publisher.publish_sse(rid, "phase_progress", {
+        "phase_id": _PHASE_IDS["vision"],
+        "status": "active",
+        "label": _PHASE_LABELS[1],
+        "meta": "Gemini Vision",
+    })
+
+    try:
+        result = await mcp_client.call(
+            "vision.analyze",
+            {"image_b64": image_b64, "timeout_s": _VISION_TIMEOUT_S},
+        )
+    except McpError as e:
+        _logger.warning("recommend.vision.mcp_error", request_id=rid, error=str(e))
+        await publisher.publish_sse(rid, "phase_progress", {
+            "phase_id": _PHASE_IDS["vision"], "status": "error",
+        })
+        await publisher.publish_sse(rid, "error", {
+            "code": "E_VISION_TIMEOUT",
+            "message": "Phân tích ảnh thất bại — vui lòng thử lại",
+            "details": {"retriable": True},
+            "request_id": rid,
+            "trace_id": _current_trace_id(),
+        })
+        return Command(goto=END)
+
+    # 3-threshold blur check Ω₂ per C-S07-J reuse
+    if is_vision_blur_error(result):
+        _logger.info(
+            "recommend.vision.blur_detected",
+            request_id=rid,
+            confidence=result.get("confidence"),
+            category=result.get("category"),
+        )
+        await publisher.publish_sse(rid, "phase_progress", {
+            "phase_id": _PHASE_IDS["vision"], "status": "error",
+        })
+        await publisher.publish_sse(rid, "error", {
+            "code": "E_VISION_BLUR",
+            "message": "Ảnh không đủ rõ để gợi ý — vui lòng chụp lại",
+            "details": {
+                "retriable": True,
+                "confidence": float(result.get("confidence", 0.0)),
+            },
+            "request_id": rid,
+            "trace_id": _current_trace_id(),
+        })
+        return Command(goto=END)
+
+    # Phase 1 done
+    await publisher.publish_sse(rid, "phase_progress", {
+        "phase_id": _PHASE_IDS["vision"], "status": "done",
+    })
+
+    # Surface detected context as `understanding` event (FE PhasesCard payload).
+    await publisher.publish_sse(rid, "understanding", {
+        "detected": {
+            "category": result.get("category"),
+            "attributes": result.get("attributes") or {},
+            "ocr_text": result.get("ocr_text", "")[:200],
+        },
+    })
+
+    _logger.info(
+        "recommend.vision.done",
+        request_id=rid,
+        category=result.get("category"),
+        confidence=result.get("confidence"),
+    )
+    return {"_detected": result}
+
+
+# ===========================================================================
+# Node 2: build_query_desc — template composition for Vespa CLIP embed input
+# ===========================================================================
+
+async def _node_build_query_desc(
+    state: IcpState,
+    publisher: RedisPublisher,
+) -> dict[str, Any]:
+    """Build composite query_desc text from vision.analyze result.
+
+    Template per session handoff §5.5 Block 5 Node 2:
+        f"{category} {attrs} {ocr_text} brand:... flavor:..."
+
+    This text is fed to vespa.image_nearest_neighbor → server-side CLIP
+    embed → 512-d vector → nearestNeighbor against image_embedding.
+    """
+    detected = state.get("_detected") or {}
+    category = detected.get("category", "") or ""
+    attributes = detected.get("attributes") or {}
+    ocr_text = (detected.get("ocr_text") or "")[:120]
+
+    parts: list[str] = []
+    if category and category != "unknown":
+        parts.append(category)
+    if ocr_text:
+        parts.append(ocr_text)
+    for key in ("brand", "flavor", "size", "color"):
+        val = attributes.get(key)
+        if val:
+            parts.append(f"{key}:{val}")
+
+    query_desc = " ".join(parts).strip()[:400]
+    if not query_desc:
+        query_desc = "sản phẩm tiêu dùng"  # fallback if vision returned nothing useful
+
+    _logger.info(
+        "recommend.build_query.done",
+        request_id=state["request_id"],
+        query_desc_len=len(query_desc),
+        category=category,
+    )
+    return {"_query_desc": query_desc}
+
+
+# ===========================================================================
+# Node 3: parallel_fetch — asyncio.gather 3 MCP tools per D-S09-NN-A LAW
+# ===========================================================================
+
+async def _node_parallel_fetch(
+    state: IcpState,
+    publisher: RedisPublisher,
+    mcp_client: McpClient,
+) -> dict[str, Any]:
+    """Parallel fetch 3 data sources:
+      1. vespa.image_nearest_neighbor → visual_hits (top 30 + sub-scores)
+      2. analytics.co_purchased → collab freq per co-bought category
+      3. analytics.product_corpus_size → dynamic N for phase_progress.meta (C-S09-Q)
+    """
+    rid = state["request_id"]
+    detected = state.get("_detected") or {}
+    category = detected.get("category", "") or ""
+    query_desc = state.get("_query_desc", "")
+
+    # ─── Step 1: query corpus size FIRST (needed for phase_progress.meta) ───
+    # This is intentionally outside gather so meta can be emitted accurately.
+    corpus_size_task = mcp_client.call("analytics.product_corpus_size", {})
+
+    # Visual + collab queries fired in parallel with corpus_size.
+    visual_task = mcp_client.call(
+        "vespa.image_nearest_neighbor",
+        {"query_desc": query_desc, "limit": _BLEND_MAX_HITS},
+    )
+    collab_task = mcp_client.call(
+        "analytics.co_purchased",
+        {"category": category or "mi_an_lien", "limit": 20},
+    )
+
+    results = await asyncio.gather(
+        visual_task, collab_task, corpus_size_task,
+        return_exceptions=True,
+    )
+    visual_res, collab_res, corpus_res = results
+
+    visual_data = _safe_gather(
+        visual_res, {"items": [], "total": 0}, rid, "vespa.image_nearest_neighbor",
+    )
+    collab_data = _safe_gather(
+        collab_res, {"items": [], "category": category}, rid, "analytics.co_purchased",
+    )
+    corpus_data = _safe_gather(
+        corpus_res, {"count": 50, "cached": False}, rid, "analytics.product_corpus_size",
+    )
+
+    # Phase 2 emit with DYNAMIC meta count per C-S09-O + C-S09-P + C-S09-Q
+    n_products = int(corpus_data.get("count", 50))
+    await publisher.publish_sse(rid, "phase_progress", {
+        "phase_id": _PHASE_IDS["embed"],
+        "status": "active",
+        "label": _PHASE_LABELS[2],
+        "meta": f"Đang so khớp với {n_products} sản phẩm shop...",
+    })
+
+    # Phase 2 done immediately (Vespa returned synchronously; FE sees progress beat)
+    await publisher.publish_sse(rid, "phase_progress", {
+        "phase_id": _PHASE_IDS["embed"], "status": "done",
+    })
+
+    _logger.info(
+        "recommend.parallel_fetch.done",
+        request_id=rid,
+        visual_hits=len(visual_data.get("items") or []),
+        collab_hits=len(collab_data.get("items") or []),
+        corpus_size=n_products,
+    )
+
+    return {
+        "_visual_hits": visual_data.get("items") or [],
+        "_co_purchased": collab_data.get("items") or [],
+    }
+
+
+# ===========================================================================
+# Node 4: blend_and_rank — Python composite per D-S09-NN-A LAW
+# ===========================================================================
+
+async def _node_blend_and_rank(
+    state: IcpState,
+    publisher: RedisPublisher,
+) -> dict[str, Any]:
+    """Compute composite score per visual hit; attach sub_scores + match_type.
+
+    composite = w_v * visual_sim + w_c * collab_norm + w_t * trending_score
+    where weights = _SIGNAL_WEIGHTS["visual"] (default BE signal).
+
+    collab_norm: collab_count[product_id] / max_collab_count (normalized 0-1).
+    match_type: dominant signal among {visual, collab, trending} per item.
+    """
+    rid = state["request_id"]
+    visual_hits = state.get("_visual_hits") or []
+    co_purchased = state.get("_co_purchased") or []
+
+    # Build collab freq lookup by product_id
+    collab_freq_by_id: dict[str, int] = {}
+    for item in co_purchased:
+        pid = item.get("product_id")
+        if pid:
+            collab_freq_by_id[pid] = int(item.get("freq", 0))
+
+    max_collab = max(collab_freq_by_id.values()) if collab_freq_by_id else 1
+    if max_collab <= 0:
+        max_collab = 1
+
+    weights = _SIGNAL_WEIGHTS[_DEFAULT_SIGNAL]
+    blended: list[dict[str, Any]] = []
+
+    for hit in visual_hits[:_BLEND_MAX_HITS]:
+        pid = hit.get("id") or hit.get("product_id", "")
+        sub_visual = float(hit.get("sub_scores", {}).get("visual_sim", 0.0))
+        sub_trend = float(hit.get("sub_scores", {}).get("trend_score", 0.0))
+        sub_collab_raw = int(collab_freq_by_id.get(pid, 0))
+        sub_collab_norm = sub_collab_raw / max_collab if max_collab > 0 else 0.0
+
+        composite = (
+            weights["v"] * sub_visual
+            + weights["c"] * sub_collab_norm
+            + weights["t"] * sub_trend
+        )
+
+        # Determine dominant signal (match_type) — which one contributed most?
+        contributions = {
+            "visual":   weights["v"] * sub_visual,
+            "collab":   weights["c"] * sub_collab_norm,
+            "trending": weights["t"] * sub_trend,
+        }
+        match_type = max(contributions, key=lambda k: contributions[k])
+
+        item_out = dict(hit)  # copy to preserve hit shape
+        item_out["match_score"] = composite
+        item_out["match_type"] = match_type
+        item_out["sub_scores"] = {
+            "visual_sim": sub_visual,
+            "collab_count": sub_collab_raw,
+            "trending_score": sub_trend,
+        }
+        blended.append(item_out)
+
+    # Sort by composite descending; take top 30 (final response truncates to 10)
+    blended.sort(key=lambda x: x["match_score"], reverse=True)
+    blended_top = blended[:_BLEND_MAX_HITS]
+
+    _logger.info(
+        "recommend.blend.done",
+        request_id=rid,
+        candidates=len(blended_top),
+        max_score=blended_top[0]["match_score"] if blended_top else 0.0,
+        signal=_DEFAULT_SIGNAL,
+    )
+    return {"_blended": blended_top}
+
+
+# ===========================================================================
+# Node 5: attach_reasons — parallel LLM + progressive product_ready streaming
+# ===========================================================================
+
+async def _gen_reason_for_product(
+    product: dict[str, Any], detected_category: str, llm_client: Any
+) -> str:
+    """Generate Vietnamese reason ≤60 chars per product via Gemini 2.5 Flash.
+
+    Reuse generate_reasons.txt pattern + 5s timeout per D-S04-15 LAW.
+    """
+    try:
+        prompt_template = load_prompt("recommend_attach_reason")
+    except Exception:
+        # Fallback prompt if recommend_attach_reason.txt missing (defensive)
+        prompt_template = (
+            "Viết 1 câu tiếng Việt ngắn (≤60 ký tự) giải thích vì sao sản phẩm "
+            "{product} phù hợp với yêu cầu ảnh thuộc loại {category}. Chỉ trả về "
+            "câu reason, không giải thích thêm."
+        )
+
+    rendered = prompt_template.format(
+        product=json.dumps({
+            "title": product.get("title", ""),
+            "category": product.get("category", ""),
+            "brand": product.get("brand", ""),
+            "price": product.get("price", 0),
+        }, ensure_ascii=False),
+        category=detected_category,
+        match_type=product.get("match_type", "visual"),
+    )
+
+    try:
+        raw = await llm_client.complete(
+            prompt=rendered,
+            timeout_s=_REASON_TIMEOUT_S,
+        )
+        # Strip JSON fences / quotes if model returned structured
+        text = str(raw).strip().strip('"').strip("'")
+        if text.startswith("{"):
+            try:
+                obj = json.loads(text)
+                text = obj.get("reason") or obj.get("text") or text
+            except json.JSONDecodeError:
+                pass
+        return text[:60] if text else _fallback_reason(product)
+    except (LLMTimeout, LLMError) as e:
+        _logger.warning(
+            "recommend.reason.llm_error",
+            product_id=product.get("id"),
+            error=str(e),
+        )
+        return _fallback_reason(product)
+
+
+def _fallback_reason(product: dict[str, Any]) -> str:
+    """Template fallback when LLM unavailable. Vietnamese, ≤60 chars."""
+    mt = product.get("match_type", "visual")
+    if mt == "collab":
+        return "Khách hay mua kèm sản phẩm tương tự"[:60]
+    if mt == "trending":
+        return "Đang được nhiều người quan tâm gần đây"[:60]
+    return "Hình dáng + danh mục khớp với ảnh bạn gửi"[:60]
+
+
+async def _node_attach_reasons(
+    state: IcpState,
+    publisher: RedisPublisher,
+    saver: AsyncRedisSaver,
+) -> dict[str, Any]:
+    """Generate Vietnamese reasons + emit product_ready per product progressively.
+
+    D-S04-14 LAW progressive streaming: emit each product_ready as soon as its
+    reason is ready (asyncio.as_completed pattern).
+
+    Final emit: products event (canonical list) + final event {detected, co_purchase_hint}.
+    Strategy β cleanup: await saver.adelete_thread(rid).
+    """
+    rid = state["request_id"]
+    blended = state.get("_blended") or []
+    detected = state.get("_detected") or {}
+    co_purchased = state.get("_co_purchased") or []
+    detected_category = detected.get("category", "") or ""
+
+    # Take top 10 for response per mockup state-0
+    top_products = blended[:_FINAL_MAX_PRODUCTS]
+    total = len(top_products)
+
+    # Phase 3 active per C-S09-P
+    await publisher.publish_sse(rid, "phase_progress", {
+        "phase_id": _PHASE_IDS["rank"],
+        "status": "active",
+        "label": _PHASE_LABELS[3],
+    })
+
+    llm_client = get_llm_client()
+
+    # Generate reasons in parallel; emit product_ready as each completes
+    async def _process_and_emit(idx: int, product: dict[str, Any]) -> dict[str, Any]:
+        reason = await _gen_reason_for_product(product, detected_category, llm_client)
+        product_with_reason = dict(product)
+        product_with_reason["reason"] = reason
+
+        # D-S04-14 LAW progressive emit
+        await publisher.publish_sse(rid, "product_ready", {
+            "item": product_with_reason,
+            "index": idx,
+            "total": total,
+        })
+        return product_with_reason
+
+    tasks = [
+        _process_and_emit(idx, prod)
+        for idx, prod in enumerate(top_products)
+    ]
+    final_products: list[dict[str, Any]] = []
+    for coro in asyncio.as_completed(tasks):
+        try:
+            result = await coro
+            final_products.append(result)
+        except Exception as e:
+            _logger.warning(
+                "recommend.product_ready.error", request_id=rid, error=str(e),
+            )
+
+    # Re-sort final_products by original blended order (as_completed may shuffle)
+    by_id = {p["id"]: p for p in final_products}
+    ordered_products = [by_id[p["id"]] for p in top_products if p.get("id") in by_id]
+
+    # Phase 3 done
+    await publisher.publish_sse(rid, "phase_progress", {
+        "phase_id": _PHASE_IDS["rank"], "status": "done",
+        "success_count": len(ordered_products), "total": total,
+    })
+
+    # Build co_purchase_hint payload (top 3 co-bought categories)
+    co_purchase_hint: dict[str, Any] | None = None
+    if co_purchased:
+        target_cats = list({
+            item.get("category") for item in co_purchased[:6]
+            if item.get("category") and item.get("category") != detected_category
+        })[:3]
+        if target_cats:
+            co_purchase_hint = {
+                "source_category": detected_category,
+                "target_categories": target_cats,
+                "confidence": min(1.0, len(co_purchased) / 20.0),
+            }
+
+    # Emit canonical products list
+    await publisher.publish_sse(rid, "products", {
+        "items": ordered_products,
+        "total": len(ordered_products),
+    })
+
+    # Emit final event with detected context + co_purchase_hint
+    await publisher.publish_sse(rid, "final", {
+        "detected": {
+            "category": detected_category,
+            "attributes": detected.get("attributes") or {},
+            "colors": detected.get("colors") or [],
+            "style_tags": detected.get("style_tags") or [],
+        },
+        "products": ordered_products,
+        "co_purchase_hint": co_purchase_hint,
+    })
+
+    # Strategy β fast-path cleanup per D-S04-13 LAW
+    try:
+        await saver.adelete_thread(rid)
+    except Exception as e:
+        _logger.warning("recommend.saver.cleanup_error", request_id=rid, error=str(e))
+
+    _logger.info(
+        "recommend.final.done",
+        request_id=rid,
+        products_count=len(ordered_products),
+        has_co_purchase_hint=co_purchase_hint is not None,
+    )
+    return {"_terminated": True}
+
+
+# ===========================================================================
+# Graph compile — Pattern A reference compile_searching_by_text_graph
+# ===========================================================================
+
+def compile_recommend_by_images_graph(
+    saver: AsyncRedisSaver,
+    publisher: RedisPublisher,
+) -> Any:
+    """Compile the 5-node recommend_by_images graph.
+
+    Per D-S04-13 LAW Pattern A + Sx04-7 fix: caller owns saver lifecycle.
+    Per D-S09-NN-B LAW: each upload = new graph run + new request_id (FE-side).
+
+    Args:
+        saver:      AsyncRedisSaver already entered + asetup() called.
+        publisher:  RedisPublisher (lazy-init OK).
+
+    Returns:
+        Compiled LangGraph ready for `.astream(initial_state, config)`.
+    """
+    # Bind mcp_client lazily — one client per compiled graph instance
+    # C-S09-AJ Phiên Sx09-C: explicit timeout_s=30.0 (mirror S-07 ship
+    # importing_by_images.py:1024). Default 10s causes httpx ReadTimeout
+    # before MCP vision.analyze (15s Gemini) can complete, especially with
+    # larger image payloads (271KB JPEG) trigger cold-start latency.
+    mcp_client = McpClient(_mcp_url(), timeout_s=30.0)
+
+    # Wrap node closures binding publisher + mcp_client + saver where needed
+    async def n_vision_analyze(s: IcpState) -> Any:
+        return await _node_vision_analyze(s, publisher, mcp_client)
+
+    async def n_build_query_desc(s: IcpState) -> dict[str, Any]:
+        return await _node_build_query_desc(s, publisher)
+
+    async def n_parallel_fetch(s: IcpState) -> dict[str, Any]:
+        return await _node_parallel_fetch(s, publisher, mcp_client)
+
+    async def n_blend_and_rank(s: IcpState) -> dict[str, Any]:
+        return await _node_blend_and_rank(s, publisher)
+
+    async def n_attach_reasons(s: IcpState) -> dict[str, Any]:
+        return await _node_attach_reasons(s, publisher, saver)
+
+    g = StateGraph(IcpState)
+    g.add_node("vision_analyze", n_vision_analyze)
+    g.add_node("build_query_desc", n_build_query_desc)
+    g.add_node("parallel_fetch", n_parallel_fetch)
+    g.add_node("blend_and_rank", n_blend_and_rank)
+    g.add_node("attach_reasons", n_attach_reasons)
+
+    # Edges: linear 5-node sequential per session handoff §5.5 Block 5
+    # C-S09-AE Phiên Sx09-C fix: Replace static add_edge with add_conditional_edges
+    # after Node 1 vision_analyze. Static edge force-overrides Command(goto=END)
+    # returned by Node 1 blur/timeout handlers → graph continues to Node 2-5 with
+    # empty state and emits useless phase_progress + final events. Mirror S-07
+    # ship pattern (importing_by_images.py:1066-1069) using router function.
+    #
+    # Router check: Node 1 success path sets state["_detected"] (vision result).
+    # Blur/timeout path returns Command(goto=END) which doesn't update state →
+    # _detected stays None → router routes to END.
+    def _route_after_vision(state: IcpState) -> str:
+        return "build_query_desc" if state.get("_detected") else END
+
+    g.add_edge(START, "vision_analyze")
+    g.add_conditional_edges("vision_analyze", _route_after_vision, {
+        "build_query_desc": "build_query_desc",
+        END: END,
+    })
+    g.add_edge("build_query_desc", "parallel_fetch")
+    g.add_edge("parallel_fetch", "blend_and_rank")
+    g.add_edge("blend_and_rank", "attach_reasons")
+    g.add_edge("attach_reasons", END)
+
+    return g.compile(checkpointer=saver)

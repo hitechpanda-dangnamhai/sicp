@@ -1125,10 +1125,8 @@ def image_nearest_neighbor(params: dict[str, Any]) -> dict[str, Any]:
     body = {
         "yql": yql,
         "desc": query_desc,
-        # Vespa embedder: input.query(query_embedding) = embed(clip_multilingual, @desc)
-        # S-09 C-S09-V fix: services.xml has 2 embedders (clip_multilingual +
-        # cross_encoder_tokenizer) → MUST use explicit embedder ID syntax.
-        "input.query(query_embedding)": "embed(clip_multilingual, @desc)",
+        # Vespa embedder: input.query(query_embedding) = embed(@desc, clip_multilingual)
+        "input.query(query_embedding)": "embed(desc)",
         "ranking.profile": "image_recommendation",
         "hits": limit,
         "timeout": "3s",

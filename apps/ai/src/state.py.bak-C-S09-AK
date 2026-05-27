@@ -251,13 +251,11 @@ class IcpState(TypedDict, total=False):
     # Underscore-prefixed per Phiên Sx04-7 declare-or-drop pattern (NOT surfaced to SSE).
     # Populated by recommend_by_images.py 5-node graph in order:
     #   _detected      ← Node 1 (vision_analyze MCP call result)
-    #   _query_desc    ← Node 2 (build_query_desc — composite template for Vespa CLIP)
     #   _visual_hits   ← Node 3 parallel (vespa.image_nearest_neighbor top 30)
     #   _co_purchased  ← Node 3 parallel (analytics.co_purchased category top 20)
     #   _blended       ← Node 4 (composite + sub_scores + match_type attached)
     # Final products event emitted from _blended after Node 5 attach_reasons.
     _detected: dict           # vision.analyze result {category, attributes, ocr_text, confidence, ...}
-    _query_desc: str          # C-S09-AK Phiên Sx09-C: composite text from Node 2 → Node 3 MCP visual fetch
     _visual_hits: list        # MCP image_nearest_neighbor top 30 with sub-scores
     _co_purchased: list       # MCP analytics.co_purchased top 20 with freq
     _blended: list            # blend_and_rank node output top 30 with composite + match_type

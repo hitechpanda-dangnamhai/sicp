@@ -1,0 +1,231 @@
+#!/usr/bin/env tsx
+/**
+ * scripts/seed-product-images.ts — S-09 D-S09-NN-D LAW Step 1 seed pipeline.
+ *
+ * Slice: S-09 First Image-Based Product Recommendation (Intent 04 V-SLICE).
+ * Task:  T01 Block 2 — Seed image data 2-step pipeline (Step 1 of 2).
+ *
+ * Purpose: populate `products.image_data` TEXT column (V010 migration shipped
+ * S-07 Phiên Sx07-D per C-S07-B) with base64-encoded placeholder PNG so the
+ * Step 2 backfill script (`backfill-image-descriptions.ts`) can pass image
+ * data to `vision.analyze` MCP tool.
+ *
+ * Why 2-step pipeline (D-S09-NN-D LAW):
+ *   Step 1 (this file) → populates PG `image_data` column from placeholder PNG
+ *   Step 2 → reads `image_data`, calls vision.analyze, POSTs Vespa update
+ *            with `image_description` text field, which triggers Vespa native
+ *            indexing-time `embed clip_multilingual` to populate `image_embedding`
+ *
+ * Idempotency contract (per Rule 4 + D-S09-NN-D LAW step 1 guarantee):
+ *   Lần 1: ~60 products updated (WHERE image_data IS NULL)
+ *   Lần 2: 0 updated, all skipped (WHERE clause filters)
+ *
+ * Placeholder generation strategy (Hackathon-pragmatic):
+ *   Generate a deterministic gradient PNG per product using `image_gradient`
+ *   field (e.g., "from-rose-100 to-rose-200" → rose tones) — produces visually
+ *   distinguishable placeholders that vision.analyze can still extract category
+ *   hints from (title is included in OCR-like context downstream). Pure Node
+ *   stdlib (no canvas, no sharp) — generates a 256x256 single-color PNG using
+ *   minimal PNG encoder logic. Color derived from product category hash.
+ *
+ * Usage:
+ *   pnpm tsx scripts/seed-product-images.ts
+ *   DATABASE_URL=postgres://icp:icp@localhost:5432/icp tsx scripts/seed-product-images.ts
+ *
+ * Decision references:
+ *   - D-S09-NN-D LAW (slices/S-09_decisions-log.md §1) — 2-step pipeline mandatory
+ *   - C-S07-B (slices/S-07_decisions-log.md) — V010 image_data inline base64
+ *   - PHASE_05_RECO_ANALYTICS.md §B Image Embedding Pipeline (S-09 scope)
+ */
+
+import { Client } from 'pg';
+import { config as loadEnv } from 'dotenv';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { createHash } from 'crypto';
+import { deflateSync } from 'zlib';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Env + path setup (D-05 ESM module + bundler resolution)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+loadEnv({ path: join(__dirname, '../.env') });
+
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  console.error('ERROR: DATABASE_URL not set. Check .env or export the var.');
+  console.error('Expected format: postgres://icp:icp@localhost:5432/icp');
+  process.exit(1);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Minimal PNG encoder (256x256 solid color) — pure Node stdlib, no native deps
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// PNG file format (per https://www.w3.org/TR/PNG/):
+//   8-byte signature + IHDR chunk + IDAT chunk (zlib-compressed) + IEND chunk
+// Each chunk: 4-byte length + 4-byte type + data + 4-byte CRC32.
+//
+// For seed purposes a 256x256 solid color is sufficient — vision.analyze will
+// see category-correlated color + title text concat context → still produces
+// usable image_description.
+
+const PNG_SIGNATURE = Buffer.from([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+]);
+
+function crc32(buf: Buffer): number {
+  let crc = 0xffffffff;
+  for (let i = 0; i < buf.length; i++) {
+    crc ^= buf[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (~crc) >>> 0;
+}
+
+function pngChunk(type: string, data: Buffer): Buffer {
+  const typeBuf = Buffer.from(type, 'ascii');
+  const lengthBuf = Buffer.alloc(4);
+  lengthBuf.writeUInt32BE(data.length, 0);
+  const crcInput = Buffer.concat([typeBuf, data]);
+  const crcBuf = Buffer.alloc(4);
+  crcBuf.writeUInt32BE(crc32(crcInput), 0);
+  return Buffer.concat([lengthBuf, typeBuf, data, crcBuf]);
+}
+
+function generatePngSolidColor(r: number, g: number, b: number): Buffer {
+  const width = 256;
+  const height = 256;
+
+  // IHDR: width(4) + height(4) + bit_depth(1) + color_type(1) + compression(1) + filter(1) + interlace(1)
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(width, 0);
+  ihdr.writeUInt32BE(height, 4);
+  ihdr[8] = 8;   // bit depth
+  ihdr[9] = 2;   // color type: RGB
+  ihdr[10] = 0;  // compression
+  ihdr[11] = 0;  // filter
+  ihdr[12] = 0;  // interlace
+
+  // IDAT: each scanline = 1 filter byte (0=None) + width*3 RGB bytes
+  const rowLength = 1 + width * 3;
+  const rawData = Buffer.alloc(rowLength * height);
+  for (let y = 0; y < height; y++) {
+    const offset = y * rowLength;
+    rawData[offset] = 0; // filter: None
+    for (let x = 0; x < width; x++) {
+      const px = offset + 1 + x * 3;
+      rawData[px] = r;
+      rawData[px + 1] = g;
+      rawData[px + 2] = b;
+    }
+  }
+  const idatCompressed = deflateSync(rawData);
+
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', idatCompressed),
+    pngChunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
+/**
+ * Derive RGB color from category string + optional image_gradient hint.
+ * Deterministic — same category always produces same color (idempotent seed).
+ */
+function colorFromCategory(category: string, hint?: string | null): { r: number; g: number; b: number } {
+  const seed = `${category}|${hint || ''}`;
+  const hash = createHash('sha256').update(seed).digest();
+  // Use mid-saturation tones (avoid pure black/white) for visual variety
+  const r = 80 + (hash[0] % 175);
+  const g = 80 + (hash[1] % 175);
+  const b = 80 + (hash[2] % 175);
+  return { r, g, b };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main loop
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function main(): Promise<void> {
+  const client = new Client({ connectionString: DATABASE_URL });
+  await client.connect();
+
+  console.log('🌱 S-09 T01 seed-product-images — Step 1/2 image_data backfill');
+  console.log('   Idempotent: targets WHERE image_data IS NULL');
+  console.log('');
+
+  try {
+    // Fetch all products WHERE image_data IS NULL (idempotency guard).
+    const res = await client.query<{
+      id: string;
+      title: string;
+      category: string;
+      image_gradient: string | null;
+    }>(
+      `SELECT id::text, title, category, image_gradient
+       FROM products
+       WHERE image_data IS NULL`,
+    );
+
+    const targets = res.rows;
+    const totalEligible = targets.length;
+
+    if (totalEligible === 0) {
+      console.log('✅ 0 products need seeding (all image_data populated).');
+      console.log('   Re-run will be no-op (idempotent).');
+      return;
+    }
+
+    console.log(`📦 ${totalEligible} products eligible for seeding`);
+    let updated = 0;
+    let failed = 0;
+
+    for (const p of targets) {
+      try {
+        const { r, g, b } = colorFromCategory(p.category, p.image_gradient);
+        const pngBuf = generatePngSolidColor(r, g, b);
+        const base64 = pngBuf.toString('base64');
+        // Match S-07 C-S07-G base64-in-content multipart pattern shape
+        // (data:image/png;base64,...) for parity with vision.analyze input contract.
+        const dataUri = `data:image/png;base64,${base64}`;
+
+        await client.query(
+          `UPDATE products
+           SET image_data = $1
+           WHERE id = $2 AND image_data IS NULL`,
+          [dataUri, p.id],
+        );
+        updated++;
+
+        if (updated % 10 === 0) {
+          console.log(`   ... ${updated}/${totalEligible} done`);
+        }
+      } catch (err) {
+        failed++;
+        console.error(`   ❌ Failed product ${p.id} (${p.title}): ${err}`);
+      }
+    }
+
+    console.log('');
+    console.log(`✅ Seeded ${updated}/${totalEligible} products`);
+    if (failed > 0) {
+      console.warn(`⚠️  ${failed} failures (see above)`);
+    }
+    console.log(`   Skipped (already populated): ${totalEligible - updated - failed}`);
+    console.log('');
+    console.log('Next: pnpm tsx scripts/backfill-image-descriptions.ts');
+  } finally {
+    await client.end();
+  }
+}
+
+main().catch((err) => {
+  console.error('💥 FATAL:', err);
+  process.exit(1);
+});

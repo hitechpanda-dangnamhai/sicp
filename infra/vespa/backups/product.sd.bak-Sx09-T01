@@ -113,22 +113,30 @@ schema product {
       indexing: attribute
     }
 
-    # === Image semantics — image_description IN doc block, image_embedding
-    # === synthetic OUTSIDE block per D-S09-NN-C LAW + C-S09-R Phiên Sx09-C ==
-    # S-09 cross-modal CLIP pathway: Gemini Vision describes uploaded image
-    # → builds image_description text → Vespa indexing-time embed via shared
-    # CLIP-multilingual model produces image_embedding 512-d in SAME vector
-    # space as text_embedding. Enables visual recommendation without separate
-    # image encoder (D-S09-NN-C LAW retracts vision.embed MCP tool).
+    # === Embeddings — text_embedding is OUTSIDE document block (synthetic) ==
+    # text_embedding moved out of document block per Vespa schema validation
+    # (Phiên Sx04-2 Bước 4 mid-smoke reality finding): "Indexing expression
+    # 'embed clip_multilingual' attempts to modify the value of the document
+    # field 'text_embedding'. Use a field outside the document block instead."
+    # See synthetic-field declaration AFTER document closing brace below.
     #
-    # Backfill 2-step pipeline mandatory (D-S09-NN-D LAW):
-    #   1. scripts/seed-product-images.ts → populates products.image_data base64
-    #   2. scripts/backfill-image-descriptions.ts → vision.analyze → POST Vespa
-    #      update fields.image_description → triggers native indexing-time embed
+    # image_embedding stays IN document block (no embed expression at S-04;
+    # fed empty/absent via vespa-feed.ts; S-07 will refactor to synthetic
+    # field with image-input embed expression). Kept now as 512-dim
+    # placeholder maintaining ADR-036 symmetric HNSW configuration.
     # C20: HNSW symmetric between text_embedding + image_embedding for ANN
     # performance parity (image search = Intent 01 primary use case).
-    field image_description type string {
-      indexing: attribute | summary
+    field image_embedding type tensor<float>(x[512]) {
+      indexing: attribute | index
+      attribute {
+        distance-metric: angular
+      }
+      index {
+        hnsw {
+          max-links-per-node: 16
+          neighbors-to-explore-at-insert: 200
+        }
+      }
     }
 
     # === Trend + temporal ==================================================
@@ -198,27 +206,6 @@ schema product {
   # See https://docs.vespa.ai/en/embedding.html and schemas reference.
   field text_embedding type tensor<float>(x[512]) {
     indexing: input title . " " . input description | embed clip_multilingual | attribute | index
-    attribute {
-      distance-metric: angular
-    }
-    index {
-      hnsw {
-        max-links-per-node: 16
-        neighbors-to-explore-at-insert: 200
-      }
-    }
-  }
-
-  # === Image embedding synthetic field (S-09 Phiên Sx09-C) ================
-  # Per D-S09-NN-C LAW + C-S09-R: image_embedding moved OUTSIDE doc block
-  # (synthetic field) with embed expression deriving from image_description
-  # text field. Vespa native CLIP-multilingual produces 512-d vector in SAME
-  # shared vector space as text_embedding (cross-modal). Backfill 2-step:
-  # seed-product-images.ts (image_data) → backfill-image-descriptions.ts
-  # (vision.analyze → image_description → POST update triggers native
-  # indexing-time embed). HNSW symmetric per C20 + ADR-036.
-  field image_embedding type tensor<float>(x[512]) {
-    indexing: input image_description | embed clip_multilingual | attribute | index
     attribute {
       distance-metric: angular
     }
@@ -314,25 +301,6 @@ schema product {
     }
     first-phase {
       expression: closeness(field, image_embedding)
-    }
-  }
-
-  # S-09 NEW Phiên Sx09-C per C-S09-R Option B: ADD parallel image_recommendation
-  # profile (KEEP image_similarity untouched cho forward-compat S-04 image search
-  # extension + S-08 voice-buy cross-modal reuse). Composite blend stays in AI
-  # graph Python blend_and_rank node per TASKLIST line 74 + D-S09-NN-A LAW
-  # (NO Vespa second-phase composite — would be overwritten by Python).
-  # summary-features expose closeness + trend_score for sub_scores extraction.
-  rank-profile image_recommendation {
-    inputs {
-      query(query_embedding) tensor<float>(x[512])
-    }
-    first-phase {
-      expression: closeness(field, image_embedding)
-    }
-    summary-features {
-      closeness(field, image_embedding)
-      attribute(trend_score)
     }
   }
 

@@ -16,6 +16,11 @@
  * - `products` NEW S-07 T02 (Phiên Sx07-F per Q5 option b + C-S07-Q):
  *   `ProductDraftSchema` + `ProductSchema` + `CANONICAL_CATEGORIES` —
  *   FE PrefillForm zodResolver consumer; same dual access pattern.
+ * - `recommendations` NEW S-09 T01 (Phiên Sx09-C per D-S09-NN-A LAW + C-S09-G/H):
+ *   `RecommendedProductSchema` + `RecommendationResponseSchema` + `SubScoresSchema`
+ *   + `MatchTypeSchema` + `RecommendationErrorCodeSchema` + `SIGNAL_WEIGHTS`
+ *   const + `composeBySignal()` helper — Intent 04 image recommendation FE
+ *   carousel + client-side filter chip re-rank consumer; same dual access.
  *
  * **Dual access pattern (S-02 T06 — C-34 RESOLVED, T07 extends to ./sse, T01 extends to ./cart, T02 S-07 extends to ./products):**
  * - **Frontend** (`apps/web`, Next.js bundler with `moduleResolution: bundler`):
@@ -50,6 +55,7 @@
  * Patched S-02 T07 (C-32 extension: dual access for sse/).
  * Patched S-05 T01 Phiên Sx05-1 (D-S05-02 LAW: cart.ts Cart entity Zod schema + dual access pattern).
  * Patched S-07 T02 Phiên Sx07-F (Q5 option b: products.ts ProductDraftSchema + dual access pattern).
+ * Patched S-09 T01 Phiên Sx09-C (D-S09-NN-A LAW + C-S09-G/H: recommendations.ts Intent 04 schemas + dual access pattern).
  */
 
 export * from './primitives';
@@ -58,3 +64,4 @@ export * from './behavior';
 export * from './sse';
 export * from './cart';
 export * from './products';
+export * from './recommendations';
