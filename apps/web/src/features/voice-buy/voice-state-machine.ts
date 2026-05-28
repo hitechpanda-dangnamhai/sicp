@@ -107,6 +107,7 @@ export type VoicePhase =
   | 'cart-ready'
   | 'clarifying'
   | 'cart-added'
+  | 'cart-removed'
   | 'no-match'
   | 'error';
 
@@ -338,15 +339,24 @@ export function reduceState(state: VoiceState, action: VoiceAction): VoiceState 
       };
     }
 
-    case 'cart_updated':
-      // Cart mutated → state-E cart-added.
+    case 'cart_updated': {
+      // Cart mutated. BE emits two distinct cart_updated shapes (verified
+      // buying_by_voices.py): add/update_qty path (bulk_cart_commit) →
+      // { committed_count, action }; remove path (voice_cart_remove) →
+      // { removed_count } (no committed_count, no action). FE must NOT treat
+      // a remove as "Đã thêm" (bug #4 Sx08-I). Detect remove defensively by
+      // the presence of removed_count → state-removed; else state-E added.
+      const p = action.payload as Record<string, unknown>;
+      const isRemove =
+        typeof p.removed_count === 'number' && p.committed_count === undefined;
       return {
         ...state,
-        phase: 'cart-added',
+        phase: isRemove ? 'cart-removed' : 'cart-added',
         cartUpdated: action.payload,
         pendingInterrupt: null,
         clarifyOptions: null,
       };
+    }
 
     case 'co_purchase_hint':
       return { ...state, coPurchaseHint: action.payload };

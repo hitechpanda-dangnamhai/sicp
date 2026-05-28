@@ -151,6 +151,23 @@ function voiceAddedCount(
   return fallback;
 }
 
+/**
+ * Số món vừa xóa khỏi giỏ ở state-removed (bug #4 fix Sx08-I).
+ *
+ * BE remove path (voice_cart_remove) emit cart_updated.removed_count (truth).
+ * typed SSE passthrough rỗng → đọc defensive, KHÔNG bịa số. Fallback 1 (đã
+ * verify BE chỉ remove khi match được item → tối thiểu 1 khi vào nhánh này).
+ */
+function voiceRemovedCount(
+  cartUpdated: Record<string, unknown> | null,
+): number {
+  if (cartUpdated) {
+    const rc = (cartUpdated as { removed_count?: unknown }).removed_count;
+    if (typeof rc === 'number' && rc >= 0) return rc;
+  }
+  return 1;
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function Intent02VoiceBuyPage(): React.ReactElement {
@@ -629,6 +646,32 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
                 </div>
               );
             })()}
+
+            {/* bottom-bar: hint (mockup state-D) + escape "Nói món khác"
+                (UX gap — mockup khóa clarify không lối thoát; KING OF LAW:
+                user không thích cả 3 loại → reset về state-0 mic để nói lại). */}
+            <div className="mt-auto flex items-center gap-2.5 pt-3">
+              <div className="flex-1 flex items-center justify-center gap-1.5 bg-white border-[0.5px] border-dashed border-icp-pink-200 rounded-[14px] py-3 px-3.5 text-[12px] font-semibold text-icp-pink-700">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="9 11 12 14 22 4" />
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                </svg>
+                Chọn 1 loại để tiếp tục
+              </div>
+              <button
+                type="button"
+                onClick={handleStartListening}
+                aria-label="Nói món khác"
+                className="flex items-center gap-1.5 rounded-[14px] py-3 px-3.5 bg-gradient-to-r from-icp-pink-50 to-icp-amber-50 border-[0.5px] border-icp-pink-200 text-icp-pink-700 font-semibold text-[12px] active:scale-95 transition-transform"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                </svg>
+                Nói món khác
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -693,6 +736,56 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
                 className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-icp-pink-500 to-icp-amber-400 text-white font-bold text-[14px] shadow-[0_6px_16px_rgba(233,30,99,0.3)]"
               >
                 Thanh toán →
+              </button>
+            </div>
+          </div>
+            );
+          })()
+        ) : null}
+
+        {/* ═══ state-removed: cart-removed (bug #4 fix Sx08-I) ═══ */}
+        {state.phase === 'cart-removed' ? (
+          (() => {
+            const removedCount = voiceRemovedCount(
+              state.cartUpdated as Record<string, unknown> | null,
+            );
+            return (
+          <div className="flex-1 flex flex-col gap-3 pt-2">
+            <div className="flex justify-end">
+              <CartCountPill bump deltaLabel={`−${removedCount}`} onClick={() => router.push('/intent-05')} />
+            </div>
+
+            <div className="flex gap-2">
+              <Avatar role="ai" />
+              <ConversationBubble
+                role="ai"
+                text={
+                  <>
+                    Đã xóa <strong>{removedCount} món</strong> khỏi giỏ.
+                    {cart?.totals ? (
+                      <span className="block mt-1 font-mono text-[13px]">
+                        Tổng giỏ: {cart.totals.total.toLocaleString('vi-VN')}₫
+                      </span>
+                    ) : null}
+                  </>
+                }
+              />
+            </div>
+
+            <div className="flex gap-3 mt-2">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="flex-1 py-3 rounded-2xl bg-white border-[0.5px] border-icp-pink-200 text-icp-pink-700 font-semibold text-[14px]"
+              >
+                Mua tiếp
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push('/intent-05')}
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-icp-pink-500 to-icp-amber-400 text-white font-bold text-[14px] shadow-[0_6px_16px_rgba(233,30,99,0.3)]"
+              >
+                Xem giỏ →
               </button>
             </div>
           </div>
