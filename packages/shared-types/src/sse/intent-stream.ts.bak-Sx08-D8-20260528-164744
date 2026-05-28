@@ -612,54 +612,6 @@ export const SseVoiceTranscribedEvent = z.object({
   language: z.string().default('vi'),
 });
 
-/**
- * `voice_clarify_options` SSE event — emitted by buying_by_voices.py BEFORE
- * each Pattern A `interrupt()` (C-S08-R). The LangGraph `interrupt()` payload
- * NEVER reaches FE (main.py discards astream chunks), so the chip-row data for
- * the CURRENT ambiguous target is delivered via THIS SSE event instead.
- *
- * **T02 FE BINDING CONTRACT (Strongest Law — FE MUST follow BE):**
- *  - FE reads chip-row state-D from THIS event, NOT from interrupt/resume.
- *  - BE emits ONE target per round inside `ambiguous_items` (multi-round
- *    clarify loop, C-S08-S); `resolved`/`total` render "k / N món" progress.
- *  - Each candidate uses `match_score` (NOT `score` — Vespa never returns it,
- *    C-S08-Q/Y). All candidate fields nullable (read verbatim from Vespa hit).
- *  - Resume POST /intent/{rid}/action sends `{choice:'clarify_pick',
- *    value:{product_id}}` (clarify_pick is the 11th choice enum value, C-S08-O).
- *
- * @see apps/ai/src/graphs/intents/buying_by_voices.py (_voice_candidate_chip
- *      + clarify_payload, Phiên Sx08-D3 C-S08-R; verified Sx08-D8)
- * @see docs/mockups/intent-02/intent-02-state-D-clarify.html (.opt-chip)
- */
-export const SseVoiceClarifyCandidate = z.object({
-  id: z.string().nullable(),
-  title: z.string().nullable(),
-  price: z.number().nullable(),
-  original_price: z.number().nullable(),
-  rating: z.number().nullable(),
-  rating_count: z.number().nullable(),
-  sold_count: z.number().nullable(),
-  stock: z.number().nullable(),
-  brand: z.string().nullable(),
-  image_url: z.string().nullable(),
-  image_icon: z.string().nullable(),
-  image_gradient: z.string().nullable(),
-  match_score: z.number().nullable(),
-});
-
-export const SseVoiceClarifyOptionsEvent = z.object({
-  type: z.literal('voice_clarify_options'),
-  request_id: z.string(),
-  resolved: z.number(),
-  total: z.number(),
-  ambiguous_items: z.array(z.object({
-    item_idx: z.number(),
-    query: z.string(),
-    qty: z.number(),
-    candidates: z.array(SseVoiceClarifyCandidate),
-  })),
-});
-
 // ---------------------------------------------------------------------------
 // Type registry — handler signature lookup for `streamIntent()` wrapper
 // ---------------------------------------------------------------------------
@@ -708,8 +660,6 @@ export type IntentStreamEventMap = {
   shopee_compare: z.infer<typeof SseShopeeCompareEvent>;
   // S-08 T01 NEW 1 (Phiên Sx08-D per D-S08-NN-02 LAW)
   voice_transcribed: z.infer<typeof SseVoiceTranscribedEvent>;
-  // S-08 T01 C-S08-R (Phiên Sx08-D3; TS sync Sx08-D8)
-  voice_clarify_options: z.infer<typeof SseVoiceClarifyOptionsEvent>;
 };
 
 /** Union of typed event names — used in `streamIntent(handlers)` key constraint. */
@@ -750,6 +700,4 @@ export const IntentStreamSchemas = {
   shopee_compare: SseShopeeCompareEvent,
   // S-08 T01 NEW 1 (Phiên Sx08-D per D-S08-NN-02 LAW)
   voice_transcribed: SseVoiceTranscribedEvent,
-  // S-08 T01 C-S08-R (Phiên Sx08-D3; TS sync Sx08-D8)
-  voice_clarify_options: SseVoiceClarifyOptionsEvent,
 } as const;
