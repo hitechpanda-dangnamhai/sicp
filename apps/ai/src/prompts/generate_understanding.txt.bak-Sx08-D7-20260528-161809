@@ -24,19 +24,10 @@ MOCKUP TARGET (intent-03B-state-0-happy line 158 — for query "nước tương
    "Anh cần **nước tương đậm đặc** phù hợp ăn phở — loại thường dùng kèm
     theo ớt và chanh. Em chọn những sản phẩm có độ đạm cao, vị đậm."
 
-5. SET is_product_reference: bool. true ONLY if the query names a
-   CONCRETE grocery product a store could stock; false for nonsense,
-   vague, or non-grocery queries (D-S08-NN-15 LAW intent-gate).
-6. SET suggested_real_query: when is_product_reference is false, GUESS
-   the real grocery product the user likely meant, as a short search
-   query string (WOW "Em doan anh can X"). When true, set to "".
-
 OUTPUT (strict JSON, no markdown fences, no commentary):
 {{
   "text": "<full understanding sentence with **bolded** key terms inline>",
-  "highlighted_terms": ["<term1 without asterisks>", "<term2 without asterisks>"],
-  "is_product_reference": <bool>,
-  "suggested_real_query": "<string>"
+  "highlighted_terms": ["<term1 without asterisks>", "<term2 without asterisks>"]
 }}
 
 EXAMPLE:
@@ -57,20 +48,4 @@ Input:  "tương ớt cay vừa"
 Output: {{
   "text": "Anh đang tìm **tương ớt cay vừa** — loại đậm vị nhưng không quá gắt. Em chọn những sản phẩm có độ cay cân bằng, được nhiều khách yêu thích.",
   "highlighted_terms": ["tương ớt cay vừa"]
-}}
-
-Input:  "khung long bao chua mau tim"
-Output: {{
-  "text": "Hmm, em chua ro anh dang tim san pham nao trong cua hang.",
-  "highlighted_terms": [],
-  "is_product_reference": false,
-  "suggested_real_query": "banh keo cho be"
-}}
-
-Input:  "mua cai gi do"
-Output: {{
-  "text": "Anh muon mua gi a? Em chua ro mat hang cu the.",
-  "highlighted_terms": [],
-  "is_product_reference": false,
-  "suggested_real_query": ""
 }}

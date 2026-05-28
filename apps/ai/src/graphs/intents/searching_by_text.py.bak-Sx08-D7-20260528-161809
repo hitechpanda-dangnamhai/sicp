@@ -305,15 +305,6 @@ async def _node_generate_understanding(
     # Success path.
     text = result.get("text", "")
     highlighted = result.get("highlighted_terms", [])
-    # S04-NN-15 gate (D-S08-NN-15 LAW): Vespa=recall, LLM=intent. If the
-    # query is not a real product reference, skip Vespa entirely and route
-    # to the no_product_ref node which emits empty_state (WOW suggestion).
-    is_product_ref = result.get("is_product_reference", True)
-    if is_product_ref is False:
-        return {
-            "_skip_search_no_ref": True,
-            "_suggested_real_query": result.get("suggested_real_query", ""),
-        }
     await publisher.publish_sse(
         rid, "understanding", {"text": text, "highlighted_terms": highlighted}
     )
@@ -856,60 +847,12 @@ async def _node_final(state: IcpState, publisher: RedisPublisher, saver: Any) ->
 # ============================================================================
 
 
-async def _node_no_product_ref(state: IcpState, publisher: RedisPublisher) -> IcpState:
-    """S04-NN-15 node: query is not a product reference. Emit empty_state with
-    a WOW suggestion (suggested_real_query) then END. Bypasses Vespa.
-
-    Reuses SseEmptyStateEvent contract {message, fallback_actions,
-    suggested_queries} (no shape change -> FE intent-03/page.tsx renders it).
-    """
-    rid = state["request_id"]
-    query_text = state["content"]
-    suggested = (state.get("_suggested_real_query") or "").strip()
-    if suggested:
-        message = (
-            f"Shop chua co san pham khop voi \"{query_text}\". "
-            f"Em doan anh can \u201c{suggested}\u201d \u2014 thu xem nhe?"
-        )
-        suggested_queries = [suggested, "San pham pho bien", "Khuyen mai hom nay"]
-    else:
-        message = (
-            f"Em khong tim thay san pham nao khop voi \"{query_text}\". "
-            "Anh/chi thu mo rong tim kiem hoac chup anh san pham nhe."
-        )
-        suggested_queries = ["San pham pho bien", "San pham moi", "Khuyen mai hom nay"]
-
-    await publisher.publish_sse(
-        rid,
-        "empty_state",
-        {
-            "message": message,
-            "fallback_actions": [
-                {"type": "widen_query", "label": "Tim rong hon", "value": suggested or query_text},
-                {"type": "capture_image", "label": "Chup anh san pham"},
-                {"type": "create_product", "label": "Tao san pham moi"},
-            ],
-            "suggested_queries": suggested_queries,
-        },
-    )
-    _logger.info(
-        "search.no_product_ref",
-        request_id=rid,
-        query=query_text,
-        suggested=suggested,
-    )
-    return {}
-
-
 def _route_after_understanding(state: IcpState) -> str:
     """If mode flipped to basic_fallback by generate_understanding interrupt
     resume='continue_basic', skip remaining Variant B LLM nodes per spec
     line 258-261 ("skip remaining Variant B LLM nodes, no parse_filters
     refinement, no generate_reasons").
     """
-    # S04-NN-15 gate: not-a-product -> emit empty_state, bypass Vespa.
-    if state.get("_skip_search_no_ref"):
-        return "no_product_ref"
     if state.get("mode") == "basic_fallback" and state.get("degraded_reason") == "llm_timeout":
         # Jump directly to hybrid_search (skips parse_filters refinement +
         # embed_query + generate_reasons).
@@ -966,8 +909,6 @@ def compile_searching_by_text_graph(
 
     async def n_understanding(s: IcpState) -> IcpState:
         return await _node_generate_understanding(s, publisher)
-    async def n_no_product_ref(s: IcpState) -> IcpState:  # S04-NN-15
-        return await _node_no_product_ref(s, publisher)
 
     async def n_parse_filters(s: IcpState) -> IcpState:
         return await _node_parse_filters(s, publisher)
@@ -994,7 +935,6 @@ def compile_searching_by_text_graph(
     g = StateGraph(IcpState)
     g.add_node("detect_typo", n_detect_typo)
     g.add_node("generate_understanding", n_understanding)
-    g.add_node("no_product_ref", n_no_product_ref)  # S04-NN-15
     g.add_node("parse_filters", n_parse_filters)
     g.add_node("embed_query", n_embed_query)
     g.add_node("hybrid_search", n_hybrid_search)
@@ -1012,7 +952,7 @@ def compile_searching_by_text_graph(
     g.add_conditional_edges(
         "generate_understanding",
         _route_after_understanding,
-        {"parse_filters": "parse_filters", "hybrid_search": "hybrid_search", "no_product_ref": "no_product_ref"},  # S04-NN-15
+        {"parse_filters": "parse_filters", "hybrid_search": "hybrid_search"},
     )
 
     g.add_edge("parse_filters", "embed_query")
@@ -1029,7 +969,6 @@ def compile_searching_by_text_graph(
 
     g.add_edge("co_purchase_lookup", "final")
     g.add_edge("final", END)
-    g.add_edge("no_product_ref", END)  # S04-NN-15
 
     compiled = g.compile(checkpointer=saver)
     return compiled
