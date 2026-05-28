@@ -14,6 +14,7 @@
  *   - Cart flow:     `'add_to_cart'` | `'skip'`
  *   - Cart clear:    `'confirm_clear'` | `'cancel_clear'` (S-05 NEW)
  *   - Stock resolve: `'resolve_remove'` | `'resolve_replace'` (S-05 NEW)
+ *   - Voice clarify: `'clarify_pick'` (S-08 NEW per D-S08-NN-B LAW)
  *
  * **`_meta.attempt_n` field** (per `03_API §1.2` line 95): monotonic integer
  * incremented by FE per logical retry. Used by Gateway
@@ -29,6 +30,9 @@
  * @see slices/S-04_decisions-log.md D-S04-13 LAW Pattern A + Option α
  * @see slices/S-05_decisions-log.md D-S05-01 LAW Hybrid Routing + D-S05-03 LAW
  *      Pattern A Interrupt Reuse cho clear_confirm + stock_resolve
+ * @see slices/S-08_decisions-log.md D-S08-NN-B LAW Voice Action Intent Enum
+ *      (Phiên Sx08-D — +1 'clarify_pick' for Intent 02 voice buy clarify
+ *      interrupt state-D chip-row inline Pattern A per MAR-1 Q1 LOCKED)
  */
 
 import { createZodDto } from 'nestjs-zod';
@@ -43,7 +47,8 @@ export const IntentActionSchema = z.object({
    */
   card_id: z.string().optional(),
   /**
-   * Resume choice per D-S04-13 LAW 3 use cases + S-05 T02 +2 use cases:
+   * Resume choice per D-S04-13 LAW 3 use cases + S-05 T02 +2 use cases +
+   * S-08 T01 +1 use case:
    *   - Typo/degrade/cart-add: `accept` | `reject` | `retry_ai` |
    *     `continue_basic` | `add_to_cart` | `skip`
    *   - Cart-clear (S-05 NEW per D-S05-01 + D-S05-03 LAW): `confirm_clear` |
@@ -53,6 +58,12 @@ export const IntentActionSchema = z.object({
    *     `resolve_replace` — resumes the `stock_action` interrupt at
    *     cart_by_text.py:_node_stock_issue_lookup. For `resolve_replace`,
    *     pass `value: {product_id, replacement_id}` (both required).
+   *   - Voice clarify (S-08 NEW per D-S08-NN-B LAW): `clarify_pick` —
+   *     resumes the `clarify_pick` interrupt at
+   *     buying_by_voices.py:_node_route_resolution. Pass
+   *     `value: {product_id: <picked_sku>}` (required) — identifies which
+   *     candidate the user picked from the state-D chip-row inline UI
+   *     per MAR-1 Q1 LOCKED mockup intent-02-state-D-clarify.html.
    */
   choice: z.enum([
     'accept',
@@ -67,6 +78,11 @@ export const IntentActionSchema = z.object({
     'cancel_clear', // resume clear_action interrupt → no-op
     'resolve_remove', // resume stock_action interrupt → cart.remove
     'resolve_replace', // resume stock_action interrupt → cart.remove + cart.update_qty
+    // S-08 T01 NEW per D-S08-NN-B LAW (Pattern A interrupt resume choice for
+    // Intent 02 voice buy clarify path — state-D chip-row inline UI per
+    // MAR-1 Q1 LOCKED). Resume payload: {choice:'clarify_pick',
+    // value:{product_id: <picked_sku>}}.
+    'clarify_pick', // resume clarify interrupt → re-resolve voice items with picked product_id
   ]),
   /**
    * Optional value payload — shape depends on `choice`:
@@ -76,6 +92,8 @@ export const IntentActionSchema = z.object({
    *     the stock_issue_ready event payload)
    *   - `resolve_remove` (S-05 NEW) → `{product_id: string}` (required —
    *     identifies which out-of-stock item to remove)
+   *   - `clarify_pick` (S-08 NEW per D-S08-NN-B LAW) → `{product_id: string}`
+   *     (required — SKU of candidate user picked from state-D chip-row)
    *   - `accept` (typo) / `confirm_clear` / `cancel_clear` → unused
    *   - others → unused
    *

@@ -32,6 +32,13 @@
 #   is therefore documentation-only AMEND for Sx07-F (per Rule 7 — surface the
 #   decision in code comments where consumers will look for it).
 #
+# S-08 T01.A amendment (Phiên Sx08-D per D-S08-NN-03 LAW): ADD `speech` module.
+#   `speech.transcribe` wraps Gemini 2.5 Flash audio input for Intent 02 voice
+#   buy flow — clones vision.py SDK + ThreadPoolExecutor sync-wrap pattern
+#   (per Confusion Warning #2 Phiên Sx08-C handoff — Gemini SDK exposes sync
+#   generate_content; we wrap in ThreadPoolExecutor for canonical timeout
+#   enforcement, NOT generate_content_async).
+#
 # Reference:
 #   - docs/specs/03_API_CONTRACTS.md §5 (MCP Tool Specs LOCKED — JSON-RPC 2.0)
 #   - docs/phases/PHASE_01_INFRA.md Day 5
@@ -39,6 +46,8 @@
 #   - slices/S-07_decisions-log.md C-S07-A (9 NEW MCP tools)
 #   - slices/S-07_decisions-log.md C-S07-N Option B (products.update separate)
 #   - slices/S-07_decisions-log.md C-S07-O Sx07-G hotfix (NEW Phiên Sx07-F)
+#   - slices/S-08_decisions-log.md D-S08-NN-03 (Gemini 2.5 Flash audio NEW
+#     Phiên Sx08-D)
 # =============================================================================
 
 from __future__ import annotations
@@ -128,6 +137,9 @@ def dispatch(method: str, params: dict[str, Any]) -> tuple[Any, dict | None]:
 # S-09 T01 (Phiên Sx09-C): analytics module added per C-S09-B + C-S09-Q.
 #   Registers `analytics.co_purchased` (PHASE_05 §C SQL) + `analytics.product_corpus_size`
 #   (Redis-cached COUNT for dynamic phase_progress.meta per mockup C-S09-O).
+# S-08 T01.A (Phiên Sx08-D): speech module added per D-S08-NN-03 LAW.
+#   Registers `speech.transcribe` (Gemini 2.5 Flash audio input for Intent 02
+#   voice buy flow — clones vision.py SDK + ThreadPoolExecutor sync-wrap).
 from src.tools import (  # noqa: E402, F401
     analytics,
     auth,
@@ -138,6 +150,7 @@ from src.tools import (  # noqa: E402, F401
     policies,
     products,
     shopee,
+    speech,  # ⭐ NEW S-08 T01.A per D-S08-NN-03 LAW
     vespa,
     vision,
 )

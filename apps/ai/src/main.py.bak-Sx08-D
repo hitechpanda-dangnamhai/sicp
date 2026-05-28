@@ -336,23 +336,6 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                                 compile_importing_by_images_graph,
                             )
                             graph = compile_importing_by_images_graph(saver, publisher)
-                    # S-08 T01.D NEW per D-S08-NN-01 LAW + D-S08-NN-A LAW cornerstone
-                    # (Phiên Sx08-D): Voice modality → Intent 02 buying_by_voices
-                    # graph (initial dispatch). Checked BEFORE entry_intent so
-                    # /intent body {"modality":"voice","content":"<base64-audio>"}
-                    # routes correctly regardless of hint field (mirrors S-07
-                    # image-modality precedent above). compile_buying_by_voices_graph
-                    # is the canonical signature per Confusion Warning #1 Phiên
-                    # Sx08-C handoff Section 2.4 — DO NOT use build_*_graph
-                    # (deprecated since Phiên Sx04-7 D-S04-13 LAW).
-                    elif modality_dispatch == "voice":
-                        # Lazy import — defers buying_by_voices module load
-                        # until first voice-modality request fires (avoids
-                        # module-import side effects polluting main.py).
-                        from .graphs.intents.buying_by_voices import (
-                            compile_buying_by_voices_graph,
-                        )
-                        graph = compile_buying_by_voices_graph(saver, publisher)
                     elif entry_intent_dispatch in (
                         "cart_clear_confirm", "cart_view_with_stock_check"
                     ):
@@ -505,18 +488,6 @@ def _drive_graph_resume_async(request_id: str, resume_value: Any) -> None:
                                 compile_importing_by_images_graph,
                             )
                             graph = compile_importing_by_images_graph(saver, publisher)
-                    # S-08 T01.D NEW per D-S08-NN-01 LAW Pattern A resume +
-                    # C-S08-P resolution (Phiên Sx08-D): Resume dispatch must
-                    # ALSO route voice modality → buying_by_voices graph so
-                    # clarify_pick interrupt POST /intent/{rid}/action resumes
-                    # the SAME graph as initial run. Preserves saver-checkpointed
-                    # voice_history + voice_parsed_items + voice_matched_products
-                    # across the interrupt boundary.
-                    elif modality_dispatch_resume == "voice":
-                        from .graphs.intents.buying_by_voices import (
-                            compile_buying_by_voices_graph,
-                        )
-                        graph = compile_buying_by_voices_graph(saver, publisher)
                     elif entry_intent_dispatch in (
                         "cart_clear_confirm", "cart_view_with_stock_check"
                     ):

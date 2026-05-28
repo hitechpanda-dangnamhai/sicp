@@ -261,27 +261,3 @@ class IcpState(TypedDict, total=False):
     _visual_hits: list        # MCP image_nearest_neighbor top 30 with sub-scores
     _co_purchased: list       # MCP analytics.co_purchased top 20 with freq
     _blended: list            # blend_and_rank node output top 30 with composite + match_type
-
-    # --- S-08 T01.E NEW Phiên Sx08-D per D-S08-NN-A LAW (Voice Session Memory
-    #     Hybrid cornerstone) + D-S08-NN-B LAW (Voice Action Intent Enum). ---
-    # Intent 02 voice buy flow internal transient fields (Pattern A reuse).
-    # Voice context loaded from Redis key voice:context:{user_id} (separate from
-    # RedisSaver checkpoint per D-S08-NN-A; TTL 30min refresh-on-read=True,
-    # FIFO 5 turns). Cart snapshot loaded from cart.get MCP (S-05 D-S05-02 LAW
-    # JSON shape reuse). Voice action enum: 'add' | 'remove' | 'update_qty'
-    # | 'query' per D-S08-NN-B LAW.
-    #
-    # NOT underscore-prefixed: voice_text + voice_action are surfaced to SSE
-    # (voice_transcribed event payload + understanding bubble text). Other 6
-    # fields are downstream transient driven by node graph internal state.
-    #
-    # voice_confidence MAY be None per R-S08-1 (Gemini audio API does not
-    # always surface confidence; FE handles null gracefully).
-    voice_audio_b64: str           # input from gateway POST /intent body.content (base64)
-    voice_text: str                # STT output from speech.transcribe MCP
-    voice_confidence: Optional[float]  # STT confidence (may be None per R-S08-1)
-    voice_action: str              # parsed enum: 'add'|'remove'|'update_qty'|'query'
-    voice_history: list            # loaded from voice:context:{user_id} (last 5 turns FIFO)
-    voice_parsed_items: list       # LLM bulk parse output [{query, qty, unit?, ordinal_ref?}]
-    voice_matched_products: list   # Vespa resolve output per item (asyncio.gather)
-    voice_clarify_pending: bool    # Pattern A interrupt flag awaiting='clarify_pick'

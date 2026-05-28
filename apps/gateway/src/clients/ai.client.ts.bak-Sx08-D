@@ -172,12 +172,7 @@ export interface PostIntentResumeBody {
     | 'confirm_clear'
     | 'cancel_clear'
     | 'resolve_remove'
-    | 'resolve_replace'
-    // S-08 T01 NEW per D-S08-NN-B LAW + C-S08-O resolution (Phiên Sx08-D —
-    // manual sync of intent-action.dto.ts choice enum for the Intent 02
-    // voice buy clarify path; tech debt recorded as C-S08-O recommending
-    // future refactor to z.infer<typeof IntentActionSchema>):
-    | 'clarify_pick';
+    | 'resolve_replace';
   value?: Record<string, unknown>;
   _meta?: { attempt_n: number };
 }

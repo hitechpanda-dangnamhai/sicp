@@ -581,37 +581,6 @@ export const SseShopeeCompareEvent = z.object({
   matched_via: z.enum(['specific', 'category_fallback', 'no_match']).optional(),
 });
 
-/**
- * S-08 T01.G NEW (Phiên Sx08-D per D-S08-NN-02 LAW).
- *
- * `voice_transcribed` SSE event — emitted by `_node_speech_transcribe` in
- * `apps/ai/src/graphs/intents/buying_by_voices.py` after the Gemini 2.5
- * Flash STT call (per D-S08-NN-03 LAW non-streaming pattern). FE handler
- * updates `voiceState.voiceText` for state-A/B display (live typewriter
- * cosmetic per D-S08-NN-07 LAW).
- *
- * `confidence` MAY be null per R-S08-1 (Gemini audio API does not always
- * surface per-utterance confidence; FE handles null gracefully and does
- * NOT block state-C UI rendering).
- *
- * `duration_ms` is APPROXIMATE — calculated from byte length at ~16 kbps
- * assumption in `apps/mcp/src/tools/speech.py` (Gemini API does not return
- * real audio duration). Used for cosmetic display only; no business logic
- * depends on it.
- *
- * @see slices/S-08_decisions-log.md D-S08-NN-02 LAW (9 SSE events reuse +
- *      1 NEW voice_transcribed)
- * @see docs/03_API_CONTRACTS.md §5 (voice_transcribed event spec
- *      post-T01.I reconcile)
- */
-export const SseVoiceTranscribedEvent = z.object({
-  type: z.literal('voice_transcribed'),
-  text: z.string(),
-  confidence: z.number().nullable(),
-  duration_ms: z.number(),
-  language: z.string().default('vi'),
-});
-
 // ---------------------------------------------------------------------------
 // Type registry — handler signature lookup for `streamIntent()` wrapper
 // ---------------------------------------------------------------------------
@@ -658,8 +627,6 @@ export type IntentStreamEventMap = {
   form_prefill: z.infer<typeof SseFormPrefillEvent>;
   market_trend: z.infer<typeof SseMarketTrendEvent>;
   shopee_compare: z.infer<typeof SseShopeeCompareEvent>;
-  // S-08 T01 NEW 1 (Phiên Sx08-D per D-S08-NN-02 LAW)
-  voice_transcribed: z.infer<typeof SseVoiceTranscribedEvent>;
 };
 
 /** Union of typed event names — used in `streamIntent(handlers)` key constraint. */
@@ -698,6 +665,4 @@ export const IntentStreamSchemas = {
   form_prefill: SseFormPrefillEvent,
   market_trend: SseMarketTrendEvent,
   shopee_compare: SseShopeeCompareEvent,
-  // S-08 T01 NEW 1 (Phiên Sx08-D per D-S08-NN-02 LAW)
-  voice_transcribed: SseVoiceTranscribedEvent,
 } as const;

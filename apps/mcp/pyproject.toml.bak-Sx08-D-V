@@ -38,9 +38,6 @@ dependencies = [
     # --- S-07 T01.C NEW: Gemini SDK for vision.analyze tool (C-S07-L empirically validated) ---
     "google-generativeai>=0.8,<1.0",
 
-    # --- S-08 T01 D-S08-NN-12/13 LAW: OpenAI STT (gpt-4o-transcribe) + TTS (gpt-4o-mini-tts) ---
-    "openai>=1.40,<2.0",
-
     # --- OpenTelemetry Python SDK (mirror T03 pin range >=1.27,<2.0) ---
     "opentelemetry-api>=1.27,<2.0",
     "opentelemetry-sdk>=1.27,<2.0",

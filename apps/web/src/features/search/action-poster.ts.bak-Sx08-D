@@ -50,12 +50,7 @@ export type IntentActionChoice =
   | 'confirm_clear'
   | 'cancel_clear'
   | 'resolve_remove'
-  | 'resolve_replace'
-  // S-08 T01 NEW per D-S08-NN-B LAW + C-S08-O resolution (Phiên Sx08-D —
-  // FE-side manual sync of IntentActionSchema for Intent 02 voice buy
-  // state-D chip-row clarify_pick resume; T02 FE will call sendAction(
-  // 'clarify_pick', {product_id}) from VoiceClarifyChipRow click handler):
-  | 'clarify_pick';
+  | 'resolve_replace';
 
 export interface IntentActionBody {
   choice: IntentActionChoice;
