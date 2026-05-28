@@ -18,6 +18,8 @@
 import { useRouter } from 'next/navigation';
 import { useStats } from '@/lib/dashboard/use-stats';
 import { useMe } from '@/lib/dashboard/use-me';
+import { useCart } from '@/src/features/cart/use-cart';
+import { formatVND } from '@/lib/utils';
 import { getTracker } from '@/lib/tracker';
 import {
   DashboardHeader,
@@ -47,6 +49,13 @@ export default function HomeDashboardPage() {
   const router = useRouter();
   const statsQuery = useStats();
   const meQuery = useMe();
+  const cartQuery = useCart();
+
+  // Số thật từ giỏ Redis (FE→gateway→MCP→Redis verified). "N món" = số dòng SP
+  // (items.length), nhất quán định nghĩa Sx08-I. Tổng = totals.total. Giỏ rỗng /
+  // chưa load → 0 (ListTile tự ẩn badge khi countBadge <= 0). KHÔNG hardcode.
+  const cartItemCount = cartQuery.data?.items.length ?? 0;
+  const cartTotal = cartQuery.data?.totals.total ?? 0;
 
   const handleTileClick = (tileId: TileId) => {
     const m = TILE_MAPPING[tileId];
@@ -201,9 +210,9 @@ export default function HomeDashboardPage() {
               accent="fuchsia"
               iconName="shopping-cart"
               title="Giỏ hàng"
-              countBadge={3}
-              monoValue="100.000 ₫"
-              monoSuffix="· 3 món"
+              countBadge={cartItemCount}
+              monoValue={formatVND(cartTotal)}
+              monoSuffix={`· ${cartItemCount} món`}
               onClick={() => handleTileClick('gio_hang')}
             />
           </div>

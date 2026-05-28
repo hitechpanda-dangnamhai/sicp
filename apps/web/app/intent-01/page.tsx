@@ -77,6 +77,7 @@ import {
   type SuggestedAttributeChip,
 } from '@/components/icp/molecules';
 import { Icon } from '@/components/icp/atoms';
+import { HomeBottomNav } from '@/components/icp/layout';
 import { useImportFlow } from '@/src/features/import/use-import-flow';
 import { getLowConfidenceFields } from '@/src/features/import/import-state-machine';
 import { postImportAction } from '@/src/features/import/action-poster';
@@ -612,6 +613,10 @@ export default function Intent01Page() {
             />
           )}
         </div>
+
+        {/* Footer điều hướng — đồng bộ với /home + các màn intent (Sx08-J).
+            HomeBottomNav: 4-tab, "Trang chính" hardcoded active, click NO-OP (S-03 D-13). */}
+        <HomeBottomNav />
       </div>
     </div>
   );

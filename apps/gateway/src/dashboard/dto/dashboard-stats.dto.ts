@@ -13,13 +13,14 @@
  * hardcoded JSON values. No real DB query for now. Future slice may replace
  * with real aggregations from orders + inventory tables.
  *
- * **Shape:**
- *   - `orders_today: number` (non-negative integer) — orders count current day
- *   - `revenue_today: number` (non-negative integer) — total revenue VND today
- *   - `inventory_count: number` (non-negative integer) — total SKUs in stock
+ * **Shape:** (REAL DB aggregations per Sx08-J — was S-03 D-10 stub)
+ *   - `orders_today: number` — COUNT paid orders today (HCMC tz), per merchant
+ *   - `revenue_today: number` — SUM(orders.total) paid today VND, per merchant
+ *   - `inventory_count: number` — SUM(products.stock) active, per merchant
+ *     (tổng số lượng hàng còn — user CHỐT Sx08-J, KHÔNG phải số loại SKU)
  *   - `currency: 'VND'` (literal) — hardcoded for Vietnam market
  *
- * S-03 T03b emit (Phiên 36 Batch 1).
+ * S-03 T03b emit (Phiên 36 Batch 1); DB-wired Sx08-J.
  */
 
 import { createZodDto } from 'nestjs-zod';

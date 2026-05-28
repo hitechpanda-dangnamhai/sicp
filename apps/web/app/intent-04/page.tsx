@@ -308,16 +308,28 @@ export default function Intent04Page() {
   const handleProductAdd = useCallback(
     (product: RecommendedProduct, position: number) => {
       stream.setCartConfirm({ title: product.title, price: product.price });
-      // Fire-and-forget BE cart mutation (per S-04 hotfix Bug #1 precedent).
-      void addItemMut.mutateAsync({
-        product_id: product.id,
-        quantity: 1,
-      } as never).catch((err: unknown) => {
-        // Cart errors surfaced via TanStack mutation state in cart UI; don't
-        // block recommendation flow.
-        // eslint-disable-next-line no-console
-        console.warn('[intent-04] cart add failed', err);
-      });
+      // BE cart mutation. BUG FIX Sx08-J: payload trước đây gửi sai field
+      // ({product_id, quantity} + `as never`) → mutation đọc vars.productId/vars.qty
+      // = undefined → POST body rỗng → BE 400 → toast hiện nhưng giỏ KHÔNG thêm.
+      // Sửa đúng AddItemVars {productId, qty, snapshot}; bỏ `as never` để TS bảo vệ.
+      void addItemMut
+        .mutateAsync({
+          productId: product.id,
+          qty: 1,
+          snapshot: {
+            title: product.title,
+            brand: product.brand ?? null,
+            image_url: product.image_url ?? null,
+            image_gradient: product.image_gradient ?? null,
+            icon_hint: product.icon_hint ?? null,
+          },
+        })
+        .catch((err: unknown) => {
+          // Cart errors surfaced via TanStack mutation state in cart UI; don't
+          // block recommendation flow.
+          // eslint-disable-next-line no-console
+          console.warn('[intent-04] cart add failed', err);
+        });
       // Behavior telemetry (AC42).
       if (stream.state.currentTurn) {
         trackRecommendationClicked({

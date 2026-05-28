@@ -50,8 +50,6 @@ import {
   LivePartialTranscript,
   PreviousTurnChip,
   CoPurchaseHintCard,
-  CartItemRow,
-  type CartItemProduct,
   StockReplacementCard,
 } from '@/components/icp/molecules';
 import { ClarifyOptionChip } from '@/components/icp/molecules/ClarifyOptionChip';
@@ -69,10 +67,19 @@ import {
 } from '@/src/features/voice-buy/voice-action-poster';
 import type {
   VoiceErrorCode,
-  VoiceMatchedProduct,
 } from '@/src/features/voice-buy/voice-state-machine';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/**
+ * state-C item-thumb gradients (mockup .item-thumb.t1/.t2/.t3 verbatim). Cosmetic
+ * per-index cycling — BE does NOT carry a thumb color field (Luật #7 đồng tông).
+ */
+const THUMB_GRADIENTS: ReadonlyArray<{ wrap: string; icon: string }> = [
+  { wrap: 'linear-gradient(135deg, #FFE4E6, #FECDD3)', icon: 'linear-gradient(135deg, #F43F5E, #E11D48)' },
+  { wrap: 'linear-gradient(135deg, #FFEDD5, #FED7AA)', icon: 'linear-gradient(135deg, #FB923C, #EA580C)' },
+  { wrap: 'linear-gradient(135deg, #FEF3C7, #FCD34D)', icon: 'linear-gradient(135deg, #F59E0B, #D97706)' },
+];
 
 /** mm:ss from ms (mockup mono timer "0:04"). */
 function fmtTimer(ms: number): string {
@@ -80,18 +87,6 @@ function fmtTimer(ms: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-/** Map a VoiceMatchedProduct → CartItemProduct for <CartItemRow>. */
-function toCartItemProduct(p: VoiceMatchedProduct): CartItemProduct {
-  return {
-    brand: p.brand,
-    name: p.title,
-    price: p.price,
-    originalPrice: p.original_price ?? undefined,
-    imageGradient: p.image_gradient ?? undefined,
-    imageIcon: undefined,
-  };
 }
 
 /** state-G title/subtitle keyed by errorCode (handoff §5 state-G). */
@@ -175,6 +170,16 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
   const { state, submitUtterance, dispatch } = useVoiceStream();
   const { data: cart } = useCart();
   const ctx = useVoiceContext(state);
+
+  // state-C bundle totals — derived from REAL BE price×qty (Luật #6, KHÔNG bịa số).
+  const cartReadyUnits = React.useMemo(
+    () => state.matchedProducts.reduce((sum, p) => sum + p.qty, 0),
+    [state.matchedProducts],
+  );
+  const cartReadyTotal = React.useMemo(
+    () => state.matchedProducts.reduce((sum, p) => sum + p.price * p.qty, 0),
+    [state.matchedProducts],
+  );
 
   // Per-utterance retry counter for resume _meta.attempt_n (D-S04-13).
   const attemptRef = React.useRef(0);
@@ -549,19 +554,127 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
           </div>
         ) : null}
 
-        {/* ═══ state-C: cart-ready ═══ */}
+        {/* ═══ state-C: cart-ready — BUNDLE-CARD (mockup intent-02-state-C, port verbatim) ═══ */}
+        {/*
+          Sx08-J: REPLACE plain CartItemRow list → bundle-card container per mockup.
+          Reuse-vs-wrap (Luật #4): CartItemRow là single-row (stepper 26px, stock
+          banner, cornerBadge ảnh) — KHÁC cấu trúc bundle-card (container + header
+          "Giỏ tạm" + count pill + item-thumb 52px gradient theo index + totals-strip).
+          → wrap inline (KHÔNG nhồi CartItemRow). px/màu/gradient port verbatim mockup.
+          BE KHÔNG cấp (Luật #6 — KHÔNG bịa): match-badge "% khớp" ẩn (match_score raw
+          0..~30, §4), stock "Còn N" ẩn (không có field). line_total/unit_price/totals
+          tính từ price×qty (số thật BE đã cấp). thumb gradient t1/t2/t3 cosmetic (Luật #7).
+        */}
         {state.phase === 'cart-ready' ? (
           <div className="flex-1 flex flex-col gap-3 pt-2">
+            {/* AI parsed-greet bubble (.ai-bubble-greet) */}
             <div className="flex gap-2">
               <Avatar role="ai" />
-              <ConversationBubble role="ai" text={<>Aida đã chuẩn bị <strong>{state.matchedProducts.length} sản phẩm</strong> vào giỏ tạm.</>} />
+              <div className="flex-1 bg-white rounded-[4px_16px_16px_16px] px-3.5 py-3 border-[0.5px] border-icp-pink-200 shadow-[0_4px_12px_rgba(233,30,99,0.08)]">
+                <div className="text-[12.5px] text-icp-pink-900 font-medium leading-[1.5]">
+                  Aida đã hiểu <strong className="text-icp-pink-700 font-bold">{state.matchedProducts.length} sản phẩm</strong> trong câu của bạn{' '}
+                  <span className="inline-flex items-center gap-1 align-middle bg-gradient-to-br from-icp-pink-500 to-icp-amber-400 text-white px-2 py-[3px] rounded-[7px] text-[9px] font-bold tracking-[0.4px] uppercase">✨ Đã tách</span>
+                  <span className="block mt-1 text-[11px] text-icp-pink-700 opacity-85">Kiểm tra qty rồi thêm vào giỏ nhé</span>
+                </div>
+              </div>
             </div>
 
-            {/* matchScorePct NOT passed — §4 KNOWN-ISSUE (BE returns raw match_score). */}
-            {state.matchedProducts.map((p) => (
-              <CartItemRow key={p.product_id} product={toCartItemProduct(p)} qty={p.qty} />
-            ))}
+            {/* Bundle card (.bundle-card) */}
+            <div className="flex gap-2">
+              <div className="w-9 flex-shrink-0" aria-hidden="true" />
+              <div className="flex-1 bg-white rounded-[4px_16px_16px_16px] p-3 border-[0.5px] border-icp-pink-200 shadow-[0_6px_16px_rgba(233,30,99,0.1)]">
+                {/* bundle-header */}
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5 text-[12px] font-bold text-icp-pink-700 tracking-[0.6px] uppercase">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                    </svg>
+                    Giỏ tạm
+                  </div>
+                  <span className="bg-gradient-to-br from-icp-pink-500 to-icp-amber-400 text-white px-2.5 py-[3px] rounded-lg text-[10px] font-bold shadow-[0_2px_6px_rgba(233,30,99,0.25)]">
+                    {state.matchedProducts.length} món
+                  </span>
+                </div>
 
+                {/* item-rows */}
+                {state.matchedProducts.map((p, i) => {
+                  const thumb = THUMB_GRADIENTS[i % THUMB_GRADIENTS.length];
+                  const lineTotal = p.price * p.qty;
+                  return (
+                    <div
+                      key={p.product_id}
+                      className="flex gap-2.5 py-2.5 items-center [&:not(:first-child)]:border-t-[0.5px] [&:not(:first-child)]:border-icp-pink-100"
+                    >
+                      {/* item-thumb 52px gradient (cosmetic per index) */}
+                      <div
+                        className="w-[52px] h-[52px] rounded-xl flex-shrink-0 flex items-center justify-center border border-white shadow-[0_3px_8px_rgba(233,30,99,0.12)]"
+                        style={{ background: thumb.wrap }}
+                      >
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white shadow-[0_2px_6px_rgba(0,0,0,0.1)]"
+                          style={{ background: thumb.icon }}
+                        >
+                          {/* image_icon từ BE không đáng tin (B1 precedent: imageIcon=undefined)
+                              → SVG fallback cố định, KHÔNG bịa icon (Luật #6). */}
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M14 2v6.343c0 .53.21 1.04.586 1.414L18.414 13.586c.375.375.586.884.586 1.414V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-5c0-.53.21-1.04.586-1.414L9.414 9.757A2 2 0 0 0 10 8.343V2" />
+                            <line x1="9" y1="2" x2="15" y2="2" />
+                          </svg>
+                        </div>
+                      </div>
+
+                      {/* item-info — match-badge "% khớp" + stock "Còn N" ẩn (BE không cấp, §4/§5) */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12.5px] font-semibold text-icp-pink-900 leading-[1.3] mb-[3px] line-clamp-2">
+                          {p.title}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-[11px] text-icp-pink-700 font-semibold">
+                            {p.price.toLocaleString('vi-VN')}₫ ×{' '}
+                          </span>
+                          <span
+                            className="font-mono text-[12px] font-bold bg-gradient-to-br from-icp-amber-400 to-icp-orange-600 bg-clip-text"
+                            style={{ WebkitTextFillColor: 'transparent' }}
+                          >
+                            {lineTotal.toLocaleString('vi-VN')}₫
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* qty-stepper (display-only — state-C qty fixed pre-commit per mockup) */}
+                      <div className="flex items-center gap-1.5 bg-gradient-to-br from-icp-pink-50 to-icp-pink-100 border-[0.5px] border-icp-pink-200 rounded-[10px] p-[3px] flex-shrink-0">
+                        <span className="w-6 h-6 bg-white rounded-[7px] flex items-center justify-center text-icp-pink-700 shadow-[0_2px_4px_rgba(233,30,99,0.1)] opacity-40">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                        </span>
+                        <span className="font-mono text-[13px] font-bold text-icp-pink-900 min-w-6 text-center">{p.qty}</span>
+                        <span className="w-6 h-6 bg-white rounded-[7px] flex items-center justify-center text-icp-pink-700 shadow-[0_2px_4px_rgba(233,30,99,0.1)] opacity-40">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* totals-strip — số thật từ price×qty (KHÔNG bịa) */}
+                <div className="bg-gradient-to-br from-icp-pink-100 to-icp-amber-100 border-[0.5px] border-icp-pink-200 rounded-[14px] px-3.5 py-3 mt-2.5 flex items-center justify-between">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] font-bold text-icp-pink-700 tracking-[0.5px] uppercase">Tổng</span>
+                    <span className="text-[11px] text-icp-pink-800 font-semibold">
+                      {state.matchedProducts.length} sản phẩm · {cartReadyUnits} đơn vị
+                    </span>
+                  </div>
+                  <span
+                    className="font-mono text-[20px] font-bold bg-gradient-to-br from-icp-pink-500 to-icp-amber-400 bg-clip-text"
+                    style={{ WebkitTextFillColor: 'transparent' }}
+                  >
+                    {cartReadyTotal.toLocaleString('vi-VN')}₫
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* ai-note: co-purchase hint (reuse S-05 component, null-safe C-S08-T) */}
             {state.coPurchaseHint ? (
               <CoPurchaseHintCard
                 hint={{
@@ -578,20 +691,25 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
               />
             ) : null}
 
+            {/* bottom-bar: btn-mic 52px + btn-add-cart gradient + badge-count "N món · tổng₫" */}
             <div className="flex gap-3 mt-2">
               <button
                 type="button"
                 onClick={handleStartListening}
-                className="flex-1 py-3 rounded-2xl bg-white border-[0.5px] border-icp-pink-200 text-icp-pink-700 font-semibold text-[14px] flex items-center justify-center gap-1.5"
+                aria-label="Nói lại"
+                className="w-[52px] h-[52px] flex-shrink-0 rounded-[14px] bg-white border-[0.5px] border-icp-pink-200 text-icp-pink-700 flex items-center justify-center shadow-[0_4px_12px_rgba(233,30,99,0.15)]"
               >
-                <Icon name="mic" size={16} /> Nói lại
+                <Icon name="mic" size={22} />
               </button>
               <button
                 type="button"
                 onClick={handleAddToCart}
-                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-icp-pink-500 to-icp-amber-400 text-white font-bold text-[14px] shadow-[0_6px_16px_rgba(233,30,99,0.3)]"
+                className="flex-1 h-[52px] rounded-[14px] bg-gradient-to-r from-icp-pink-500 via-[#F43F5E] to-icp-amber-400 text-white font-bold text-[14px] flex items-center justify-center gap-2 shadow-[0_10px_22px_rgba(233,30,99,0.35)] tracking-[-0.2px]"
               >
                 Thêm vào giỏ
+                <span className="bg-white/25 px-2.5 py-[3px] rounded-lg text-[11px] backdrop-blur-sm">
+                  {state.matchedProducts.length} món · {cartReadyTotal.toLocaleString('vi-VN')}₫
+                </span>
               </button>
             </div>
           </div>

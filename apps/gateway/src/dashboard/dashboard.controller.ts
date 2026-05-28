@@ -78,7 +78,7 @@ export class DashboardController {
     return context.with(trace.setSpan(context.active(), span), async () => {
       try {
         span.setAttribute('auth.user_id_prefix', req.user.id.slice(0, 8));
-        const result = await this.dashboardService.getStats();
+        const result = await this.dashboardService.getStats(req.user.id);
         return result as DashboardStatsDto;
       } catch (err) {
         span.recordException(err instanceof Error ? err : new Error(String(err)));

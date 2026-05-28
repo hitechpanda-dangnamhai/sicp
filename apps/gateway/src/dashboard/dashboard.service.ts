@@ -1,33 +1,34 @@
 /**
  * apps/gateway/src/dashboard/dashboard.service.ts
  *
- * Stub Dashboard service per S-03 D-10 (MAR-1 Q5 RESOLVED Phiên 34) — returns
- * hardcoded JSON values matching DashboardStatsSchema. NO real DB query.
+ * Dashboard service — REAL DB aggregations per Sx08-J (KING OF LAW: hoàn thiện
+ * tính năng → query thật thay stub). Was S-03 D-10 stub returning hardcoded
+ * 8/2.4M/142; replaced now that orders + order_items + products tables ship
+ * data (S-05 Cart/Order + product inventory).
  *
- * **Why stub now (rationale per D-10):**
- *   - Mockup `golden-reference-mockup.html` StatBar (3 KPIs: 8 orders / 2.4M
- *     revenue / 142 inventory) needs functional BE endpoint for FE TanStack
- *     Query useStats hook (AC-25 + DM-14).
- *   - Real aggregations (SUM/COUNT from orders + order_items + products) defer
- *     to future slice when respective V-SLICEs ship data (S-05 Cart/Order +
- *     product inventory updates).
- *   - Stub allows AC-21 (BE endpoint with JwtAuthGuard) + AC-22 (401 without)
- *     to verify FULL auth + endpoint plumbing now, NOT block on DB schema.
+ * **3 KPIs (scoped to authenticated merchant via userId):**
+ *   - orders_today    = COUNT(orders) status='paid', created_at = today (TZ
+ *                       Asia/Ho_Chi_Minh), user_id = merchant.
+ *   - revenue_today   = COALESCE(SUM(orders.total), 0) same filter (paid only —
+ *                       user CHỐT Sx08-J: doanh thu = đơn đã thanh toán thật).
+ *   - inventory_count = COALESCE(SUM(products.stock), 0) status='active',
+ *                       merchant_id = merchant (user CHỐT: tồn kho = tổng số
+ *                       lượng hàng còn, KHÔNG phải số loại SP).
  *
- * **Pattern parity with `auth/application/forgot-password.use-case.ts`** (S-03
- * T03 Phiên 33 stub precedent) — `@Injectable()` + `createLogger().child()` +
- * async method even though logic sync (consistent service interface +
- * future-proof when real DB query added).
+ * **Timezone:** day boundary computed in Asia/Ho_Chi_Minh (parity với V006
+ * analytics_daily MV: `DATE(created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')`).
  *
- * **Log:** `dashboard.stats_served` info-level — captures observability signal
- * for analytics (which users hit dashboard, how often). NO PII in extras
- * (user_id is request-scoped, NOT logged here — controller already records on
- * span attribute per C-28 manual span pattern).
+ * **DB access:** PgPool (S-02 T06) injected via DatabaseModule — pattern parity
+ * với TrackingModule. `pool.query()` auto-emits OTel `pg.query` child span.
  *
- * S-03 T03b emit (Phiên 36 Batch 1).
+ * **Defensive:** result rows COALESCE'd to 0 in SQL; parsed via Zod schema to
+ * catch drift (throws if mismatch).
+ *
+ * Sx08-J emit (replace S-03 D-10 stub).
  */
 
 import { Injectable } from '@nestjs/common';
+import { PgPool } from '../database';
 import { createLogger, type IcpLogPayload } from '../observability';
 import { DashboardStatsSchema, type DashboardStatsType } from './dto/dashboard-stats.dto';
 
@@ -39,33 +40,56 @@ export class DashboardService {
     env: process.env.NODE_ENV ?? 'dev',
   }).child({ component: 'dashboard.service' });
 
+  constructor(private readonly pg: PgPool) {}
+
   /**
-   * Return hardcoded dashboard stats per D-10 stub.
+   * Aggregate dashboard KPIs for the given merchant from live DB tables.
    *
-   * Values chosen to match mockup `golden-reference-mockup.html` StatBar text:
-   *   - orders_today=8 → matches mockup "8 Đơn hôm nay"
-   *   - revenue_today=2400000 → matches mockup "2.4M Doanh thu" (VND)
-   *   - inventory_count=142 → matches mockup "142 Tồn kho"
-   *
+   * @param userId authenticated merchant id (orders.user_id / products.merchant_id)
    * @returns DashboardStatsType matching DashboardStatsSchema
    */
-  async getStats(): Promise<DashboardStatsType> {
+  async getStats(userId: string): Promise<DashboardStatsType> {
+    // Orders + revenue: paid orders created today (HCMC tz). Single row.
+    const ordersSql = `
+      SELECT
+        COUNT(*)::int                      AS orders_today,
+        COALESCE(SUM(total), 0)::bigint    AS revenue_today
+      FROM orders
+      WHERE user_id = $1
+        AND status = 'paid'
+        AND DATE(created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')
+            = DATE(NOW() AT TIME ZONE 'Asia/Ho_Chi_Minh')
+    `;
+    // Inventory: total stock units across active products for this merchant.
+    const inventorySql = `
+      SELECT COALESCE(SUM(stock), 0)::bigint AS inventory_count
+      FROM products
+      WHERE merchant_id = $1
+        AND status = 'active'
+    `;
+
+    const [ordersRes, inventoryRes] = await Promise.all([
+      this.pg.query<{ orders_today: number; revenue_today: string }>(ordersSql, [userId]),
+      this.pg.query<{ inventory_count: string }>(inventorySql, [userId]),
+    ]);
+
+    // pg returns BIGINT as string → Number() (values well within JS safe-int
+    // for Hackathon scale: revenue/stock far below 2^53).
     const stats: DashboardStatsType = {
-      orders_today: 8,
-      revenue_today: 2_400_000,
-      inventory_count: 142,
+      orders_today: ordersRes.rows[0]?.orders_today ?? 0,
+      revenue_today: Number(ordersRes.rows[0]?.revenue_today ?? 0),
+      inventory_count: Number(inventoryRes.rows[0]?.inventory_count ?? 0),
       currency: 'VND',
     };
 
-    // Defensive: parse via Zod schema to catch any future drift between
-    // hardcoded literal and schema definition (vd if schema gains a new
-    // required field but stub forgot to update). Throws if mismatch.
+    // Defensive: parse via Zod schema to catch drift between query result and
+    // schema definition. Throws if mismatch.
     DashboardStatsSchema.parse(stats);
 
     this.log.info(
       {
         message: 'dashboard.stats_served',
-        extras: { source: 'stub' },
+        extras: { source: 'db', user_id_prefix: userId.slice(0, 8) },
       } as IcpLogPayload,
       'dashboard.stats_served',
     );
