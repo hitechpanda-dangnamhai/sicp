@@ -7,18 +7,21 @@
  *
  * Slice:    S-01 UI Foundation (baseline 7 props + StockIssueBanner inline)
  *           S-05 T03 EXTEND (Phiên Sx05-3) — +3 props per C-S05-I + C-S05-J
+ *           S-08 T02 EXTEND (Phiên Sx08-G) — +1 prop matchScorePct (state-C "% khớp" badge)
  *
  * Task:     T05 AC-2, AC-7 (S-01 dev preview)
  *           S-05 T03 (Phiên Sx05-3) — qty Spinner overlay + optimistic line_total + currency formatter override
+ *           S-08 T02 (Phiên Sx08-G) — voice-buy state-C match badge (B11)
  *
  * Source:   Family B mockup HTML (per C-03 structural inference + Tailwind translation):
  *           - intent-05/intent-05-state-0-happy.html line 144-200 (base row pattern)
  *           - intent-05/intent-05-state-E-stock-issue.html line 185-212 (stockIssue='out' banner)
  *           - intent-05/intent-05-state-C-update-qty.html line 178-201 (isUpdating spinner inline)
  *           - intent-05/intent-05-state-0-happy.html line 158/171/187/199/228/256 (no-space currency)
+ *           - intent-02/intent-02-state-C-cart-ready.html line 584/623/661 (.match-badge "98% khớp")
  *
  * Reach:    I05 cart line item (single-intent, NOT C-24 multi-intent qualifier).
- *           Now reused by /intent-05/page.tsx production consumer (S-05 T03).
+ *           Now reused by /intent-05/page.tsx (S-05 T03) + /intent-02 state-C (S-08 T02).
  *
  * Decisions applied (S-01 baseline preserved):
  * - C-03 structural inference + C-23 atom bypass for micro-elements (26×26 qty
@@ -31,19 +34,26 @@
  * - C-18 Tier 4 Tailwind utility inline
  * - C-22 atom interface verified — bypasses Button/ChipPill; only <Icon> + <Spinner> from atoms
  *
- * Decisions applied (S-05 T03 NEW):
+ * Decisions applied (S-05 T03):
  * - C-S05-I (Conflict #2 Path A): EXTEND existing CartItemRow +3 props (NOT new <CartItem>)
- *   because S-01 ship has 6 consumers (/dev/* pages + Storybook + BottomSheet + barrel).
- *   Backward-compat preserved — all 7 base props unchanged.
+ *   because S-01 ship has 6 consumers. Backward-compat preserved.
  * - C-S05-J (Conflict #3 Option A additive): `currencyFormatter` prop defaults to
- *   `formatVND` (NBSP). Cart contexts pass `formatVNDCompact` for no-space mockup parity
- *   per Rule 6 LAW (237 mockup instances verified Sx05-3-DISCOVER).
- * - D-S05-07 LAW: `lineTotalOverride` enables optimistic line_total during qty debounce
- *   window — parent reducer computes `optimisticQty * product.price` and passes here.
- *   Falls back to `product.price * qty` when undefined (S-01 baseline behavior).
+ *   `formatVND`. Cart contexts pass `formatVNDCompact` for no-space mockup parity.
+ * - D-S05-07 LAW: `lineTotalOverride` enables optimistic line_total during qty debounce.
  *
- * Concern 3 A1 lock (S-01): ship stockIssue='out' only (mockup state-E direct).
- * NO 'low' inferred variant.
+ * Decisions applied (S-08 T02 NEW — backward-compat tuyệt đối):
+ * - +`matchScorePct?` (handoff §3.B11): when present → green pill "{pct}% khớp"
+ *   `rgba(34,197,94,0.12)` rendered IN THE META-ROW (after `name`, before `price`)
+ *   per mockup state-C. NOT `cornerBadge` (cornerBadge is image-corner discount/new
+ *   badge — different position + style).
+ * - ⚠️ KNOWN-ISSUE (handoff §3.B11 + §4): BE `voice_matched_products[].match_score`
+ *   is RAW scale 0..~30 (NOT a pct; BE does NOT wrap pct for state-C, unlike state-F
+ *   C-S08-Y). Therefore /intent-02 page does NOT pass `matchScorePct` → badge hidden.
+ *   Prop fully implemented + optional so it activates the moment BE adds a wrapped
+ *   match_pct field. KHÔNG ×100, KHÔNG bịa số.
+ * - All 10 S-05/S-01 props + 6 consumers UNCHANGED.
+ *
+ * Concern 3 A1 lock (S-01): ship stockIssue='out' only. NO 'low' inferred variant.
  */
 
 import * as React from 'react';
@@ -82,7 +92,7 @@ export interface CartItemRowProps extends Omit<React.HTMLAttributes<HTMLDivEleme
   /** Optional top-right badge on product image (state-E shows discount/-15% or MỚI badges) */
   cornerBadge?: CartItemCornerBadge;
 
-  // ─── S-05 T03 NEW (Phiên Sx05-3 per C-S05-I + C-S05-J) ────────────────────
+  // ─── S-05 T03 (Phiên Sx05-3 per C-S05-I + C-S05-J) ───────────────────────
   /**
    * Render <Spinner size={14} color="pink" /> in place of qty number (state-C
    * mockup line 181 inline pattern). Used during debounce-pending or in-flight
@@ -91,16 +101,24 @@ export interface CartItemRowProps extends Omit<React.HTMLAttributes<HTMLDivEleme
   isUpdating?: boolean;
   /**
    * Override line_total render for optimistic UI per D-S05-07 LAW. When
-   * undefined falls back to `product.price * qty` (S-01 baseline). Parent
-   * reducer computes `product.price * optimisticQty` and passes here.
+   * undefined falls back to `product.price * qty` (S-01 baseline).
    */
   lineTotalOverride?: number;
   /**
-   * Currency formatter override. Default `formatVND` (with NBSP per Intl) for
-   * backward-compat with S-01 baseline + 6 production consumers. Cart contexts
-   * pass `formatVNDCompact` for no-space mockup parity per C-S05-J Path A.
+   * Currency formatter override. Default `formatVND` for backward-compat.
+   * Cart contexts pass `formatVNDCompact` for no-space mockup parity (C-S05-J).
    */
   currencyFormatter?: (value: number) => string;
+
+  // ─── S-08 T02 NEW (Phiên Sx08-G per handoff §3.B11) ──────────────────────
+  /**
+   * Voice match percentage (0..100) → green pill "{pct}% khớp" in the meta-row
+   * (after name, before price) per mockup intent-02 state-C. Optional; when
+   * undefined the badge is hidden (backward-compat). NOTE: /intent-02 page does
+   * NOT currently pass this — BE returns RAW match_score (0..~30), not a pct.
+   * See file header KNOWN-ISSUE. KHÔNG bịa số.
+   */
+  matchScorePct?: number;
 }
 
 // PRIVATE: stock-issue banner (raw inline per C-23 atom bypass)
@@ -140,6 +158,16 @@ function CornerBadge(props: { badge: CartItemCornerBadge }): React.ReactElement 
   );
 }
 
+// PRIVATE (S-08 T02): voice match badge — green pill rgba(34,197,94,0.12) in meta-row.
+function MatchBadge(props: { pct: number }): React.ReactElement {
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-px rounded-full text-[10px] font-bold text-icp-green-600 bg-[rgba(34,197,94,0.12)]">
+      <span className="inline-block w-1 h-1 rounded-full bg-icp-green-600" aria-hidden="true" />
+      {props.pct}% khớp
+    </span>
+  );
+}
+
 // MAIN: <CartItemRow>
 export const CartItemRow = React.forwardRef<HTMLDivElement, CartItemRowProps>(
   (
@@ -153,6 +181,7 @@ export const CartItemRow = React.forwardRef<HTMLDivElement, CartItemRowProps>(
       isUpdating,
       lineTotalOverride,
       currencyFormatter,
+      matchScorePct,
       className,
       ...props
     },
@@ -188,7 +217,7 @@ export const CartItemRow = React.forwardRef<HTMLDivElement, CartItemRowProps>(
             {cornerBadge ? <CornerBadge badge={cornerBadge} /> : null}
           </div>
 
-          {/* Body — brand + name + price + qty stepper row */}
+          {/* Body — brand + name + (match badge) + price + qty stepper row */}
           <div className="flex-1 min-w-0">
             <div className="text-[9px] text-icp-pink-700 font-semibold uppercase tracking-[0.3px] mb-[2px]">
               {product.brand}
@@ -196,6 +225,14 @@ export const CartItemRow = React.forwardRef<HTMLDivElement, CartItemRowProps>(
             <div className="text-[13px] text-icp-pink-900 font-semibold leading-[1.3] tracking-[-0.1px] mb-1.5 overflow-hidden line-clamp-2">
               {product.name}
             </div>
+
+            {/* S-08 T02 NEW: match badge in meta-row (after name, before price). Hidden when undefined. */}
+            {matchScorePct !== undefined ? (
+              <div className="mb-1.5">
+                <MatchBadge pct={matchScorePct} />
+              </div>
+            ) : null}
+
             <div className="flex items-baseline gap-1.5 mb-2">
               <span className="text-[14px] text-icp-rose-700 font-bold font-mono tracking-[-0.3px]">
                 {fmt(product.price)}
@@ -219,7 +256,7 @@ export const CartItemRow = React.forwardRef<HTMLDivElement, CartItemRowProps>(
                 >
                   <Icon name="minus" size={14} />
                 </button>
-                {/* S-05 T03 NEW: Spinner replaces qty number during in-flight PATCH */}
+                {/* S-05 T03: Spinner replaces qty number during in-flight PATCH */}
                 {isUpdating ? (
                   <div className="min-w-[24px] flex items-center justify-center" aria-label="Đang cập nhật">
                     <Spinner size={14} color="pink" />

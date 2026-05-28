@@ -185,7 +185,14 @@ def _voice_match_class(m: dict) -> str:
     cands = m.get("candidates") or []
     # Ordinal reference path sets match_score=1.0 with a single candidate;
     # treat as confident (no Vespa scale involved).
-    if m.get("resolution") == "ordinal":
+    # FIX (Sx08-H): clarify_pick is an explicit user choice — set match_score=1.0
+    # + resolution="clarify_pick" at L1135. Without this whitelist, the picked
+    # item still falls through to the top2/top1 ratio check below; since its
+    # original Vespa candidates list is unchanged (top2 still high), the ratio
+    # re-classifies it as "ambiguous", so the multi-round loop never advances
+    # past the last item and routes to no_match_alts. A confirmed pick is
+    # confident by definition — same as ordinal.
+    if m.get("resolution") in ("ordinal", "clarify_pick"):
         return "match"
     if m.get("matched_product") is None or top1 < VOICE_MIN_SCORE:
         return "no_match"
