@@ -55,12 +55,6 @@
  */
 
 import { z } from 'zod';
-// S-10 T01.G — analytics card/reasoning/clarify schemas (engine-faithful types)
-import {
-  AnalyticsCardSchema,
-  AnalyticsReasoningSchema,
-  AnalyticsClarifyOptionSchema,
-} from '../dto/analytics.dto';
 
 // ---------------------------------------------------------------------------
 // S-02 T07 existing 10 events (C-36 LOCKED) — UNCHANGED
@@ -82,7 +76,6 @@ export const SseStatusEvent = z.object({
     'synthesizing',
     'committing',
     'awaiting_user_input',
-    'load_context', // S-10 T01.G — analytics graph load_context phase
     'done',
   ]),
 });
@@ -681,35 +674,6 @@ export const SseVoiceClarifyOptionsEvent = z.object({
  *
  * **S-04 T03 extends:** 7 NEW S-04 events appended (per D-S04-03/13/14 LAW).
  */
-// ---------------------------------------------------------------------------
-// S-10 T01.G NEW 2 — Intent 07 Voice Analytics (D-S10-NN-G math-first reasoning)
-// `chart` + `tool_result` are REUSED from base (S-02/S-08); only these 2 are new.
-// ---------------------------------------------------------------------------
-
-/**
- * `analytics_cards` — 0..N action cards emitted by `_node_build_insights`.
- * Each card carries solver-derived numbers + `_trace` (D-S10-NN-G); `reasoning`
- * is the aggregate 5-slot block for drill-down. NO LLM-generated numbers.
- */
-export const SseAnalyticsCardsEvent = z.object({
-  type: z.literal('analytics_cards'),
-  request_id: z.string(),
-  count: z.number(),
-  cards: z.array(AnalyticsCardSchema),
-  reasoning: AnalyticsReasoningSchema.nullable(),
-});
-
-/**
- * `analytics_clarify` — DORMANT Pattern-A interrupt (mockup state-I). Emitted only
- * when the classifier finds no analyzable subject AND can offer concrete options.
- */
-export const SseAnalyticsClarifyEvent = z.object({
-  type: z.literal('analytics_clarify'),
-  request_id: z.string(),
-  question: z.string(),
-  options: z.array(AnalyticsClarifyOptionSchema),
-});
-
 export type IntentStreamEventMap = {
   // S-02 T07 base 10
   status: z.infer<typeof SseStatusEvent>;
@@ -746,9 +710,6 @@ export type IntentStreamEventMap = {
   voice_transcribed: z.infer<typeof SseVoiceTranscribedEvent>;
   // S-08 T01 C-S08-R (Phiên Sx08-D3; TS sync Sx08-D8)
   voice_clarify_options: z.infer<typeof SseVoiceClarifyOptionsEvent>;
-  // S-10 T01.G NEW 2
-  analytics_cards: z.infer<typeof SseAnalyticsCardsEvent>;
-  analytics_clarify: z.infer<typeof SseAnalyticsClarifyEvent>;
 };
 
 /** Union of typed event names — used in `streamIntent(handlers)` key constraint. */
@@ -791,7 +752,4 @@ export const IntentStreamSchemas = {
   voice_transcribed: SseVoiceTranscribedEvent,
   // S-08 T01 C-S08-R (Phiên Sx08-D3; TS sync Sx08-D8)
   voice_clarify_options: SseVoiceClarifyOptionsEvent,
-  // S-10 T01.G NEW 2
-  analytics_cards: SseAnalyticsCardsEvent,
-  analytics_clarify: SseAnalyticsClarifyEvent,
 } as const;

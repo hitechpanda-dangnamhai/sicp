@@ -359,7 +359,6 @@ async def _node_enrich(
 async def _node_generate_description(
     state: IcpState,
     publisher: RedisPublisher,
-    mcp_client: McpClient | None = None,  # D-S10-NN-G-I01-Q4
 ) -> dict[str, Any]:
     """LLM call to compose product title + description from vision + enrich data.
 
@@ -375,22 +374,6 @@ async def _node_generate_description(
     attrs = vision.get("attributes") or {}
     shopee_agg = (enrich.get("shopee") or {}).get("aggregates") or {}
     trend = enrich.get("gtrends") or {}
-    # D-S10-NN-G-I01-Q4: math-first price (strict LAW D-S10-NN-G — LLM never generates the
-    # number). suggest_price (pure) computes the prefill; deterministic shopee_avg
-    # fallback when the solver does not emit (confidence gate) or no shopee data.
-    _price_ctx = {
-        "shopee_avg_price": shopee_agg.get("avg_price", 0),
-        "shopee_sample_count": shopee_agg.get("sample_count", 0),
-        "trend_trajectory": trend.get("trajectory", "stable"),
-    }
-    _price_solver = (
-        await _fetch_price_solver(mcp_client, _price_ctx) if mcp_client else {}
-    )
-    _algo_price = (
-        int(_price_solver["suggested_price"])
-        if _price_solver.get("emitted") and _price_solver.get("suggested_price")
-        else None
-    )
 
     context_payload = {
         "category": vision.get("category", ""),
@@ -425,7 +408,7 @@ async def _node_generate_description(
             "_description": {
                 "title": title_fallback,
                 "description": f"{title_fallback} — nhập từ ảnh.",
-                "suggested_price": _algo_price if _algo_price is not None else shopee_agg.get("avg_price", 0),  # D-S10-NN-G-I01-Q4
+                "suggested_price": shopee_agg.get("avg_price", 0),
             },
         }
 
@@ -434,7 +417,7 @@ async def _node_generate_description(
         llm_result = {}
     title = str(llm_result.get("title") or "").strip()
     description = str(llm_result.get("description") or "").strip()
-    suggested_price = _algo_price if _algo_price is not None else shopee_agg.get("avg_price", 0)  # D-S10-NN-G-I01-Q4
+    suggested_price = llm_result.get("suggested_price") or shopee_agg.get("avg_price", 0)
     try:
         suggested_price = int(suggested_price)
     except (TypeError, ValueError):
@@ -1100,7 +1083,7 @@ def compile_importing_by_images_graph(
         return await _node_enrich(s, publisher, mcp_client)
 
     async def n_describe(s: IcpState) -> Any:
-        return await _node_generate_description(s, publisher, mcp_client)  # D-S10-NN-G-I01-Q4
+        return await _node_generate_description(s, publisher)
 
     async def n_emit_prefill(s: IcpState) -> Any:
         return await _node_emit_prefill_and_interrupt(s, publisher)

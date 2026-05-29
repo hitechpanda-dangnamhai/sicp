@@ -51,8 +51,6 @@ import { ChartLine } from '@/components/icp/organisms/charts/ChartLine';
 import { ChartBar } from '@/components/icp/organisms/charts/ChartBar';
 import { EmptyState } from '@/components/icp/organisms/EmptyState';
 import { ErrorState } from '@/components/icp/organisms/ErrorState';
-import { HomeBottomNav } from '@/components/icp/layout';
-import styles from './intent-07.module.css';
 
 // --- helpers ---------------------------------------------------------------
 const vnd = new Intl.NumberFormat('vi-VN');
@@ -121,40 +119,35 @@ export default function Intent07AnalyzePage() {
   const { status } = stream.state;
 
   return (
-    <div className={styles.pageWrap}>
-      <div className={styles.phoneFrame}>
-        {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-pink-100/70 bg-white/60 backdrop-blur">
-          <button
-            onClick={() => router.push('/home')}
-            className="text-[13px] text-rose-700 font-medium"
-            aria-label="Trang chính"
-          >
-            ← Trang chính
-          </button>
-          <div className="flex items-center gap-1.5">
-            {status === 'analyzing' || status === 'listening' ? (
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" aria-hidden />
-            ) : null}
-            <span className="text-[13px] font-bold text-rose-900">Phân tích kinh doanh</span>
-          </div>
-          <span className="w-[68px]" aria-hidden />
-        </header>
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 via-orange-50/40 to-amber-50/30 flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-between px-4 py-3 border-b border-pink-100/70 bg-white/60 backdrop-blur">
+        <button
+          onClick={() => router.push('/home')}
+          className="text-[13px] text-rose-700 font-medium"
+          aria-label="Trang chính"
+        >
+          ← Trang chính
+        </button>
+        <div className="flex items-center gap-1.5">
+          {status === 'analyzing' || status === 'listening' ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" aria-hidden />
+          ) : null}
+          <span className="text-[13px] font-bold text-rose-900">Phân tích kinh doanh</span>
+        </div>
+        <span className="w-[68px]" aria-hidden />
+      </header>
 
-        <main className={`${styles.frameBody} px-4 py-5`}>
-          {status === 'idle' && renderIdle(handleStart)}
-          {status === 'listening' &&
-            renderListening(recorder.durationMs, handleStop, handleCancel)}
-          {status === 'analyzing' && renderAnalyzing(stream.state)}
-          {status === 'result' && renderResult(stream.state, stream.dispatch)}
-          {status === 'empty' && renderEmpty(handleStart)}
-          {status === 'clarify' && renderClarify(stream.state, handleStart)}
-          {status === 'error' && renderError(stream.state, handleStart, handleCancel)}
-        </main>
-
-        {/* Bottom nav — same dashboard shell as /home (footer pinned to frame). */}
-        <HomeBottomNav />
-      </div>
+      <main className="flex-1 overflow-y-auto px-4 py-5">
+        {status === 'idle' && renderIdle(handleStart)}
+        {status === 'listening' &&
+          renderListening(recorder.durationMs, handleStop, handleCancel)}
+        {status === 'analyzing' && renderAnalyzing(stream.state)}
+        {status === 'result' && renderResult(stream.state, stream.dispatch)}
+        {status === 'empty' && renderEmpty(handleStart)}
+        {status === 'clarify' && renderClarify(stream.state, handleStart)}
+        {status === 'error' && renderError(stream.state, handleStart, handleCancel)}
+      </main>
     </div>
   );
 }

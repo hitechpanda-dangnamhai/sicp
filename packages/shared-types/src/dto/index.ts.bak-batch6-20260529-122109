@@ -16,5 +16,3 @@
 
 export * from './error.dto';
 export * from './intent-suggest-attrs.dto';
-// S-10 T01.G — Intent 07 analytics reasoning/card DTOs
-export * from './analytics.dto';

@@ -85,11 +85,6 @@ export const IntentRequestSchema = z.object({
       'recommend',
       'cart_clear_confirm',
       'cart_view_with_stock_check',
-      // S-10 NEW (Intent 07): voice analytics dispatch discriminator. AI
-      // main.py reads `entry_intent = payload.get("hint")` and routes
-      // `modality=='voice' and entry_intent=='analyze'` → analyzing_by_voices.
-      // Additive enum extension (zero-blast): only voice modality consumes it.
-      'analyze',
     ])
     .optional(),
   /**

@@ -97,11 +97,3 @@ Input utterance: "mua cái gì đó đi"
 Voice history: []
 Current cart: {{"items": []}}
 Output: {{"action": "add", "items": [{{"query": "cái gì đó", "qty": 1, "is_product_reference": false}}], "confidence": 0.1}}
-
-# Cross-intent (S-10): a superlative referring to the previous analyze
-# turn's ranked list. matched_products is stored top-first by sales, so
-# "bán chạy nhất" -> ordinal_ref 1 (resolved from voice_history[-1]).
-Input utterance: "thêm cái bán chạy nhất vào giỏ"
-Voice history: [{{"user_utterance": "phân tích cửa hàng", "action": "analyze.run", "matched_products": [{{"id": "MAGGI-01", "title": "Nước tương Maggi 700ml"}}, {{"id": "TUONGAN-01", "title": "Dầu ăn Tường An 1L"}}]}}]
-Current cart: {{"items": []}}
-Output: {{"action": "add", "items": [{{"query": "[ordinal]", "qty": 1, "ordinal_ref": 1}}], "confidence": 0.9}}

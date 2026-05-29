@@ -43,26 +43,10 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
-# shared-types is a workspace dep built before web (line below). Its per-package
-# node_modules (pnpm symlinks → root .pnpm store, incl. zod) must be present or
-# `pnpm --filter @icp/shared-types build` → tsc fails "Cannot find module 'zod'".
-# Symmetric to the apps/web copy above. (.dockerignore excludes node_modules, so
-# `COPY . .` below does NOT bring it from host — it must come from the deps stage.)
-COPY --from=deps /app/packages/shared-types/node_modules ./packages/shared-types/node_modules
 COPY . .
 
 RUN corepack enable && corepack prepare pnpm@9 --activate
 RUN pnpm --filter @icp/shared-types build
-# Same-origin proxy target for next.config.js `rewrites()`. Next bakes rewrite
-# destinations into routes-manifest.json at BUILD time, so this must be set
-# before `pnpm --filter @icp/web build`. In docker the web server proxies
-# /api/v1/* to the gateway over the compose network (service DNS `gateway`),
-# NOT localhost (which is the web container itself → ECONNREFUSED). Override at
-# build with `--build-arg GATEWAY_PROXY_TARGET=...` if the gateway service name
-# or port changes. NOT a NEXT_PUBLIC_ var → never inlined into the client bundle
-# (browser SSE/fetch keep using localhost:3001 via the host port map).
-ARG GATEWAY_PROXY_TARGET=http://gateway:3001
-ENV GATEWAY_PROXY_TARGET=$GATEWAY_PROXY_TARGET
 RUN pnpm --filter @icp/web build
 
 # --- Stage 3: runner --------------------------------------------------------

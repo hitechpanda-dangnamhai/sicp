@@ -1,0 +1,62 @@
+/* =============================================================================
+ * apps/web/app/intent-07/intent-07.module.css — Scoped page shell for /intent-07.
+ *
+ * Mirrors `app/home/home.module.css` (pageWrap + phoneFrame) so Intent 07 sits
+ * in the SAME mobile dashboard frame as /home (centered phone card + gradient +
+ * shadow), instead of rendering full-bleed. Per-page CSS Module is the existing
+ * convention (home uses its own module) → zero coupling, zero-blast.
+ *
+ * `frameBody` lets the content area + bottom nav stack as a column inside the
+ * frame; the nav is always the last child so the footer is pinned to the bottom
+ * of the card regardless of content height.
+ * =============================================================================
+ */
+
+.pageWrap {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  font-family: 'Be Vietnam Pro', -apple-system, sans-serif;
+  background: #FDF2F4;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 14px;
+  color: #831447;
+}
+
+@media (min-width: 1024px) {
+  .pageWrap {
+    padding: 32px;
+  }
+}
+
+.phoneFrame {
+  width: 100%;
+  max-width: 414px;
+  /* Match home frame height so the bottom nav anchors at the card bottom even
+     for short states (idle/empty). 85vh keeps it phone-proportioned on desktop;
+     content scrolls inside via .frameBody. */
+  min-height: min(85vh, 760px);
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #FCE7F0 0%, #FEEEE0 40%, #FFF8F0 100%);
+  border-radius: 24px;
+  overflow: hidden;
+  border: 0.5px solid #F9D8E4;
+  box-shadow: 0 20px 60px rgba(233, 30, 99, 0.18);
+}
+
+@media (min-width: 1024px) {
+  .phoneFrame {
+    box-shadow: 0 32px 80px rgba(233, 30, 99, 0.24);
+  }
+}
+
+/* Scrollable content region between header and bottom nav. */
+.frameBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}

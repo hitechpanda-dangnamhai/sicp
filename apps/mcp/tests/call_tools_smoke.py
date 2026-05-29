@@ -1,0 +1,116 @@
+#!/usr/bin/env python3
+"""S-10 Phần B+C end-to-end smoke (live DB).
+
+Calls the 3 NEW SQL tools (aggregate / detect_anomaly / stock_snapshot) against
+the seeded DB, feeds their output into the 5 solvers, and produces the real
+Intent-07 action cards — proving the math-first chain works on real data
+(no LLM, no graph yet; that's Phần D/E).
+
+Run from apps/mcp/:
+    DATABASE_URL=postgresql://icp:icp_dev_password@localhost:5432/icp \
+      PYTHONPATH=. python3 tests/call_tools_smoke.py
+"""
+from __future__ import annotations
+
+import os
+
+os.environ.setdefault("DATABASE_URL", "postgresql://icp:icp_dev_password@localhost:5432/icp")
+
+import psycopg  # noqa: E402
+
+from src.tools.analytics import (  # noqa: E402
+    aggregate, detect_anomaly, stock_snapshot,
+    suggest_promo, suggest_restock, suggest_loan, explain_trend,
+)
+
+DSN = os.environ["DATABASE_URL"]
+
+
+def resolve():
+    with psycopg.connect(DSN) as c:
+        with c.cursor() as cur:
+            cur.execute("""
+                SELECT id::text,
+                       round(EXTRACT(EPOCH FROM (NOW()-created_at))/2592000.0, 1)
+                FROM users WHERE email='merchant1@demo.icp'
+            """)
+            row = cur.fetchone()
+    return row[0], float(row[1])
+
+
+def main():
+    mid, tenure = resolve()
+    print(f"merchant Anh Nam id={mid[:8]}…  tenure={tenure} months\n")
+
+    # --- Tool 1: aggregate (chart D + loan revenue) ---
+    agg = aggregate({"merchant_id": mid, "period": "month"})
+    print("[aggregate] monthly chart:")
+    for r in agg["rows"]:
+        print(f"    {r['label']}  rev {r['revenue']:>12,}  orders {r['orders']}")
+    print(f"    last_30d_revenue = {agg['last_30d_revenue']:,}\n")
+
+    # --- Tool 2: detect_anomaly (severity + explain_trend inputs + contribution) ---
+    an = detect_anomaly({"merchant_id": mid, "window_days": 7})
+    print(f"[detect_anomaly] merchant delta {an['merchant']['delta_pct']}%  "
+          f"(recent {an['merchant']['recent_rev']:,} / prior {an['merchant']['prior_rev']:,})")
+    for c in an["categories"]:
+        print(f"    {c['category']:11} {c['delta_pct']:>+6}%  sev={c['severity']:11} "
+              f"contrib={c['contribution_pct']}%")
+    cat = {c["category"]: c for c in an["categories"]}
+
+    # --- Tool 3: stock_snapshot (restock + loan velocity) ---
+    st = stock_snapshot({"merchant_id": mid, "category": "nuoc_tuong"})
+    maggi = next(p for p in st["products"] if p["title"].startswith("Nước tương Maggi đậm"))
+    print(f"\n[stock_snapshot] Maggi: stock {maggi['current_stock']} qty_7d {maggi['qty_7d']} "
+          f"velocity {maggi['velocity_per_day']}/d days_left {maggi['days_left']}\n")
+
+    print("=" * 60)
+    print("ACTION CARDS (math-first, every number from _trace):")
+    print("=" * 60)
+
+    # Card 1: dau_an caution -> promo + explain_trend
+    da = cat["dau_an"]
+    promo = suggest_promo({"delta_pct": da["delta_pct"]})
+    trend = explain_trend({
+        "qty_now": da["recent_qty"], "qty_prev": da["prior_qty"],
+        "price_now": da["recent_rev"] / da["recent_qty"],
+        "price_prev": da["prior_rev"] / da["prior_qty"],
+        "delta_rev_category": da["recent_rev"] - da["prior_rev"],
+        "delta_rev_merchant": an["merchant"]["recent_rev"] - an["merchant"]["prior_rev"],
+        "period": "rolling_7d", "product_id": None, "merchant_id": mid,
+    })
+    print(f"\n① CAUTION dau_an {da['delta_pct']}% (severity={da['severity']}):")
+    print(f"   explain: {trend['direction']} {trend['delta_revenue_pct']}% · "
+          f"volume {trend['breakdown'][0]['pct']}% / price {trend['breakdown'][1]['pct']}% · "
+          f"contribution {trend['category_contribution_pct']}%")
+    print(f"   promo  : giảm giá {promo['promo_pct']}% → hồi phục ~{promo['projected_recovery_pct']}%")
+
+    # Card 2: nuoc_tuong restock (Maggi)
+    restock = suggest_restock({"qty_7d": maggi["qty_7d"], "current_stock": maggi["current_stock"]})
+    nt = cat["nuoc_tuong"]
+    print(f"\n② OPPORTUNITY nuoc_tuong {nt['delta_pct']}% (Maggi đang lên):")
+    print(f"   restock: bán {restock['velocity_per_day']}/ngày, tồn {maggi['current_stock']} "
+          f"(đủ {restock['days_left']} ngày) → đặt thêm ~{restock['reorder_qty']} chai")
+
+    # Card 3: loan
+    loan = suggest_loan({
+        "avg_monthly_revenue": agg["last_30d_revenue"], "tenure_months": tenure,
+        "qty_7d": maggi["qty_7d"], "trend_trajectory": "rising",
+        "reorder_qty": restock["reorder_qty"], "unit_price": maggi["unit_price"],
+    })
+    print(f"\n③ LOAN (eligible={loan['emitted']}, reputation={loan['reputation']}):")
+    print(f"   vay ~{loan['suggested_amount']:,}đ / {loan['term_months']} tháng "
+          f"(hạn mức 0.5× rev {agg['last_30d_revenue']:,}, cửa hàng {tenure}m)")
+
+    # --- assertions ---
+    assert -22 <= da["delta_pct"] <= -15 and da["severity"] == "caution", da
+    assert trend["category_contribution_pct"] and 55 <= trend["category_contribution_pct"] <= 70, trend
+    assert 72 <= trend["breakdown"][0]["pct"] <= 88, trend["breakdown"]
+    assert 14 <= promo["promo_pct"] <= 17, promo  # real -18.6% -> 16 (clamp 18.6/1.2)
+    assert restock["reorder_qty"] >= 60 and restock["emitted"], restock
+    assert loan["emitted"] is True and loan["suggested_amount"] > 0, loan
+    print("\n✅ FULL CHAIN SMOKE PASS — 3 tools → 5 solvers → 3 cards from real DB")
+
+
+if __name__ == "__main__":
+    main()

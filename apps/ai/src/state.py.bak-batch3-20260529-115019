@@ -285,21 +285,3 @@ class IcpState(TypedDict, total=False):
     voice_parsed_items: list       # LLM bulk parse output [{query, qty, unit?, ordinal_ref?}]
     voice_matched_products: list   # Vespa resolve output per item (asyncio.gather)
     voice_clarify_pending: bool    # Pattern A interrupt flag awaiting='clarify_pick'
-
-    # ------------------------------------------------------------------
-    # S-10 T01.D (Intent 07 analyzing_by_voices) — ADDITIVE analytics voice
-    # fields per D-S10-NN-G LAW (math-first reasoning). total=False so these
-    # are optional; only the analytics graph reads/writes them. voice_text /
-    # voice_action / voice_history / voice_confidence are REUSED from S-08.
-    # ------------------------------------------------------------------
-    analyze_metric: str            # classify: revenue|trend|stock|loan|overview
-    analyze_dimension: str         # classify: category|product|merchant|month
-    analyze_time_range: str        # classify: rolling_7d|week|month
-    analyze_filters: dict          # classify: {category?, product?}
-    analyze_clarify_pending: bool  # Pattern A interrupt flag awaiting='analyze_clarify'
-    _agg_data: dict                # transient: analytics.aggregate result
-    _anomaly_data: dict            # transient: analytics.detect_anomaly result
-    _stock_data: dict              # transient: analytics.stock_snapshot result
-    analyze_reasoning: dict        # build_insights: {price,promo,restock,trend,loan}
-    analyze_cards: list            # build_insights: 0..N action cards (numbers+_trace)
-    analyze_narrative: str         # narrate: LLM VN prose (NO numbers generated)

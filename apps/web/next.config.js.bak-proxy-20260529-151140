@@ -37,21 +37,8 @@ const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
   async rewrites() {
-    // Gateway base URL for the SAME-ORIGIN PROXY (server-side, runs inside the
-    // web container). MUST be container-reachable, so it differs from the
-    // BROWSER-facing URL used by client EventSource/fetch:
-    //   - server proxy target → `http://gateway:3001` (docker network DNS)
-    //   - browser SSE/fetch    → `http://localhost:3001` (host port map)
-    // Using NEXT_PUBLIC_GATEWAY_URL here would be wrong: it is empty in .env and
-    // its fallback `localhost:3001` resolves to the web container itself
-    // (ECONNREFUSED). `GATEWAY_PROXY_TARGET` is a server-only var baked at build
-    // time (apps/web/Dockerfile ARG, default `http://gateway:3001`) and is NOT
-    // inlined into the client bundle. Local non-docker dev (var unset) falls
-    // back to localhost:3001.
-    const gatewayUrl =
-      process.env.GATEWAY_PROXY_TARGET ||
-      process.env.NEXT_PUBLIC_GATEWAY_URL ||
-      'http://localhost:3001';
+    // Gateway base URL — env-driven for prod override, defaults to dev port.
+    const gatewayUrl = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://localhost:3001';
     return [
       {
         // Same-origin proxy for all Gateway endpoints. Tracker SDK uses

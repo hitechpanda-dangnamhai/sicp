@@ -120,10 +120,7 @@ export interface PostIntentBody {
     | 'search'
     | 'recommend'
     | 'cart_clear_confirm'
-    | 'cart_view_with_stock_check'
-    // S-10 NEW (Intent 07 voice analytics): forwarded to AI, dispatched to
-    // analyzing_by_voices when modality=='voice'. Mirrors intent-request.dto.ts.
-    | 'analyze';
+    | 'cart_view_with_stock_check';
   /** S-04 NEW per D-S04-03 LAW Adaptive Single Endpoint. */
   mode?: 'ai_augmented' | 'basic_fallback';
   /**
