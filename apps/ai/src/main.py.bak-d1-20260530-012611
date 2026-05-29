@@ -654,13 +654,6 @@ def create_app() -> Flask:
             filters_override = payload.get("filters") if isinstance(
                 payload.get("filters"), dict
             ) else None
-            # S-10 text-entry (Intent 07 preset, e.g. home "Xem phân tích"):
-            # optional text question that drives the analyze flow WITHOUT audio.
-            # When present + dispatched to analyzing_by_voices, the STT node uses
-            # it directly (skips Gemini). Absent → normal voice/audio path.
-            text_query = payload.get("text_query") if isinstance(
-                payload.get("text_query"), str
-            ) else None
             span.set_attribute("ai.modality", modality)
             span.set_attribute("ai.mode", mode)
             span.set_attribute("ai.user_id", user_id)
@@ -699,11 +692,6 @@ def create_app() -> Flask:
                 # When dict non-empty, parse_filters node uses these instead
                 # of calling LLM. Shape: {category?: str, extra: {brand?: str}}.
                 "_filters_override": filters_override,
-                # S-10 NEW: preset text question for Intent 07 text-entry. When
-                # set, analyzing_by_voices STT node skips Gemini and uses it.
-                # None for all other flows → no behavior change (voice graph's
-                # transcribe node ignores voice_text and reads audio content).
-                "voice_text": text_query or None,
             }
 
             # Drive search graph async in background thread.

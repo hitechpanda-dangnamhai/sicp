@@ -1,5 +1,13 @@
-#######
-cd ~/projects/icpp/sicp && docker compose -f infra/docker-compose.yml build gateway web && docker compose -f infra/docker-compose.yml up -d gateway web
 
-#######
-
+1/ Muahang 
+s0 = xoa het
+s1 = "toi muon mua 1 chai dau an, 1 thung bia, 2 chai tuong ot"
+s2 = vao gio hang
+s3 = vao Home
+s4 = xem gio hang 
+2/ Muahang => xoa hang 
+s0 = vao mua hang 
+s1 = "bo thung bia"
+s2 = xem gio hang
+s3 = vao Home 
+s4 = xem icon gio hang

@@ -127,11 +127,6 @@ export interface PostIntentBody {
   /** S-04 NEW per D-S04-03 LAW Adaptive Single Endpoint. */
   mode?: 'ai_augmented' | 'basic_fallback';
   /**
-   * S-10 NEW (Intent 07 text-entry): preset question text driving the analyze
-   * flow without audio. Forwarded to AI; analyzing_by_voices uses it directly.
-   */
-  text_query?: string;
-  /**
    * Sx05-3-CODE HOTFIX (D-S05-13 LAW Cross-service User Context Propagation,
    * Phiên Sx05-3-CODE manual test discovery).
    *

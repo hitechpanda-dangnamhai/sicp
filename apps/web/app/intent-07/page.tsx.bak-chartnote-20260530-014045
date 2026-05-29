@@ -46,7 +46,6 @@ import { LivePartialTranscript } from '@/components/icp/molecules/LivePartialTra
 import { ActionCard } from '@/components/icp/molecules/ActionCard';
 import { AnalyzingPhasesCard } from '@/components/icp/molecules/AnalyzingPhasesCard';
 import { OrbPulse } from '@/components/icp/atoms/OrbPulse';
-import { Icon } from '@/components/icp/atoms';
 import { ChartCard } from '@/components/icp/organisms/ChartCard';
 import { ChartLine } from '@/components/icp/organisms/charts/ChartLine';
 import { ChartBar } from '@/components/icp/organisms/charts/ChartBar';
@@ -285,18 +284,11 @@ function renderAnalyzing(s: ReturnType<typeof useAnalyzeStream>['state']) {
 }
 
 // === state-C/G: chart (with expand → drilldown) ============================
-// `cautionNote` (optional) disambiguates the long-term monthly trend shown here
-// (whole shop, per month — usually rising) from the short-term per-category
-// warning surfaced in the action cards (one item, rolling 7 days — may be
-// falling). Both numbers are correct; the note prevents the "chart up but text
-// says down" confusion. Numbers come straight from the engine payload.
-function renderChart(chart: AnalyzeChartData, cautionNote?: string) {
+function renderChart(chart: AnalyzeChartData) {
   if (chart.values.length < 2) return null;
   const total = chart.values.reduce((a, b) => a + b, 0);
   const avg = total / chart.values.length;
   const last = chart.values[chart.values.length - 1];
-  const first = chart.values[0];
-  const shopRising = last >= first;
 
   const stats = (
     <div className="flex gap-4 pt-2">
@@ -325,26 +317,15 @@ function renderChart(chart: AnalyzeChartData, cautionNote?: string) {
     );
 
   return (
-    <div className="flex flex-col gap-2">
-      <ChartCard
-        title={chart.title}
-        meta={`${chart.yAxis} · Toàn cửa hàng / theo tháng`}
-        live
-        stats={stats}
-        defaultExpanded={false}
-      >
-        {body}
-      </ChartCard>
-      {cautionNote && (
-        <div className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200/70 px-3 py-2">
-          <Icon name="info" size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
-          <p className="text-[11.5px] leading-snug text-amber-800">
-            Biểu đồ là doanh thu <strong>toàn cửa hàng theo tháng</strong> (xu hướng dài hạn
-            {shopRising ? ' đang tăng' : ' đang giảm'}). {cautionNote}
-          </p>
-        </div>
-      )}
-    </div>
+    <ChartCard
+      title={chart.title}
+      meta={chart.yAxis}
+      live
+      stats={stats}
+      defaultExpanded={false}
+    >
+      {body}
+    </ChartCard>
   );
 }
 
@@ -376,18 +357,7 @@ function renderResult(
         </div>
       )}
 
-      {(() => {
-        // Build the scope-clarifying note from the real caution card (if any),
-        // so the chart explains why "shop up / item down" are both true.
-        const caution = s.cards.find((c) => c.type === 'caution');
-        const cat = caution?.category;
-        const dropPct = caution?.reasoning?.trend?.delta_revenue_pct;
-        const note =
-          caution && cat && typeof dropPct === 'number'
-            ? `Riêng ${cat} trong 7 ngày gần nhất lại giảm ${Math.abs(dropPct)}% — đó là cảnh báo bên dưới.`
-            : undefined;
-        return s.chart ? renderChart(s.chart, note) : null;
-      })()}
+      {s.chart && renderChart(s.chart)}
 
       {/* state-H — dynamic action cards (H-Q2: real count) */}
       {s.cards.length > 0 && (

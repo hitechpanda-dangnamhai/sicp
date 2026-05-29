@@ -60,11 +60,6 @@ export function useCart(): UseQueryResult<Cart, Error> {
     // Override QueryProvider default (false) — cart is mutable, refetch on focus
     // catches cross-tab mutations + bg-refresh after long idle (per handoff known issue #2).
     refetchOnWindowFocus: true,
-    // Always refetch when the cart page mounts, even within staleTime. Guarantees
-    // a fresh cart after AI/voice mutations on OTHER routes (e.g. "bỏ dầu ăn khỏi
-    // giỏ" on /intent-02) regardless of whether their invalidate reached this
-    // query instance — no hard refresh needed. Cheap: one GET on page open.
-    refetchOnMount: 'always',
     staleTime: 30_000,
   });
 }

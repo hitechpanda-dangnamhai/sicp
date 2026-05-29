@@ -36,9 +36,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { streamIntent, type IntentStreamHandlers } from '@/lib/sse-client';
-import { CART_QUERY_KEY } from '@/src/features/cart/use-cart';
 import {
   initialState,
   reduceState,
@@ -58,10 +56,6 @@ export interface UseVoiceStreamReturn {
 
 export function useVoiceStream(): UseVoiceStreamReturn {
   const [state, setState] = useState<VoiceState>(initialState);
-  // TanStack QueryClient — invalidate cart cache on cart_updated so the cart
-  // page reflects server truth without a hard refresh (D-S05-11 parity with
-  // use-cart-stream; voice-buy previously only updated its local reducer).
-  const queryClient = useQueryClient();
 
   // Refs survive React 18 StrictMode double-mount; cleanup only on real unmount.
   const esCloseRef = useRef<(() => void) | null>(null);
@@ -113,9 +107,6 @@ export function useVoiceStream(): UseVoiceStreamReturn {
     },
     cart_updated: (e) => {
       dispatch({ type: 'cart_updated', payload: e });
-      // Terminal cart mutation (add / remove e.g. "bỏ dầu ăn khỏi giỏ") — refetch
-      // server truth so the cart page is fresh on next view (no hard refresh).
-      void queryClient.invalidateQueries({ queryKey: CART_QUERY_KEY });
     },
     partial_text: () => {
       // Cosmetic incremental token stream (§2.1). Optional — no-op, must not crash.
@@ -128,7 +119,7 @@ export function useVoiceStream(): UseVoiceStreamReturn {
     error: (e) => {
       dispatch({ type: 'error', message: e.message });
     },
-  }), [dispatch, queryClient]);
+  }), [dispatch]);
 
   const submitUtterance = useCallback(
     async (audioBase64: string, mode?: string) => {

@@ -44,7 +44,6 @@ import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api'
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { DashboardService } from './dashboard.service';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
-import { DashboardInsightDto } from './dto/dashboard-insight.dto';
 
 function getTracer(): Tracer {
   return trace.getTracer('gateway.dashboard.controller');
@@ -81,46 +80,6 @@ export class DashboardController {
         span.setAttribute('auth.user_id_prefix', req.user.id.slice(0, 8));
         const result = await this.dashboardService.getStats(req.user.id);
         return result as DashboardStatsDto;
-      } catch (err) {
-        span.recordException(err instanceof Error ? err : new Error(String(err)));
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: err instanceof Error ? err.message : String(err),
-        });
-        throw err;
-      } finally {
-        span.end();
-      }
-    });
-  }
-
-  // ────────────────────────────────────────────────────────────────────────
-  // GET /dashboard/insight  — hero "AI VỪA PHÁT HIỆN" card (S-10, REAL data)
-  // ────────────────────────────────────────────────────────────────────────
-
-  @Get('insight')
-  @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
-  @ApiCookieAuth('icp_session')
-  @ApiOperation({
-    summary: 'Get home hero AI insight — REAL analytics (S-10 detect_anomaly)',
-    description:
-      'Returns `{delta_pct, direction, cause_count, has_data}` from ' +
-      'analytics.detect_anomaly (merchant-wide 7d-vs-prior-7d + count of ' +
-      'flagged categories). Replaces the hard-coded "giảm 12% / 2 nguyên nhân" ' +
-      'in HeroInsightCard. Same engine as /intent-07 so numbers agree. Requires ' +
-      'icp_session cookie.',
-  })
-  @ApiResponse({ status: 200, type: DashboardInsightDto })
-  @ApiResponse({ status: 401, description: 'Missing or invalid icp_session cookie' })
-  async getInsight(@Req() req: AuthedRequest): Promise<DashboardInsightDto> {
-    const tracer = getTracer();
-    const span = tracer.startSpan('gateway.dashboard.insight');
-    return context.with(trace.setSpan(context.active(), span), async () => {
-      try {
-        span.setAttribute('auth.user_id_prefix', req.user.id.slice(0, 8));
-        const result = await this.dashboardService.getInsight(req.user.id);
-        return result as DashboardInsightDto;
       } catch (err) {
         span.recordException(err instanceof Error ? err : new Error(String(err)));
         span.setStatus({

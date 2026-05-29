@@ -31,8 +31,6 @@ import { Injectable } from '@nestjs/common';
 import { PgPool } from '../database';
 import { createLogger, type IcpLogPayload } from '../observability';
 import { DashboardStatsSchema, type DashboardStatsType } from './dto/dashboard-stats.dto';
-import { DashboardInsightSchema, type DashboardInsightType } from './dto/dashboard-insight.dto';
-import { McpClient } from '../clients/mcp.client';
 
 @Injectable()
 export class DashboardService {
@@ -42,10 +40,7 @@ export class DashboardService {
     env: process.env.NODE_ENV ?? 'dev',
   }).child({ component: 'dashboard.service' });
 
-  constructor(
-    private readonly pg: PgPool,
-    private readonly mcp: McpClient,
-  ) {}
+  constructor(private readonly pg: PgPool) {}
 
   /**
    * Aggregate dashboard KPIs for the given merchant from live DB tables.
@@ -100,82 +95,5 @@ export class DashboardService {
     );
 
     return stats;
-  }
-
-  /**
-   * Hero "AI VỪA PHÁT HIỆN" insight for the given merchant — REAL analytics.
-   *
-   * Calls analytics.detect_anomaly (same engine as /intent-07) and derives:
-   *   - delta_pct   = merchant.delta_pct (recent 7d vs prior 7d, merchant-wide)
-   *   - cause_count = # categories with severity != 'normal' (the "N nguyên nhân")
-   *
-   * No LLM, no hard-coded numbers (replaces HeroInsightCard 12% / 2 causes).
-   * Defensive: any MCP/shape failure degrades to has_data=false so the home
-   * page never errors on the hero card.
-   */
-  async getInsight(userId: string): Promise<DashboardInsightType> {
-    let insight: DashboardInsightType = {
-      delta_pct: null,
-      direction: 'flat',
-      cause_count: 0,
-      has_data: false,
-    };
-
-    try {
-      const res = await this.mcp.call<{
-        merchant?: { delta_pct?: number; recent_rev?: number; prior_rev?: number };
-        categories?: Array<{ severity?: string }>;
-      }>('analytics.detect_anomaly', { merchant_id: userId, window_days: 7 });
-
-      const merchant = res?.merchant;
-      const categories = res?.categories ?? [];
-      // has_data only when there is at least one category row AND a prior-period
-      // baseline to compare against (else delta is meaningless / divide-by-zero).
-      const hasData =
-        categories.length > 0 && typeof merchant?.delta_pct === 'number';
-
-      if (hasData) {
-        const delta = merchant!.delta_pct as number;
-        const causeCount = categories.filter(
-          (c) => c.severity && c.severity !== 'normal',
-        ).length;
-        insight = {
-          delta_pct: delta,
-          direction: delta < -0.5 ? 'down' : delta > 0.5 ? 'up' : 'flat',
-          cause_count: causeCount,
-          has_data: true,
-        };
-      }
-    } catch (err) {
-      // Degrade gracefully — hero card shows neutral fallback, home stays up.
-      this.log.warn(
-        {
-          message: 'dashboard.insight_degraded',
-          extras: {
-            user_id_prefix: userId.slice(0, 8),
-            error: err instanceof Error ? err.message : String(err),
-          },
-        } as IcpLogPayload,
-        'dashboard.insight_degraded',
-      );
-    }
-
-    DashboardInsightSchema.parse(insight);
-
-    this.log.info(
-      {
-        message: 'dashboard.insight_served',
-        extras: {
-          source: 'detect_anomaly',
-          user_id_prefix: userId.slice(0, 8),
-          delta_pct: insight.delta_pct,
-          cause_count: insight.cause_count,
-          has_data: insight.has_data,
-        },
-      } as IcpLogPayload,
-      'dashboard.insight_served',
-    );
-
-    return insight;
   }
 }

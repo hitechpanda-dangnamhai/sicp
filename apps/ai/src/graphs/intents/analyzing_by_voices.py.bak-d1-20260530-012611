@@ -272,30 +272,6 @@ async def _node_speech_transcribe(
 ) -> dict[str, Any]:
     """speech.transcribe MCP -> voice_transcribed + partial_text SSE."""
     rid = state["request_id"]
-
-    # S-10 text-entry bypass: when a preset question text is supplied directly
-    # (e.g. home "Xem phân tích" → /intent-07?preset=...), skip Gemini STT and
-    # use the text as-is. Emits the SAME SSE shape as a real transcription so the
-    # downstream graph + FE result view are identical. Additive / zero-blast: the
-    # audio path below is untouched and only runs when no preset text is present.
-    preset_text = (state.get("voice_text") or "").strip()
-    if preset_text:
-        await publisher.publish_sse(
-            rid, "phase_progress", {"phase": "transcribe", "request_id": rid},
-        )
-        await publisher.publish_sse(
-            rid, "voice_transcribed",
-            {"type": "voice_transcribed", "text": preset_text, "confidence": 1.0,
-             "duration_ms": 0, "language": "vi"},
-        )
-        await publisher.publish_sse(
-            rid, "partial_text",
-            {"text": preset_text, "delta": preset_text, "request_id": rid},
-        )
-        _logger.info("analyze.transcribe.preset_text", request_id=rid,
-                     text_chars=len(preset_text))
-        return {"voice_text": preset_text, "voice_confidence": 1.0}
-
     audio_b64 = state.get("voice_audio_b64") or state.get("content") or ""
 
     if not audio_b64:

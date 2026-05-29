@@ -28,8 +28,6 @@
 
 'use client';
 
-import * as React from 'react';
-import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/icp/atoms';
 
@@ -38,53 +36,7 @@ export interface HeroInsightCardProps {
   className?: string;
 }
 
-interface InsightData {
-  delta_pct: number | null;
-  direction: 'down' | 'up' | 'flat';
-  cause_count: number;
-  has_data: boolean;
-}
-
 export function HeroInsightCard({ className }: HeroInsightCardProps) {
-  const router = useRouter();
-  const [insight, setInsight] = React.useState<InsightData | null>(null);
-
-  React.useEffect(() => {
-    let alive = true;
-    void (async () => {
-      try {
-        const res = await fetch('/api/v1/dashboard/insight', { credentials: 'include' });
-        if (!res.ok) return;
-        const data = (await res.json()) as InsightData;
-        if (alive) setInsight(data);
-      } catch {
-        /* leave null → neutral fallback headline */
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  // Headline: derive from real data; fall back to a neutral prompt while loading
-  // or when the merchant has no anomaly baseline (has_data=false).
-  const dirWord =
-    insight?.direction === 'down' ? 'giảm' : insight?.direction === 'up' ? 'tăng' : null;
-  const pct =
-    insight?.delta_pct != null ? Math.abs(Math.round(insight.delta_pct)) : null;
-  const headline =
-    insight?.has_data && dirWord && pct != null ? (
-      <>
-        Doanh thu tuần này {dirWord} <span className="grad-text-amber">{pct}%</span>
-      </>
-    ) : (
-      <>Xem phân tích doanh thu tuần này</>
-    );
-  const subline =
-    insight?.has_data && insight.cause_count > 0
-      ? `Tôi tìm ra ${insight.cause_count} nguyên nhân chính. Anh xem thử nhé?`
-      : 'Bấm để xem chi tiết doanh thu 7 ngày qua.';
-
   return (
     <div
       className={cn(
@@ -144,10 +96,10 @@ export function HeroInsightCard({ className }: HeroInsightCardProps) {
             AI VỪA PHÁT HIỆN
           </div>
           <div className="text-[18px] text-white font-bold leading-[1.3] tracking-[-0.3px] mb-1.5">
-            {headline}
+            Doanh thu tuần này giảm <span className="grad-text-amber">12%</span>
           </div>
           <div className="text-[12px] text-white/85 leading-[1.4]">
-            {subline}
+            Tôi tìm ra 2 nguyên nhân chính. Anh xem thử nhé?
           </div>
         </div>
       </div>
@@ -156,7 +108,6 @@ export function HeroInsightCard({ className }: HeroInsightCardProps) {
       <div className="relative flex gap-2">
         <button
           type="button"
-          onClick={() => router.push('/intent-07?preset=revenue_7d')}
           className={cn(
             'flex-1 bg-white border-none text-pink-700 py-3 rounded-2xl',
             'text-[13px] font-bold flex items-center justify-center gap-1.5',

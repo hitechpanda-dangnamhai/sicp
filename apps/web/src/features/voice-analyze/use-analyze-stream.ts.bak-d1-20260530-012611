@@ -43,12 +43,6 @@ export interface UseAnalyzeStreamReturn {
   state: AnalyzeState;
   /** POST /intent (voice + hint=analyze) + open EventSource. */
   submitUtterance: (audioBase64: string) => Promise<void>;
-  /**
-   * POST /intent for TEXT-driven analytics (Intent 07 preset, no audio):
-   * sends `text_query` instead of audio. AI skips STT and runs the same
-   * analyze flow. Used by home "Xem phân tích" → /intent-07?preset=...
-   */
-  submitText: (text: string) => Promise<void>;
   dispatch: (action: AnalyzeAction) => void;
 }
 
@@ -213,58 +207,6 @@ export function useAnalyzeStream(): UseAnalyzeStreamReturn {
     [buildHandlers, dispatch],
   );
 
-  const submitText = useCallback(
-    async (text: string) => {
-      esCloseRef.current?.();
-      esCloseRef.current = null;
-
-      const idempotencyKey = crypto.randomUUID();
-      const res = await fetch('/api/v1/intent', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'Idempotency-Key': idempotencyKey,
-        },
-        body: JSON.stringify({
-          modality: 'voice',
-          hint: 'analyze', // dispatch discriminator → analyzing graph
-          text_query: text, // AI skips STT and uses this as the question
-        }),
-      });
-
-      if (!res.ok) {
-        let errText = '';
-        try {
-          errText = await res.text();
-        } catch {
-          /* swallow */
-        }
-        dispatch({
-          type: 'error',
-          message: `POST /intent failed: HTTP ${res.status}${errText ? ` — ${errText.slice(0, 200)}` : ''}`,
-          code: 'E_POST_FAILED',
-        });
-        return;
-      }
-
-      const { request_id } = (await res.json()) as { request_id: string };
-      dispatch({ type: 'submit', requestId: request_id });
-
-      const close = streamIntent(
-        `${process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:3001'}/api/v1/intent/stream?id=${encodeURIComponent(request_id)}`,
-        buildHandlers(),
-        {
-          onError: () => {
-            // Transient drop — EventSource auto-reconnects (mirror S-04/S-08).
-          },
-        },
-      );
-      esCloseRef.current = close;
-    },
-    [buildHandlers, dispatch],
-  );
-
   useEffect(() => {
     return () => {
       esCloseRef.current?.();
@@ -272,5 +214,5 @@ export function useAnalyzeStream(): UseAnalyzeStreamReturn {
     };
   }, []);
 
-  return { state, submitUtterance, submitText, dispatch };
+  return { state, submitUtterance, dispatch };
 }
