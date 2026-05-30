@@ -16,7 +16,7 @@ follow-ups ("thêm 1 chai nữa") resolve correctly.
 "{voice_text}"
 
 INSTRUCTIONS:
-1. Classify the utterance into ONE of 5 action enum values per D-S08-NN-B LAW:
+1. Classify the utterance into ONE of 4 action enum values per D-S08-NN-B LAW:
    - "add"        — user wants to add product(s) to cart
                     (e.g. "Cho tôi 2 chai nước tương Maggi")
    - "update_qty" — user wants to change qty of item already in cart
@@ -25,14 +25,6 @@ INSTRUCTIONS:
                     (e.g. "Bỏ Maggi khỏi giỏ", "xóa mì tôm")
    - "query"      — user asks about history with NO cart mutation
                     (e.g. "Sản phẩm hồi nãy là gì?", "Em đặt mấy chai rồi?")
-   - "recommend"  — user expresses a NEED / CONTEXT implying a product
-                    category but names NO concrete product (e.g. "trời
-                    nóng uống gì", "đói quá ăn gì"). items MUST be [].
-                    GATE: use ONLY when no concrete product is named.
-                    If a real product is named (even loosely, e.g.
-                    "cho 2 bia") → "add", NOT "recommend". Nonsense /
-                    non-grocery → "add" with is_product_reference:false.
-                    When unsure → prefer "add"/"query".
 
 2. Extract items[] — list of {{query, qty, unit?, ordinal_ref?}}:
    - query        : product search string (Vietnamese, may include brand)
@@ -63,7 +55,7 @@ INSTRUCTIONS:
 OUTPUT (strict JSON, no markdown fences, no commentary, no quotes around the
 braces, exact key order):
 {{
-  "action": "add" | "update_qty" | "remove" | "query" | "recommend",
+  "action": "add" | "update_qty" | "remove" | "query",
   "items": [{{"query": "<string>", "qty": <int>, "unit": "<string?>", "ordinal_ref": <int?>, "is_product_reference": <bool>}}, ...],
   "confidence": <float in [0.0, 1.0]>,
   "ai_summary_vi": "<optional Vietnamese summary string, omit when not needed>"
@@ -113,21 +105,3 @@ Input utterance: "thêm cái bán chạy nhất vào giỏ"
 Voice history: [{{"user_utterance": "phân tích cửa hàng", "action": "analyze.run", "matched_products": [{{"id": "MAGGI-01", "title": "Nước tương Maggi 700ml"}}, {{"id": "TUONGAN-01", "title": "Dầu ăn Tường An 1L"}}]}}]
 Current cart: {{"items": []}}
 Output: {{"action": "add", "items": [{{"query": "[ordinal]", "qty": 1, "ordinal_ref": 1}}], "confidence": 0.9}}
-
-# Contextual-need recommendation (action="recommend"): the user states a
-# need/context and names NO concrete product. items MUST be [].
-Input utterance: "trời nóng quá uống gì cho mát"
-Voice history: []
-Current cart: {{"items": []}}
-Output: {{"action": "recommend", "items": [], "confidence": 0.8}}
-
-Input utterance: "tối nay nấu canh chua nên mua gì"
-Voice history: []
-Current cart: {{"items": []}}
-Output: {{"action": "recommend", "items": [], "confidence": 0.75}}
-
-# GATE counter-example: a concrete product is named → "add", NOT "recommend".
-Input utterance: "cho tôi 2 lon bia"
-Voice history: []
-Current cart: {{"items": []}}
-Output: {{"action": "add", "items": [{{"query": "bia", "qty": 2, "unit": "lon", "is_product_reference": true}}], "confidence": 0.92}}

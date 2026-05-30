@@ -236,7 +236,7 @@ VESPA_RESOLVE_LIMIT = 10
 
 # Voice action enum per D-S08-NN-B LAW.
 _VOICE_ACTIONS_MUTATE = {"add", "update_qty", "remove"}
-_VOICE_ACTIONS_ALL = {"add", "update_qty", "remove", "query", "recommend"}
+_VOICE_ACTIONS_ALL = {"add", "update_qty", "remove", "query"}
 
 
 def _mcp_url() -> str:
@@ -1413,138 +1413,6 @@ async def _node_final(
 # ============================================================================
 
 
-# ============================================================================
-# Node 3b — reason_need (action=recommend) — contextual-need reasoning LAYER
-# ============================================================================
-# Maps a vague NEED ("trời nóng uống gì") to ONE real category + search term,
-# fetches REAL products via vespa.hybrid_search (global — same recall as
-# resolve_items), and presents them as AMBIGUOUS candidates so route_resolution
-# renders the existing state-D clarify chip-row ("pick one of these"). Real
-# products only (Vespa never returns hallucinated items); category constrained
-# to the 11-taxonomy inside reason_need.txt. Additive: feeds the buy pipeline,
-# does not alter any existing node.
-_RECOMMEND_AMBIGUOUS_SCORE = float(os.getenv("ICP_RECOMMEND_AMBIG_SCORE", "5.0"))
-_RECOMMEND_MAX_CHIPS = int(os.getenv("ICP_RECOMMEND_MAX_CHIPS", "3"))
-
-
-async def _node_reason_need(
-    state: IcpState, publisher: RedisPublisher
-) -> dict[str, Any]:
-    """Contextual-need recommendation layer (action == "recommend").
-
-    voice_text -> LLM reason_need (category from fixed 11-taxonomy + search
-    term + VN reason) -> vespa.hybrid_search (global, real products) -> build
-    ONE pseudo-item with near-equal candidate scores so _voice_match_class
-    returns "ambiguous" -> route_resolution renders the existing state-D
-    clarify chip-row. No category / no hits -> empty matched list -> routes to
-    voice_no_match_alts ("không có"). Reuses the buy pipeline end-to-end.
-    """
-    rid = state["request_id"]
-    need_text = (state.get("voice_text") or "").strip()
-
-    await publisher.publish_sse(
-        rid,
-        "phase_progress",
-        {"phase": "reason_need", "request_id": rid},
-    )
-
-    # --- LLM reasoning: need -> category + search term + VN reason ---
-    llm = get_llm_client()
-    template = load_prompt("reason_need")
-    prompt = template.format(need_text=need_text)
-    try:
-        reasoned = await llm.generate_json(
-            prompt=prompt,
-            timeout_s=LLM_PARSE_TIMEOUT_S,
-        )
-    except LLMTimeout:
-        return await _emit_error_and_route_to_final(
-            publisher, rid, "E_INTENT_PARSE_FAILED",
-            "Em chưa nghĩ ra gợi ý, bạn nói lại nhu cầu nhé?",
-            {"retriable": True, "reason": "reason_need_timeout"},
-        )
-    except Exception as e:  # noqa: BLE001
-        _logger.error("voice.reason_need.unexpected",
-                      request_id=rid, error=str(e))
-        return await _emit_error_and_route_to_final(
-            publisher, rid, "E_INTENT_PARSE_FAILED",
-            "Em chưa nghĩ ra gợi ý, bạn nói lại nhu cầu nhé?",
-            {"retriable": True, "detail": str(e)[:200]},
-        )
-
-    category = (reasoned or {}).get("category")
-    search_term = ((reasoned or {}).get("search_term") or "").strip()
-    reason_vi = ((reasoned or {}).get("reason_vi") or "").strip()
-
-    # No sensible mapping -> no recommendation (route to no_match -> "không có").
-    if not category or not search_term:
-        _logger.info("voice.reason_need.no_category",
-                     request_id=rid, need=need_text, raw=reasoned)
-        await publisher.publish_sse(
-            rid, "understanding",
-            {"text": reason_vi or "Em chưa tìm được món phù hợp với yêu cầu này.",
-             "request_id": rid},
-        )
-        return {"voice_matched_products": []}
-
-    # --- Fetch REAL products (global Vespa, category-constrained) ---
-    mcp = McpClient(_mcp_url(), timeout_s=20.0)
-    try:
-        result = await mcp.call(
-            "vespa.hybrid_search",
-            {"query": search_term, "limit": VESPA_RESOLVE_LIMIT,
-             "category_filter": category},
-        )
-    except McpError as e:
-        _logger.warning("voice.reason_need.vespa_error",
-                        request_id=rid, search_term=search_term, error=str(e))
-        return {"voice_matched_products": []}
-
-    hits = (result or {}).get("items") or (result or {}).get("hits") or []
-    if not hits:
-        _logger.info("voice.reason_need.no_hits",
-                     request_id=rid, category=category, search_term=search_term)
-        await publisher.publish_sse(
-            rid, "understanding",
-            {"text": reason_vi or "Hiện chưa có món phù hợp trong cửa hàng.",
-             "request_id": rid},
-        )
-        return {"voice_matched_products": []}
-
-    # Recommendation = "several options, pick one" = ambiguous by definition.
-    # Force ambiguous so route_resolution renders the state-D clarify chip-row:
-    # equal candidate scores (>= VOICE_MIN_SCORE) => top2/top1 = 1.0 >=
-    # VOICE_RATIO_AMBIGUOUS. matched_product set (non-None => not no_match);
-    # resolution="recommend" is NOT in the confident whitelist, so
-    # _voice_match_class falls through to the ratio test => "ambiguous".
-    chips = hits[:_RECOMMEND_MAX_CHIPS]
-    for c in chips:
-        c["match_score"] = _RECOMMEND_AMBIGUOUS_SCORE
-
-    pseudo_item = {
-        "item_idx": 0,
-        "query": need_text,
-        "qty": 1,
-        "matched_product": chips[0],
-        "candidates": chips,
-        "match_score": _RECOMMEND_AMBIGUOUS_SCORE,
-        "resolution": "recommend",
-    }
-
-    # Narrate the reasoning (reuse understanding event — D-S08-NN-02, no new event).
-    await publisher.publish_sse(
-        rid, "understanding",
-        {"text": reason_vi or "Một vài gợi ý cho bạn:",
-         "request_id": rid},
-    )
-    _logger.info(
-        "voice.reason_need.emitted",
-        request_id=rid, need=need_text, category=category,
-        search_term=search_term, chip_count=len(chips),
-    )
-    return {"voice_matched_products": [pseudo_item]}
-
-
 def _route_by_voice_action(state: IcpState) -> str:
     """Conditional edge after parse_voice_intent → dispatch by action enum.
 
@@ -1560,9 +1428,6 @@ def _route_by_voice_action(state: IcpState) -> str:
     # add / update_qty → resolve_items
     if action in ("add", "update_qty"):
         return "resolve_items"
-    # recommend → contextual-need reasoning layer (additive; feeds buy pipeline)
-    if action == "recommend":
-        return "reason_need"
     _logger.warning("voice.unknown_action_route",
                     action=action)
     return "final"
@@ -1632,9 +1497,6 @@ def compile_buying_by_voices_graph(
     async def n_parse_voice_intent(s: IcpState) -> dict[str, Any]:
         return await _node_parse_voice_intent(s, publisher)
 
-    async def n_reason_need(s: IcpState) -> dict[str, Any]:
-        return await _node_reason_need(s, publisher)
-
     async def n_resolve_items(s: IcpState) -> dict[str, Any]:
         return await _node_resolve_items(s, publisher)
 
@@ -1666,7 +1528,6 @@ def compile_buying_by_voices_graph(
     g.add_node("load_voice_context", n_load_voice_context)
     g.add_node("speech_transcribe", n_speech_transcribe)
     g.add_node("parse_voice_intent", n_parse_voice_intent)
-    g.add_node("reason_need", n_reason_need)
     g.add_node("resolve_items", n_resolve_items)
     g.add_node("voice_cart_remove", n_voice_cart_remove)
     g.add_node("voice_recall", n_voice_recall)
@@ -1690,14 +1551,12 @@ def compile_buying_by_voices_graph(
             "resolve_items": "resolve_items",
             "voice_cart_remove": "voice_cart_remove",
             "voice_recall": "voice_recall",
-            "reason_need": "reason_need",
             "final": "final",
         },
     )
 
     # resolve_items → route_resolution (interrupt handling) → conditional
     g.add_edge("resolve_items", "route_resolution")
-    g.add_edge("reason_need", "route_resolution")
     g.add_conditional_edges(
         "route_resolution",
         _route_after_resolution,
