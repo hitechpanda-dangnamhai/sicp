@@ -227,7 +227,7 @@ export function SplashContent() {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              ECOSIN
+              Aida
             </div>
             <div className="text-[11px] text-[#BE185D] font-bold uppercase mb-[18px] tracking-[3px]">
               Hiểu — Học — Hành động
