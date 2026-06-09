@@ -90,3 +90,8 @@ docker-compose.override.yaml
 infra/vespa/models/clip_multilingual/model.onnx
 #infra/vespa/models/clip_multilingual/tokenizer.json
 infra/vespa/models/cross_encoder_rerank/model.onnx
+
+# --- Build artifacts / archives bị commit nhầm (dọn ngày push lỗi 408) ---
+*.zip
+storybook-static/
+apps/web/storybook-static/
