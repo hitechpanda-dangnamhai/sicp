@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-10T16:20:54Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-10T16:24:43Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -18,8 +18,8 @@
 - dashboard: 2 route — @Get('stats') @Get('insight') 
 - health: 2 route — @Get() @Get('ready') 
 - intent-action: 1 route — @Post(':rid/action') 
-- intent: 2 route — @Post() @Get('stream') 
 - intent-suggest-attrs: 1 route — @Post(':rid/suggest-attrs') 
+- intent: 2 route — @Post() @Get('stream') 
 - products: 1 route — @Patch(':id') 
 - tracking: 1 route — @Post() 
 - TOTAL: 25 route / 10 controller
@@ -102,6 +102,7 @@
 
 ## Frontend (apps/web)   <!-- find app -name page.tsx; ls components -->
 - pages (App Router): 47
+  - / (root)
   - /auth/forgot-password
   - /auth/login
   - /dev/acceptance/intent-01
@@ -148,7 +149,6 @@
   - /me/help
   - /me/notifications
   - /me/security
-  - / (root)
 - components/ui (shadcn): 8 file
 - components/icp/atoms: 10 file
 - components/icp/molecules: 44 file

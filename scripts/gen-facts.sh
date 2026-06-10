@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # gen-facts.sh v2 — sinh docs/FACTS.md từ code/DB thật. CẤM SỬA FACTS.md TAY.
 set -euo pipefail
+export LC_ALL=C
 cd "$(dirname "$0")/.."
 OUT="docs/FACTS.md"; mkdir -p docs
 ts="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
