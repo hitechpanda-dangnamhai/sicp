@@ -1,0 +1,358 @@
+ICP Workflow — Phase 2: Task Execution <S-XX>-T0Y <Task Name>
+
+## Context state
+
+Slice <S-XX> Phase 1 DONE. Đang execute task T0Y trong tổng số N tasks.
+Tasks DONE trước đó: <list T01..T0(Y-1) hoặc "none">.
+Tasks TODO sau: <list T0(Y+1)..T0N hoặc "none">.
+
+## Output language
+
+Tiếng Việt mix English technical terms.
+
+## Đã upload
+
+Tier 1 (8 files mandatory):
+- 5 INDEX_*, MASTER_ROADMAP, MASTER_SLICE_BACKLOG, TASK_OPERATING_SYSTEM
+
+Important Notes :
+Đối với các Files: 
+- INDEX_PROJECT.md
+- INDEX_SLICES.md
+- INDEX_DECISIONS.md
+Nếu không có thì tạo mới hoặc sử dụng file có tên và ghi chú thêm mỗi lần làm xong Task và đặt tên chúng là
+- INDEX_PROJECT_<S-XX>.md
+- INDEX_SLICES_<S-XX>.md
+- INDEX_DECISIONS_<S-XX>.md
+
+Tier 2 (slice context):
+- slices/<S-XX>_BRIEF.md
+- slices/<S-XX>_TASKLIST.md (current status)
+- slices/<S-XX>_decisions-log.md (cumulative D-NN + C-NN)
+- reports/<S-XX>_*.md intermediate reports liên quan task T0Y
+
+Tier 3 (task-specific): AI sẽ DISCOVER+DECIDE Bước 1.
+
+## Workflow Phase 2 (6 bước)
+
+### Bước 1: DISCOVER + DECIDE Tier 3 upload
+
+Đọc TASKLIST row T0Y. Identify:
+- Task scope: file gì emit, capability gì build
+- Dependencies: T0(Y-1) DONE chưa, output ở đâu
+- Pre-approved decisions áp dụng: D-NN nào relevant T0Y
+- Conflicts cumulative: C-NN nào affect T0Y
+- Stop conditions: ambiguity points cần human resolve trước khi code
+
+Output DECIDE: "Cần upload Tier 3 thêm các files sau vì [rationale]:
+                - [file 1] — [lý do]
+                - [file 2] — [lý do]
+                ...
+                Total ~Y KB. OK?"
+
+Đợi human confirm + upload.
+
+### Bước 2: Emit Task Pack
+
+Emit `taskpacks/<S-XX>-<T0Y>_<NAME>.md` per template:
+- Read First: 3-8 file references (per Rule 3 evidence sources)
+- Acceptance Criteria: bullet list cụ thể
+- Sub-items breakdown: với effort per item
+- Files emitted/modified: explicit paths
+- Smoke test: command checks
+- Stop Conditions: bullet list per Rule 5 STOP scenarios
+- Pre-approved decisions referenced: D-NN + C-NN cumulative áp dụng
+
+Đợi human ACK task pack scope trước khi proceed Bước 3.
+
+### Bước 3: Code execution
+
+AI emit code files theo Task Pack:
+- Mỗi file create/modify emit vào sandbox
+- Xuất ra /mnt/user-data/outputs/ cho human download
+- Hoặc nếu code-heavy task, emit theo batches với commit logical
+
+Track Stop Conditions throughout. Nếu hit STOP per Rule 5:
+- Break code
+- Write status
+- Output: "STOP per Rule 5. Phát hiện [X]. Options:
+   (a) Defer task này, làm task khác trước
+   (b) Amend scope, human approve
+   (c) Rollback, redo task pack
+   Human decide."
+- Đợi human decide → AI proceed. Decision logged Bước 6 amendment C-NN.
+
+### Bước 4: Smoke test + verification
+
+Chạy smoke commands theo Task Pack Acceptance Criteria. Capture output.
+Document:
+- All checks PASS: proceed Bước 5
+- Some checks FAIL: document trong "Known issues" Bước 5 report
+
+### Bước 5: Emit Implementation Report
+
+Emit `reports/<S-XX>-<T0Y>_REPORT.md` per Rule 4 template:
+- Scope: file gì emit, capability gì build
+- Changed files: full path list
+- Command output: build/test/lint logs
+- Tests: smoke at minimum, document PASS/FAIL
+- Known issues: tự khai báo, không giấu
+- Bonus — Conflicts Surfaced: nếu phát hiện docs inconsistency mới Rule 7
+- Verdict: 9 Gates PASS / FIX / REJECT preview
+
+### Bước 6: DECIDE INDEX + decisions-log + TASKLIST updates — MANDATORY ATOMIC
+
+CRITICAL RULE: Bước 6 emit cùng turn với Bước 5 report. KHÔNG split phiên.
+File emit Bước 3+5 + INDEX patches Bước 6 phải là cùng atomic batch human save.
+
+Output emission method (BUỘC tuân thủ):
+- INDEX files đều >200 dòng, code files variable.
+- KHÔNG dùng Cách 2 "tìm-thay đoạn" cho INDEX patches — human dễ copy sai → file
+  corrupted (đã có bug pattern).
+- BẮT BUỘC: AI đọc file gốc → apply edits trong sandbox → emit FULL REPLACE-READY
+  FILE vào outputs/. Human download + save đè trực tiếp.
+
+5 patches cần emit (đầy đủ file mới):
+
+1. **INDEX_SLICES.md** — Full replace-ready:
+   - Section [chữ cái] của <S-XX>: append per-task subsection mới
+     "### Task T0Y — <Name>"
+   - Subsection content:
+     ```
+     #### Artifacts (per-task T0Y)
+     | Path | Type | What's inside |
+     |---|---|---|
+     | `taskpacks/<S-XX>-T0Y_<NAME>.md` | taskpack | <summary> |
+     | `reports/<S-XX>-T0Y_REPORT.md` | implementation report | <summary> |
+     | `<code file 1>` | code | <purpose> — see INDEX_PROJECT.md Section [letter] |
+     | ... |
+
+     **Summary:** 1 paragraph 3-6 câu cover scope + decisions applied + conflicts
+     surfaced + verdict.
+     ```
+   - Update frontmatter: Total entries + Version bump if patch lớn
+   - Append update log line nếu phiên này có patch lớn (vd C-NN amendment)
+
+2. **INDEX_PROJECT.md** — Full replace-ready:
+   - Add rows Section A/B/C/D theo path cho mỗi code file MỚI emit
+   - Update "Last patched" column cho mỗi code file MODIFY
+   - Update frontmatter: Total entries
+
+3. **slices/<S-XX>_TASKLIST.md** — Full replace-ready:
+   - T0Y row Status `TODO` → `DONE (YYYY-MM-DD)`
+   - Append Status Log line cuối: "T0Y DONE Phiên N — verdict X"
+
+4. **slices/<S-XX>_decisions-log.md** — Full replace-ready (nếu có mid-task C-NN):
+   - Append entry vào Section 3 (Operational running log)
+   - Full C-NN format: Surface date + Conflict + Source A/B + Resolution + Applied tasks + Status
+
+5. **INDEX_DECISIONS.md** — Full replace-ready (nếu có mid-task C-NN ở patch 4):
+   - Append row Section 2.2b (hoặc 2.3b nếu pattern S-00b dùng) cho C-NN mới
+   - Update frontmatter Total entries
+
+### Bước 7: Emit Review (9 Gates)
+
+Emit `reviews/<S-XX>-<T0Y>_REVIEW.md`:
+- 9 Gates verdict table với evidence per gate
+- Overall verdict: PASS / FIX REQUIRED / REJECT
+- Recommendations: nếu FIX REQUIRED, list revisions cụ thể
+
+Nếu verdict FIX REQUIRED → AI propose fixes → human decide accept hoặc rollback.
+Nếu PASS → task T0Y COMPLETE, proceed task tiếp theo.
+
+### Bước 8: Verify (2-chiều)
+
+Sau khi human save all files + 5 INDEX patches, AI request verify:
+
+```bash
+# 1. Task subsection trong INDEX_SLICES
+grep -A1 "^### Task T0Y" INDEX_SLICES.md  # expect: header found
+
+# 2. Code files reference INDEX_PROJECT
+grep -oE '`<path-pattern>`' INDEX_PROJECT.md | sort -u
+
+# 3. TASKLIST status
+grep "T0Y" slices/<S-XX>_TASKLIST.md  # expect: DONE marker
+
+# 4. Decisions-log + INDEX_DECISIONS sync nếu có mid-task C-NN
+grep -c '^### [CD]-' slices/<S-XX>_decisions-log.md  # expect: N+1 if C-NN added
+
+# 5. No corruption
+grep -c "^### Task T" INDEX_SLICES.md  # expect: count increase by 1
+```
+
+Bất kỳ check fail → STOP, AI patch lại INDEX trước khi đóng task.
+
+## Sync Rule — Log và Index phải đi cùng nhau (RULE ÁP DỤNG SUỐT PHASE 2)
+
+Mọi task T0Y DONE phải emit 6 patches trong CÙNG turn DELIVER:
+
+1. `taskpacks/<S-XX>-T0Y_<NAME>.md` (Bước 2)
+2. Code files (Bước 3)
+3. `reports/<S-XX>-T0Y_REPORT.md` (Bước 5)
+4. `reviews/<S-XX>-T0Y_REVIEW.md` (Bước 7)
+5. INDEX_SLICES.md full replace-ready (Bước 6 patch 1)
+6. INDEX_PROJECT.md full replace-ready (Bước 6 patch 2)
+7. slices/<S-XX>_TASKLIST.md full replace-ready (Bước 6 patch 3)
+8. slices/<S-XX>_decisions-log.md full replace-ready (Bước 6 patch 4, nếu có C-NN)
+9. INDEX_DECISIONS.md full replace-ready (Bước 6 patch 5, nếu có C-NN)
+
+KHÔNG split các patch trên qua nhiều phiên. Cùng atomic batch human save.
+
+Mid-execution amendment rule (nếu task surface C-NN mới):
+1. Append vào slices/<S-XX>_decisions-log.md Section 3
+2. ĐỒNG THỜI append INDEX_DECISIONS.md Section 2.2b
+3. Nếu C-NN affect file code → patch INDEX_PROJECT.md row "Last patched"
+4. KHÔNG bao giờ chỉ patch decisions-log mà bỏ INDEX_DECISIONS
+
+Sanity check checklist cuối task T0Y:
+- [ ] Mọi code file mới có entry trong INDEX_PROJECT?
+- [ ] Mọi code file modify có "Last patched" update?
+- [ ] Task subsection có trong INDEX_SLICES Section [chữ cái]?
+- [ ] TASKLIST T0Y status DONE?
+- [ ] Mid-task C-NN nếu có → cả 2 file decisions-log + INDEX_DECISIONS đã update?
+- [ ] No corruption: no stray ```markdown fence, no broken headers?
+
+Bất kỳ ✗ nào → outdated, patch trước khi đóng task.
+
+## Rules guidance
+
+- Rule 1: AI propose task pack scope, human ack trước implement
+- Rule 4: Mọi code task reviewable — report + review mandatory
+- Rule 5 STOP: spec ambiguity ngoài decisions-log → DỪNG + hỏi human
+- Rule 7 surface: phát hiện docs inconsistency mới → ghi "Bonus — Conflicts Surfaced",
+  KHÔNG sửa docs/ (defer maintainer batch Phase 3)
+- **Rule 8 SYNC INDEX (LAW — overrides Rule 1-7 if conflict)**: per-task batch (taskpack
+  + code + report + review + 5 INDEX patches) atomic cùng turn DELIVER. Full replace-ready
+  file cho mọi INDEX patch (NO snippet). See `ai-delivery/TASK_OPERATING_SYSTEM.md` v2.0
+  Rule 8 sub-section 8.4 cho mid-execution amendment rule khi surface C-NN mới.
+- **HR-1 Cross-reference style (locked 2026-05-21, `INDEX_GOVERNANCE.md` v1.3 HARD RULES
+  section)**: Cross-references giữa governance docs dùng **tên file** (không line/row
+  numbers — drift). Khi cần detail file chưa upload → REQUEST user upload, KHÔNG infer
+  từ memory. Capability codes P-CAP dùng prefix **CAP-NN** để không nhầm với conflict
+  `C-NN`. Cross-slice D/C refs prefix slice (vd `S01-C-05`, `S02-D-01`).
+- 9 Gates check cuối Bước 7 review
+
+## Tương tác 1:1
+
+Mỗi turn 1 trong 3 loại: DISCOVER / DECIDE / DELIVER.
+Edit file:
+- Code files: emit nguyên file replace-ready
+- INDEX files: BẮT BUỘC full replace-ready, KHÔNG snippet tìm-thay
+- Append decisions-log: emit full file (KHÔNG append-only snippet)
+
+Bắt đầu Bước 1 (DISCOVER+DECIDE Tier 3 upload).
+
+Bắt buộc ghi nhớ:
+
+ICP project. Repo: /home/hai-dang/projects/icpp/sicp
+TASK_OPERATING_SYSTEM.md v3.0 áp dụng (8 Rules + 8 Execution Rules LAW).
+Quan trọng nhất:
+- ER-R1: 1 command / 1 paste cycle (không batch)
+- ER-R2: verify trước mọi edit (cat/grep/view fresh)
+- ER-R3: STOP khi unexpected, đưa options A/B/C
+- ER-R8: file .md upload theo tên đúng, không cần path
+
+Ack 8 Rules + 8 Execution Rules LAW trước khi proceed.
+
+Đối với các slice/task có tính chất vertical, law bắt buộc: 
+
++ Phải review các mockups và các state tuơng ứng với intent hoặc slice/task đang làm đầu tiên
+
+═══════════════════════════════════════════════════════════════════
+MOCKUP AMBIGUITY RESOLUTION RULE (MAR-1)
+
+Khi đọc mockup file (.html, .png, .fig, .sketch), nếu phát hiện 
+BẤT KỲ element nào sau đây gây mơ hồ về intent — DỪNG lại và 
+HỎI tôi 1:1 trước khi suy luận:
+
+1. Visual elements không có behavior rõ ràng:
+   - Pagination dots, progress indicators, carousels
+   - Tabs, segmented controls không có active state khác
+   - Decorative icons có thể là interactive button
+   - Animation cues (drift, pulse, fade) — purely visual hay 
+     có trigger state change?
+
+2. Copy text mơ hồ:
+   - Placeholder text trong input — cosmetic hay real seed data?
+   - Button label thiếu context navigation đích
+   - Error message — static hay dynamic từ backend?
+
+3. State transitions không document:
+   - Mockup có 5 states (A/B/C/D/E) — transition giữa các 
+     states ra sao? Auto-timer? User action? Backend response?
+   - Loading state duration?
+   - Success state — auto redirect hay manual click?
+
+4. Hidden/conditional elements:
+   - Element chỉ xuất hiện ở 1 vài states — điều kiện hiển thị?
+   - Demo hint card có xuất hiện ở production hay chỉ dev?
+
+5. Cross-screen relationship:
+   - File mockup A và B — flow connection ra sao?
+   - File mockup chỉ có 1 screen nhưng UI gợi ý multi-screen 
+     (vd pagination dots) — có thật sự multi-screen không?
+
+6. Responsive/breakpoint behavior:
+   - Mockup mobile 414px — desktop layout thế nào?
+   - Touch gesture (swipe, long-press) — có support không?
+
+7. Accessibility cues:
+   - Color-only differentiation — có cần icon/text fallback?
+   - Focus states không hiện trong mockup — design thế nào?
+
+CÁCH ĐẶT CÂU HỎI:
+- Pattern: "Mockup [file/element] có [đặc điểm X]. Đây là 
+  [interpretation A] hay [interpretation B]? Nếu [A] thì 
+  [hệ quả 1]; nếu [B] thì [hệ quả 2]."
+- 1 câu hỏi / 1 element mơ hồ
+- KHÔNG đề xuất 3 options phức tạp khi câu hỏi đơn giản
+- Đợi user trả lời 1-2 từ ngắn ("decorative", "carousel", 
+  "auto 2s", "user click") rồi mới proceed
+
+KHÔNG được:
+- Suy luận theo industry convention (Tinder/Duolingo/...) 
+  rồi commit code
+- Đề xuất 3 options khi 1 câu hỏi yes/no đủ resolve
+- Tự fill 2 mockup screens "thêm cho đủ carousel" khi 
+  designer chỉ làm 1 screen
+
+KHI NÀO ÁP DỤNG: Bước 1 DISCOVER của mọi task có mockup input
+trong context. Trước khi propose Task Pack scope ở Bước 2.
+═══════════════════════════════════════════════════════════════════
+
+## Phiên context — File system layout LAW (anh strict-enforce)
+
+**Convention bắt buộc cho mọi turn của phiên này và chỉ áp dụng với tất cả các file .md:**
+
+1. **`.md` docs (governance + spec + report + INDEX)** ALL ở `~/Downloads/` flat — KHÔNG subfolder. Path không carry semantic; **chỉ filename là canonical identifier**. Ví dụ:
+   - `S-04_decisions-log.md`, `S-04_TASKLIST.md`, `INDEX_DECISIONS_S-04.md`, `03_API_CONTRACTS.md`, `LOG_CATALOG.md` ... ALL live ở `/home/hai-dang/Downloads/<filename>.md`
+   - Đừng emit code with `slices/S-04_decisions-log.md` hay `docs/03_API_CONTRACTS.md` — đó là **suy luận sai về path**
+
+2. **Code files** (apps/, packages/, infra/) → `~/projects/icpp/sicp/` THEO ĐÚNG cấu trúc thư mục — path subfolder CARRY semantic. Ví dụ:
+   - `~/projects/icpp/sicp/apps/gateway/src/intent/intent.controller.ts`
+   - `~/projects/icpp/sicp/packages/shared-types/src/sse/intent-stream.ts`
+   - Đừng nhầm code file với .md doc
+
+3. **Emit format quyết định theo file size + change footprint:**
+   - **File ≤ 200 LOC** hoặc **≥ 30% lines change** → emit full file (download + copy/paste workflow)
+   - **File ≥ 200 LOC** AND **< 30% lines change** AND **≥ 2 anchor points unique-verifiable** → emit Python **patch script** với defensive validation:
+     - Đọc file → validate every anchor exists + is unique
+     - Apply patches in-memory
+     - Post-verify grep counts (min/max bounds)
+     - Backup original to `.bak-<phiên>` extension
+     - Atomic write (only if all checks PASS); exit code 1 + stderr nếu bất kỳ check nào fail
+   - Quyết định emit format phải state explicit reasoning ở turn của Claude (vd: "File 1639 LOC, change ~12%, 7 anchor points all unique → emit patch script tiết kiệm ~40K tokens")
+
+4. **Verify-before-edit (ER-R2 LAW áp dụng nghiêm)**: Mọi patch script bắt buộc:
+   - Trước emit script: dùng `view`/`grep`/`sed -n` để đọc EXACT anchor strings hiện có trong file target
+   - Tuyệt đối KHÔNG copy anchor string từ memory hay từ phiên trước — phải re-verify mỗi phiên
+   - Script phải dry-run được trên file copy trước khi apply lên file thật
+
+5. **Output emit cho patch script workflow:**
+   - Tên file: `apply-<phiên>-batch-<N>.py` (vd `apply-batch-1.py`)
+   - Mặc định DOCS_DIR hardcoded = `/home/hai-dang/Downloads` (KHÔNG path biến); user chỉ cần `python3 ~/Downloads/<script-name>.py` chạy từ bất kỳ pwd
+   - Đầu script comment block ghi rõ Phiên + Files target + Number of sub-patches per file
+   - Script tự emit summary cuối: "✅ Batch N atomic patch COMPLETE" hoặc "❌ FATAL: <reason>"
+
+**Anh kỳ vọng Claude phiên này tuân thủ ER-R10 LAW (xem TASK_OPERATING_SYSTEM v3.2 nếu đã apply).**

@@ -1,0 +1,327 @@
+ICP Workflow — Phase 1: Slice Setup <S-XX> <Slice Name>
+
+## Context state
+
+<Mô tả ngắn slice trước đã DONE chưa, vd "S-00b DONE 7/9 DoD PASS".
+ Nếu là slice đầu tiên thì ghi "Bắt đầu dự án".
+ Nếu slice CHƯA có trong BACKLOG, ghi rõ: "Slice <S-XX> emerged từ
+ audit/decision X — chưa có trong BACKLOG, cần insert">
+
+## Output language
+
+Tiếng Việt mix English technical terms.
+
+## Đã upload (Tier 1 — 8 files mandatory)
+
+- INDEX_GOVERNANCE.md
+- INDEX_DOCS.md
+- INDEX_PROJECT.md
+- INDEX_SLICES.md
+- INDEX_DECISIONS.md
+- MASTER_ROADMAP.md
+- MASTER_SLICE_BACKLOG.md
+- ai-delivery/TASK_OPERATING_SYSTEM.md
+
+### Important Notes :
+Đối với các Files: 
+- INDEX_PROJECT.md
+- INDEX_SLICES.md
+- INDEX_DECISIONS.md
+Nếu không có thì tạo mới hoặc sử dụng file có tên và ghi chú thêm mỗi lần làm xong Task và đặt tên chúng là
+- INDEX_PROJECT_<S-XX>.md
+- INDEX_SLICES_<S-XX>.md
+- INDEX_DECISIONS_<S-XX>.md
+
+## Workflow Phase 1 (5 bước)
+
+### Bước 0: Slice existence check
+
+Verify <S-XX> có trong MASTER_SLICE_BACKLOG. Nếu missing:
+- STOP per Rule 5
+- Output: "Slice <S-XX> chưa có trong BACKLOG"
+- Propose insert position (between which slices, dependency edges)
+- Đợi human OK → emit 4 patches (BACKLOG add row + INDEX_SLICES Section C add row
+  + INDEX_GOVERNANCE C9 update + decisions-log note)
+- Sau khi human save → proceed Bước 1
+
+### Bước 1: DISCOVER + DECIDE Tier 3 upload
+
+Đọc INDEX_* (đã upload Tier 1). Identify:
+- Slice type (H-UI / P-CAP / V-SLICE / Q-GATE) per BACKLOG
+- Method (EBT v2 / CDP / VSP / Checklist) tương ứng slice type
+- Primary phase spec per INDEX_DOCS Section 2
+- Past slice dependencies per INDEX_SLICES (slice trước đã DONE chưa, output ở đâu)
+- Relevant ADRs + cumulative C-NN per INDEX_DECISIONS
+
+Output DECIDE: "Cần upload Tier 3 thêm các files sau vì [rationale]:
+                - [file 1] (~X KB) — [lý do]
+                - [file 2] (~X KB) — [lý do]
+                ...
+                Total ~Y KB. Skip [file Z] vì [lý do]. OK?"
+
+Đợi human confirm + zip thêm Tier 3 → upload.
+
+### Bước 2: Apply method matrix
+
+Sau khi human upload Tier 3, apply method tương ứng slice type:
+
+**H-UI (EBT v2 — 5 bước):**
+1. SCAN: Extract mockups.zip vào sandbox /tmp/mockups/. Parse N HTML.
+2. COUNT: Python script đếm frequency CSS classes + SVG patterns. Emit
+   reports/<S-XX>_FREQUENCY_REPORT.md.
+3. SEMANTIC_NORMALIZE (4 sub-rules):
+   - 3.1 Component vs Utility: shimmer/pulse-ring → utility CSS, không component
+   - 3.2 Compound merging: ai-bubble + user-bubble → ConversationBubble compound
+   - 3.3 Variants: ac-tag-price/ac-tag-stock → 1 component prop variant
+   - 3.4 MOCKUP IS LAW: pattern frequency thấp nhưng wow → vẫn build (per Rule 6)
+4. CLASSIFY: Atom / Molecule / Organism / Utility. Emit reports/<S-XX>_SEMANTIC_COMPONENTS.md.
+5. BUDGET: Map vào ~5-7 task buckets dependency order. Emit reports/<S-XX>_BUDGET_REPORT.md
+   (nếu effort variance >2x BACKLOG estimate, MUST surface conflict + human pick option).
+
+**P-CAP (CDP — 5 bước):**
+1. INVENTORY: Đọc docs, list capabilities (~10-15 items).
+2. CONSUMER_MAPPING: Matrix Capability × Intent (8 intents).
+3. TIMING_DECISION: MUST_BEFORE / CAN_INCREMENTAL / DEFER (3 groups).
+4. TASK_BREAKDOWN: Mỗi capability = 1 task (~1-2 ngày). Emit reports/<S-XX>_CAPABILITY_MATRIX.md.
+5. ACCEPTANCE_TESTS: Smoke test integration cho mỗi MUST_BEFORE.
+
+**V-SLICE (VSP — 5 bước):**
+1. USER_JOURNEY: Map flow từ mockup intent.
+2. LAYER_SLICING: Matrix Milestone × Layer (FE/BE/DB/Events/Logs). Emit
+   reports/<S-XX>_LAYER_MATRIX.md.
+3. HAPPY_VS_EDGE: Classify state — MUST/SHOULD/NICE_TO_HAVE.
+4. SUB_TASK_BREAKDOWN: ~5-8 sub-tasks (DB → BE → FE order).
+5. ESTIMATE_SEQUENCE: Effort + cross-slice deps.
+
+**Q-GATE (Checklist Mode):**
+Liệt kê kiểm tra cần thực hiện, không phân task code. Output checklist
+trong slices/<S-XX>_TASKLIST.md.
+
+### Bước 3: DELIVER 3 files chính (+ intermediate reports nếu method requires)
+
+Emit 3 files vào sandbox + xuất ra outputs cho human download:
+- **slices/<S-XX>_BRIEF.md** theo template (Slice Goal / Type / Method / Evidence /
+  Done Means / Non-goals / Dependencies / Risks / Effort+timeline)
+- **slices/<S-XX>_TASKLIST.md** với task table T01-T0N (ID + name + type + priority
+  + depends on + output + effort + status)
+- **slices/<S-XX>_decisions-log.md** seed initial với Sections:
+  - Section 1: Pre-approved decisions (D-NN) — full format each
+  - Section 2: Surfaced conflicts (C-NN) — Source A/B với Rule 7 priority + Resolution + Applied tasks + Status
+  - Section 3: Operational running log (empty at planning, populated Phase 2)
+  - Section 4: Cross-references
+  - Section 5: Summary table tra cứu nhanh
+
+**Intermediate reports** (method-specific) — same workflow, emit vào reports/:
+- H-UI: reports/<S-XX>_FREQUENCY_REPORT.md + reports/<S-XX>_SEMANTIC_COMPONENTS.md + reports/<S-XX>_BUDGET_REPORT.md
+- P-CAP: reports/<S-XX>_CAPABILITY_MATRIX.md
+- V-SLICE: reports/<S-XX>_LAYER_MATRIX.md
+- Q-GATE: KHÔNG có intermediate report
+
+### Bước 4: DECIDE INDEX + BACKLOG updates — MANDATORY ATOMIC
+
+CRITICAL RULE: Bước 4 emit cùng turn với Bước 3 DELIVER. KHÔNG split phiên,
+KHÔNG để patch INDEX cho phiên sau. File emit Bước 3 + INDEX patches Bước 4 phải
+là cùng atomic batch human save.
+
+Output emission method (BUỘC tuân thủ):
+- INDEX files (INDEX_SLICES, INDEX_DECISIONS, MASTER_SLICE_BACKLOG) đều >200 dòng.
+- KHÔNG dùng Cách 2 "tìm-thay đoạn" cho INDEX patches — human dễ copy sai indent
+  hoặc miss text khiến file corrupted (đã có bug pattern).
+- BẮT BUỘC: AI đọc file gốc → apply edits trong sandbox → emit FULL REPLACE-READY
+  FILE vào /mnt/user-data/outputs/. Human download + save đè trực tiếp.
+
+3 INDEX patches cần emit (đầy đủ file mới, không snippet):
+
+1. **INDEX_SLICES.md** — Full replace-ready:
+   - Move <S-XX> từ Section C TODO row → strikethrough audit trail + insert Section
+     [D/E/...] mới (header + Achievement summary + Artifacts table 4-6 rows)
+   - Update frontmatter: Last updated + Version bump + Total entries
+   - Append update log line cuối
+
+2. **INDEX_DECISIONS.md** — Full replace-ready:
+   - Section 2 scope expand thêm slice mới (rename existing 2.1/2.2/2.3 với "a"
+     suffix → add 2.1b/2.2b cho slice mới)
+   - Section 2 header note: naming convention prefix per-slice (vd `S00b-D-01` vs
+     `S01-D-01`) để tra cứu cross-slice không nhầm
+   - Insert 2.1b (D-NN table) + 2.2b (C-NN table với Source A/B + Resolution + Applied tasks + Status)
+   - Update frontmatter: Total entries + Version bump
+   - Append update log line
+
+3. **MASTER_SLICE_BACKLOG.md** — Full replace-ready:
+   - Row in main table: <S-XX> Status `TODO` → `IN_PROGRESS (planning DONE YYYY-MM-DD, execution TODO)`
+   - Goal field: amend với specific outputs từ method matrix (vd "10 atoms + 13 molecules")
+   - Output expected: list 6 artifacts emitted + Phase 2 TODO
+   - Estimated effort: strikethrough cũ + amend với computed effort + cite C-NN
+     (vd "~~5-7 days~~ → 20-25 days, amended via C-05 Option A")
+   - Risks block: mark RESOLVED with cross-ref slices/<S-XX>_decisions-log.md C-NN
+
+### Bước 5: Verify (2-chiều)
+
+Sau khi human save 6 file (3 chính + 3 reports) + 3 INDEX patches, AI request verify
+chạy commands trong terminal root repo:
+
+```bash
+# 1. File → INDEX: every artifact đã emit phải có path trong INDEX_SLICES
+ls slices/<S-XX>_*.md reports/<S-XX>_*.md
+grep -oE 'slices/<S-XX>[^ )`]*\.md|reports/<S-XX>[^ )`]*\.md' INDEX_SLICES.md MASTER_SLICE_BACKLOG.md INDEX_DECISIONS.md | sort -u
+# expect: ≥6 unique paths matched
+
+# 2. INDEX → File: every INDEX entry phải tồn tại
+grep -oE 'slices/<S-XX>[^ )`]*\.md|reports/<S-XX>[^ )`]*\.md' INDEX_SLICES.md | xargs -I{} ls {} 2>&1 | grep -v "^slices\|^reports"
+# expect: no error output (no missing files)
+
+# 3. D-NN, C-NN count match
+grep -c '^### [CD]-' slices/<S-XX>_decisions-log.md  # expect: N D-NN + M C-NN
+grep -cE '<S-XX>.*[CD]-0|2\.1b|2\.2b' INDEX_DECISIONS.md  # expect: ≥ N+M+2
+
+# 4. Section header integrity (catch corruption like stray ```markdown fences)
+grep -c "^## Section [A-Z] —" INDEX_SLICES.md  # expect: increase by 1 vs before
+grep -c "^### 2\.[12]b" INDEX_DECISIONS.md  # expect: 2
+
+# 5. Status sync MASTER_SLICE_BACKLOG ↔ INDEX_SLICES
+grep "<S-XX>.*IN_PROGRESS" MASTER_SLICE_BACKLOG.md  # expect: 1 line
+grep "Section [A-Z] — <S-XX>" INDEX_SLICES.md  # expect: 1 header line
+```
+
+Bất kỳ check fail → STOP, AI patch lại INDEX trước khi đóng phiên.
+
+## Sync Rule — Log và Index phải đi cùng nhau (RULE ÁP DỤNG SUỐT PHASE 1)
+
+Mọi artifact emit ra (BRIEF, TASKLIST, decisions-log, intermediate reports) PHẢI
+được index ngay trong cùng phiên emit. KHÔNG bao giờ emit file mà để patch INDEX
+cho phiên sau.
+
+Mapping bắt buộc artifact ↔ INDEX:
+
+| Artifact | INDEX file phải patch | Section trong INDEX |
+|---|---|---|
+| `slices/<S-XX>_BRIEF.md` | INDEX_SLICES.md | Section [chữ cái] — header + Artifacts table |
+| `slices/<S-XX>_TASKLIST.md` | INDEX_SLICES.md | cùng Section, Artifacts table |
+| `slices/<S-XX>_decisions-log.md` | INDEX_SLICES.md + INDEX_DECISIONS.md | Section Artifacts + Section 2.1b/2.2b entries |
+| `reports/<S-XX>_<NAME>.md` (intermediate) | INDEX_SLICES.md | cùng Section, Artifacts table |
+| D-NN pre-approved decision | INDEX_DECISIONS.md | Section 2.1b entry |
+| C-NN surfaced conflict | INDEX_DECISIONS.md | Section 2.2b entry |
+| Slice status change | INDEX_SLICES.md + MASTER_SLICE_BACKLOG.md | move Section C → D + table row update |
+
+Sanity check checklist cuối Phase 1:
+- [ ] Mọi file Bước 3 emit có path trong INDEX_SLICES Section [chữ cái]?
+- [ ] Mọi D-NN, C-NN có entry trong INDEX_DECISIONS Section 2.1b/2.2b?
+- [ ] Slice row trong MASTER_SLICE_BACKLOG status đã update?
+- [ ] Version bump frontmatter các INDEX (vd v1.1 → v1.2)?
+- [ ] Update log line append cuối các INDEX?
+- [ ] No corruption: không có stray ```markdown fence, no broken section headers?
+
+Bất kỳ ✗ nào → outdated, patch trước khi đóng phiên.
+
+## Rules guidance
+
+- Rule 1: AI propose, human approve mọi decision lớn
+- Rule 5 STOP: ambiguity ngoài specs/ADRs/past decisions → STOP + hỏi, KHÔNG silent fix
+- Rule 6 MOCKUP IS LAW: slice H-UI hoặc V-SLICE MUST extract patterns từ mockup
+- Rule 7 Evidence Hierarchy: mockup > recent ADR > handoff > phase spec > general spec > repo
+- **Rule 8 SYNC INDEX (LAW — overrides Rule 1-7 if conflict)**: atomic emit artifact +
+  INDEX patches cùng turn. Full replace-ready file cho mọi INDEX patch (NO snippet
+  tìm-thay). See `ai-delivery/TASK_OPERATING_SYSTEM.md` v2.0 Rule 8 sub-sections 8.1-8.8
+  (atomic emit, replace-ready output, mapping artifact↔INDEX, mid-execution amendment,
+  verification 2-chiều, sanity checklist, anti-patterns, hierarchy override).
+- **HR-1 Cross-reference style (locked 2026-05-21, `INDEX_GOVERNANCE.md` v1.3 HARD RULES
+  section)**: Cross-references giữa governance docs (INDEX_*, MASTER_*, S-XX_*, reports/,
+  reviews/, taskpacks/) dùng **tên file** (không line/row numbers — drift). Khi cần
+  detail file chưa upload → REQUEST user upload, KHÔNG infer từ memory. P-CAP capability
+  codes dùng prefix **CAP-NN** (per S-02 precedent 2026-05-21) để không nhầm với conflict
+  `C-NN`. Cross-slice D/C refs prefix slice (vd `S01-C-05`, `S02-D-01`).
+- KHÔNG code yet, chỉ planning
+
+## Tương tác 1:1
+
+Mỗi turn 1 trong 3 loại:
+- DISCOVER: AI ra 1 bash command → human paste output
+- DECIDE: AI quyết định + rationale → human confirm/đổi
+- DELIVER: AI emit file content trong sandbox + xuất ra outputs/, present file
+  links cho human download
+
+Edit file:
+- Artifacts (slices/, reports/) nhỏ <200 dòng: emit nguyên file replace-ready
+- Artifacts lớn: emit nguyên file replace-ready (KHÔNG dùng tìm-thay đoạn)
+- INDEX files (3 file >200 dòng): BẮT BUỘC emit full replace-ready file mới, KHÔNG snippet
+- Append decisions-log: emit full file (KHÔNG append-only via snippet)
+
+Bắt đầu Bước 0 (verify slice existence).
+
+Bắt buộc ghi nhớ:
+
+ICP project. Repo: /home/hai-dang/projects/icpp/sicp
+TASK_OPERATING_SYSTEM.md v3.0 áp dụng (8 Rules + 8 Execution Rules LAW).
+Quan trọng nhất:
+- ER-R1: 1 command / 1 paste cycle (không batch)
+- ER-R2: verify trước mọi edit (cat/grep/view fresh)
+- ER-R3: STOP khi unexpected, đưa options A/B/C
+- ER-R8: file .md upload theo tên đúng, không cần path
+
+Ack 8 Rules + 8 Execution Rules LAW trước khi proceed.
+
+Đối với các slice/task có tính chất vertical, law bắt buộc: 
+
++ Phải review các mockups và các state tuơng ứng với intent hoặc slice/task đang làm đầu tiên
+
+═══════════════════════════════════════════════════════════════════
+MOCKUP AMBIGUITY RESOLUTION RULE (MAR-1)
+
+Khi đọc mockup file (.html, .png, .fig, .sketch), nếu phát hiện 
+BẤT KỲ element nào sau đây gây mơ hồ về intent — DỪNG lại và 
+HỎI tôi 1:1 trước khi suy luận:
+
+1. Visual elements không có behavior rõ ràng:
+   - Pagination dots, progress indicators, carousels
+   - Tabs, segmented controls không có active state khác
+   - Decorative icons có thể là interactive button
+   - Animation cues (drift, pulse, fade) — purely visual hay 
+     có trigger state change?
+
+2. Copy text mơ hồ:
+   - Placeholder text trong input — cosmetic hay real seed data?
+   - Button label thiếu context navigation đích
+   - Error message — static hay dynamic từ backend?
+
+3. State transitions không document:
+   - Mockup có 5 states (A/B/C/D/E) — transition giữa các 
+     states ra sao? Auto-timer? User action? Backend response?
+   - Loading state duration?
+   - Success state — auto redirect hay manual click?
+
+4. Hidden/conditional elements:
+   - Element chỉ xuất hiện ở 1 vài states — điều kiện hiển thị?
+   - Demo hint card có xuất hiện ở production hay chỉ dev?
+
+5. Cross-screen relationship:
+   - File mockup A và B — flow connection ra sao?
+   - File mockup chỉ có 1 screen nhưng UI gợi ý multi-screen 
+     (vd pagination dots) — có thật sự multi-screen không?
+
+6. Responsive/breakpoint behavior:
+   - Mockup mobile 414px — desktop layout thế nào?
+   - Touch gesture (swipe, long-press) — có support không?
+
+7. Accessibility cues:
+   - Color-only differentiation — có cần icon/text fallback?
+   - Focus states không hiện trong mockup — design thế nào?
+
+CÁCH ĐẶT CÂU HỎI:
+- Pattern: "Mockup [file/element] có [đặc điểm X]. Đây là 
+  [interpretation A] hay [interpretation B]? Nếu [A] thì 
+  [hệ quả 1]; nếu [B] thì [hệ quả 2]."
+- 1 câu hỏi / 1 element mơ hồ
+- KHÔNG đề xuất 3 options phức tạp khi câu hỏi đơn giản
+- Đợi user trả lời 1-2 từ ngắn ("decorative", "carousel", 
+  "auto 2s", "user click") rồi mới proceed
+
+KHÔNG được:
+- Suy luận theo industry convention (Tinder/Duolingo/...) 
+  rồi commit code
+- Đề xuất 3 options khi 1 câu hỏi yes/no đủ resolve
+- Tự fill 2 mockup screens "thêm cho đủ carousel" khi 
+  designer chỉ làm 1 screen
+
+KHI NÀO ÁP DỤNG: Bước 1 DISCOVER của mọi task có mockup input
+trong context. Trước khi propose Task Pack scope ở Bước 2.
+═══════════════════════════════════════════════════════════════════
