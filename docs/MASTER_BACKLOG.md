@@ -51,7 +51,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-10 | Analytics Voice | 05 | ✅ | — |
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
-| S-META-02 | Hoà tan docs cũ | META | 🔄 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 chờ · T08 chuẩn hoá tham chiếu (chạy cuối) chờ |
+| S-META-02 | Hoà tan docs cũ | META | 🔄 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 chuẩn hoá tham chiếu (chạy cuối) chờ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | — *(mỗi 10 slice/tháng)* |
 
 ## §3 Queue P0 → P1 → P2 (việc còn lại tới go-live)
@@ -99,6 +99,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 27 | TTS FE audio playback | — | 🔵 | wire `speech.synthesize` → FE |
 | 28 | gtrends real API / Image CDN / dark mode / i18n / token contract test | — | 🔵 | — |
 | 29 | Đồng bộ log level enum structlog→Pino (warning→warn, critical→fatal) | — | 🔵 | query Loki hiện phải OR 2 enum |
+| 30 | Inline comment pattern voice:context Redis FIFO 5 turns TTL 30min (Intent 02 + 07) | — | 🔵 | thêm note tại `_node_load_voice_context` 2 graph khi chạm code; "KHÔNG đổi schema mà không bump version" |
 
 ## §4 Done gần đây
 

@@ -15,6 +15,10 @@
 | 00_CONTEXT.md ⚠️ trùng tên | docs/00_CONTEXT.md v3 (mới, file sống ở docs/) | 2026-06-11 |
 | 01_ARCHITECTURE.md | docs/00_CONTEXT.md v3 §2 (bản đồ kiến trúc) | 2026-06-11 |
 | phases/ (7 file Phase 00–06) | tan vào docs/MASTER_BACKLOG.md §3 (queue P0/P1/P2) + code (nhà thật); nhãn Phase chỉ còn cột "Phase" trong slice registry §2 | 2026-06-11 |
+| 02_DATA_MODEL.md | code (infra/migrations/V001-V010 + infra/vespa/{schemas,services.xml} + apps/mcp/src/policies/) + V011/V012 spec phủ bởi ADR-040/041/042/043/044/046 + BACKLOG #1/#3/#4/#14/#24/#25 | 2026-06-11 |
+| 03_API_CONTRACTS.md | code (packages/shared-types/src/{,sse,behavior,dto,api}) + apps/gateway/src + apps/mcp/src/tools/ + ADR-048 (Pattern A) + ADR-049 (idempotency per-route) | 2026-06-11 |
+| 04_INTENT_SPECS.md | code (apps/ai/src/graphs/intents/*.py + state.py) + 00_CONTEXT v3 §6 (8 intent enum) | 2026-06-11 |
+| 09_FIELD_AUDIT.md | code (infra/vespa/schemas/product.sd summary fields + packages/shared-types/src/) + ADR-025 (UI Field Audit Process) | 2026-06-11 |
 
 > ⚠️ **Ca trùng tên `00_CONTEXT.md`:** docs/00_CONTEXT.md là v3 mới (Workflow v2,
 > hiến pháp + bản đồ). Bản v1 ở docs/archive-v1/00_CONTEXT.md là fossil. Mọi
