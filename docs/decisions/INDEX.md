@@ -47,5 +47,6 @@
 | [ADR-044](ADR-044.md) | Per-tenant usage metering (billing SaaS) | Accepted | Bảng `usage_events` + rollup `usage_daily` per tenant; metrics ai_calls/searches/orders/storage_mb |
 | [ADR-045](ADR-045.md) | Workflow v2 (dual-surface) + critical-path tenant-before-payment | Accepted | (a) Workflow v2 dual-surface + FACTS gate + Single Home; (b) P0 multi-tenant TRƯỚC payment |
 | [ADR-046](ADR-046.md) | Tenant data model #2 — marketplace (users/sessions global) | Accepted | `users`/`sessions` global; merchant/staff qua `tenant_memberships`; mọi data khác tenant-scoped (RLS + app-level) |
+| [ADR-047](ADR-047.md) | AI service trusts Gateway-forwarded identity (no JWT verify in AI/MCP) | Accepted | Gateway = perimeter; AI/MCP tin `X-User-Id` + `X-Tenant-Id`; enforce network isolation infra-level |
 
 ⚠️ **Gap:** ADR-026 … ADR-030 không tồn tại trong file gốc — không sinh số bù.

@@ -51,7 +51,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-10 | Analytics Voice | 05 | ✅ | — |
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
-| S-META-02 | Hoà tan docs cũ | META | 🔄 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06–T07 chờ · T08 chuẩn hoá tham chiếu (chạy cuối) chờ |
+| S-META-02 | Hoà tan docs cũ | META | 🔄 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 chờ · T08 chuẩn hoá tham chiếu (chạy cuối) chờ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | — *(mỗi 10 slice/tháng)* |
 
 ## §3 Queue P0 → P1 → P2 (việc còn lại tới go-live)
@@ -66,7 +66,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 4 | GDPR/Luật BVDLCN 2025 consent + DSAR + retention | ADR-041 | 🟡 | `consent_records`/`data_subject_requests`/`data_retention_policies` chưa có; consent gate tracking; V011 |
 | 5 | Auth hardening (rate-limit + refresh rotation + CORS/CSP) | — | 🟡 | `@nestjs/throttler`+Redis; reuse-detection trên `sessions.refresh_token_hash` UNIQUE (V009 đã có) |
 | 6 | DR / backup / PITR | — | 🟡 | pg_dump + WAL-G + restore runbook; Vespa/Redis snapshot |
-| 7 | Grafana Alerting + SLO/error-budget | — | 🟡 | thay "console-only"; alert p95/error-rate/payment/aggregator |
+| 7 | Grafana Alerting + SLO/error-budget + production dashboards | — | 🟡 | alert p95/error-rate/payment/aggregator; dashboards Service map (RED), Intent latency, LLM cost, Behavior funnel, per-tenant panel |
 | 8 | File upload validate (MIME + size) | — | 🟡 | reject oversize trước Gemini vision |
 | 9 | Tenant-scoped analytics matview | — | 🟡 | matview +`tenant_id` GROUP BY (sau S-tenant) |
 
