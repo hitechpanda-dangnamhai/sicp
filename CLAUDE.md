@@ -111,6 +111,9 @@ Known issues: <tự khai, kể cả nghi ngờ>
 
 ### Shared types / codegen
 - OpenAPI do Gateway sinh là source of truth (`@nestjs/swagger`, lệnh `pnpm openapi:sync`). TS: import `@icp/shared-types`. Behavior schemas: Zod tại `packages/shared-types/src/behavior/*` (`discriminatedUnion('event_type')`).
+- Đổi DTO → `pnpm openapi:sync` BẮT BUỘC trước commit; CI gate drift (`git diff --exit-code packages/shared-types/openapi.json packages/shared-types/src/api/`).
+- FE: CẤM raw `fetch` cho REST endpoint — dùng generated services từ `@icp/shared-types/api` (wrap TanStack Query). Streaming/SSE qua `apps/web/lib/sse-client.ts` (`EventSource`) là ngoại lệ duy nhất.
+- API URL versioned `/api/v1/...`. Field rename/remove = breaking → 2-phase (parallel field → FE migrate → remove old).
 
 ### Async / streaming
 - SSE:
@@ -125,6 +128,13 @@ Known issues: <tự khai, kể cả nghi ngờ>
 - CORS: allow origin cụ thể qua `CORS_ORIGIN`. KHÔNG `*`.
 - Upload: ảnh base64 inline trong field `content`. Size 2 lớp: transport `useBodyParser('json', { limit: '10mb' })` + Zod `content.max(10_000_000)`. (MIME server-side cho image: chưa validate — xem BACKLOG §3 P0 #8.)
 - Pino redact paths: `password`/`*.password`, `authorization`/`*.authorization`, `token`/`*.token`, `access_token`, `refresh_token`, `jwt` (giữ `jti`). PII rộng (email/phone/name) chưa enforce — xem BACKLOG §3 P1 #21.
+
+### Observability (logs / traces / behavior)
+- Log fields LOCKED mọi entry: `timestamp` (ISO8601 UTC), `level`, `service`, `trace_id`, `span_id`, `message`. Optional: `request_id`, `user_id`, `tenant_id` (V011), `intent`, `phase`, `duration_ms`, `ok`, `error_code`, `error_message`, `extras`. CẤM free-form (`User ${x} did...`).
+- Log levels — ⚠️ enum khác nhau: Node Pino `trace/debug/info/warn/error/fatal` vs Python structlog `debug/info/warning/error/critical`. Khi query Loki → handle cả 2 (đồng bộ enum = BACKLOG §3 P2 #29).
+- Span naming: `<layer>.<component>.<operation>`. Mọi span gắn `service.name/version` (Resource); `user.id`, `intent.type`, `request.id` khi có; `tenant.id` sau V011.
+- Behavior events: emit qua tracker SDK (`packages/shared-types/src/behavior/tracker.ts`) → `POST /api/v1/track` (batch). 100% capture, KHÔNG sample. CẤM trộn vào ops log. Schema strict Zod per event_type → invalid event = drop + ops log `tracker.event_dropped.reason`. Rename schema = bump version `event.v2`.
+- Mọi message name + event_type phải đăng ký `docs/LOG_CATALOG.md` (DoD §5) TRƯỚC khi emit.
 
 ### Performance budget (SLO target — chưa đo)
 - API p95 < **500ms** (non-AI); AI first SSE < **1s**, full response < **8s**.

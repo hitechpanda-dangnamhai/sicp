@@ -2,6 +2,13 @@
 
 > Append-only registry. Mọi message name (operational log) và event_type (behavior event) phải có entry ở đây trước khi dùng trong code.
 
+> **Registry append-only — entry mới phải đăng ký TRƯỚC khi dùng (CLAUDE.md DoD §5 +
+> §11 Observability). Verify quality: S-AUDIT định kỳ (mỗi 10 slice / tháng). Single
+> Home của registry log + behavior event — `07_BEHAVIOR_LOGS.md` đã hoà tan; mọi
+> event_type sống ở đây + Zod schemas ở `packages/shared-types/src/behavior/`. SSE
+> event catalog: source duy nhất = `packages/shared-types/src/sse/intent-stream.ts`
+> (Zod), KHÔNG chép vào registry này (mầm drift).**
+
 <!-- PRODUCTION RECONCILE (2026-06-09, verified vs live code):
 ⚠️ Kafka CHƯA WIRE: KHÔNG có topic `icp.*` nào trong code, KHÔNG có kafkajs/@nestjs/microservices/
 producer/consumer. "subscribe" thật = Redis pub/sub cho SSE (`sse:pubsub:{rid}`). → Mọi log/event do
@@ -25,8 +32,8 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 
 ### Intent / AI dispatch (gateway + ai) ✅ — RECONCILE
 - **Gateway:** `intent.received` · `intent.failed` · `intent.action_received` · `intent.action_failed` · `intent.suggest_attrs_received` · `intent.suggest_attrs_done` · `intent.suggest_attrs_failed` · `intent.sse_opened` · `intent.sse_session_missing` · `intent.sse_idle_timeout` · `intent.sse_idle_timeout_resume_failed`; `ai_client.initialized/health_ok/unhealthy/unreachable/intent_dispatched/intent_failed/intent_timeout/intent_resume_ok/intent_resume_failed`.
-- **AI:** `intent.received` · `intent.classified` · `intent.checkpoint_cleaned` · `intent.checkpoint_cleanup_failed`.
-- 🟡 **CHƯA CODE (ops log target):** `intent.completed`/`intent.degraded`/`intent.unknown`/`intent.sse_closed`/`intent.sse_heartbeat_sent`; `intent.first_card_emitted` hiện là **behavior event** (§B). **Hiện code dùng:** dispatch=`ai_client.intent_dispatched`; interrupt/resume per-graph (`analyze.interrupt_clarify`/`analyze.resumed`); lifecycle=`intent.sse_idle_timeout`+`sse.pubsub.unsubscribed`; degrade=`analyze.classify.timeout_degrade`/`parse_filters.timeout_fallback`.
+- **AI:** `intent.received` · `intent.classified` · `intent.checkpoint_cleaned` · `intent.checkpoint_cleanup_failed` · `intent.first_card_emitted` (verified `apps/ai/src/tools/redis_publisher.py:297` + `searching_by_text.py:614`; pair với §B `search.first_card_rendered` D-S04-14 LAW FE-side time-to-paint).
+- 🟡 **CHƯA CODE (ops log target):** `intent.completed`/`intent.degraded`/`intent.unknown`/`intent.sse_closed`/`intent.sse_heartbeat_sent`. **Hiện code dùng:** dispatch=`ai_client.intent_dispatched`; interrupt/resume per-graph (`analyze.interrupt_clarify`/`analyze.resumed`); lifecycle=`intent.sse_idle_timeout`+`sse.pubsub.unsubscribed`; degrade=`analyze.classify.timeout_degrade`/`parse_filters.timeout_fallback`.
 
 ### SSE Pub/Sub (gateway) ✅
 `sse.pubsub.subscribed` · `sse.pubsub.forwarded` · `sse.pubsub.unsubscribed` · `sse.pubsub.subscribe_failed`. 🟡 `sse.pubsub.published` (AI-side) chưa thấy log.
@@ -81,8 +88,8 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 - 🟡 **CHƯA CODE (target khi wire crawler thật ADR-039):** `gtrends.fetched`/`cache_hit`/`unavailable`/`rate_limited` — **nên dùng** khi thay fixture.
 
 ### Cards (mcp) ✅ — RECONCILE
-`cards.list_pending.done`.
-- 🟡 `card.created`/`card.expired` (worker-cardgen) = **CHƯA CODE** (worker skeleton). `card.accepted`/`card.rejected` = **behavior event** (§B), không phải ops log.
+`cards.list_pending.done` · `card.created` (verified `apps/mcp/src/tools/cards.py:152`).
+- 🟡 `card.expired` (worker-cardgen) = **CHƯA CODE** (worker skeleton — BACKLOG §3 P1 #14). `card.accepted`/`card.rejected` = **behavior event** (§B), không phải ops log.
 
 ### Cart (gateway + ai) ✅ — RECONCILE
 - **Gateway (REST):** `cart.get_received` · `cart.item_add_received` · `cart.item_remove_received` · `cart.qty_change_received` · `cart.clear_received` · `cart.promo_apply_received` · `cart.promo_remove_received` · `cart.mcp_error` · `cart.mcp_network_error` · `cart.mcp_timeout` · `cart.endpoint_error`.
@@ -90,8 +97,12 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 - **MCP (cart tool):** `cart.promo_removed` · `cart.promo_fixture_load_failed` · `cart.free_gift_fixture_load_failed`.
 - **Node names verified 6** (cart graph): clear_confirm_prompt/clear_execute/cart_view/stock_issue_lookup/stock_resolve/final — xem 04/PHASE_03.
 
+### Outbox (mcp) ✅ — NEW
+`event.appended` (verified `apps/mcp/src/tools/events.py:138`).
+- Outbox WRITE đã code (same-txn `published_at=NULL`, ADR-006). Relay→Kafka + sweeper vẫn 🟡 CHƯA CODE (Kafka chưa wire — xem Domain Events banner dưới + BACKLOG §3 P1 #10/#11).
+
 ### Domain Events — 🟡 CHƯA CODE (giữ banner)
-> Kafka chưa wire (không topic `icp.*`, không producer/consumer). `event.appended/published/consumed/publish_retried/handler_failed` = **target** tới khi event bus + workers implement.
+> Kafka chưa wire (không topic `icp.*`, không producer/consumer). `event.published/consumed/publish_retried/handler_failed` = **target** tới khi event bus + workers implement.
 
 ### Orders & Payments — 🟡 CHƯA CODE (giữ banner)
 > workers (payment/inventory/notif consumer) = skeleton. Verified KHÔNG có `order.*`/`payment.*`/`stock.*`/`notification.*` trong gateway/ai/mcp → tất cả = **target**.

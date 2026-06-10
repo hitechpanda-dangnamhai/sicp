@@ -8,6 +8,10 @@
 | DECISIONS.md | docs/decisions/ (39 ADR + INDEX) | 2026-06-10 |
 | MASTER_ROADMAP.md + MASTER_SLICE_BACKLOG.md | docs/MASTER_BACKLOG.md | 2026-06-10 |
 | 05_CODING_CONVENTIONS.md | CLAUDE.md §11 | 2026-06-11 |
+| 06_OBSERVABILITY.md | CLAUDE.md §11 (Observability) + docs/LOG_CATALOG.md | 2026-06-11 |
+| 07_BEHAVIOR_LOGS.md | docs/LOG_CATALOG.md §B + CLAUDE.md §11 | 2026-06-11 |
+| 08_FE_BE_CONTRACT.md | CLAUDE.md §11 (Shared types/codegen bổ sung) | 2026-06-11 |
+| LOG_CATALOG.md | docs/LOG_CATALOG.md (promoted, không archive) | 2026-06-11 |
 
 > Tra commit hoà tan: `git log --oneline --diff-filter=A -- docs/archive-v1/<file>` —
 > git là nguồn, không chép tay hash (hash chép tay = bản sao có thể sai — đã bắt 1
