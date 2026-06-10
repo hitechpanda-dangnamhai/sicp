@@ -45,5 +45,6 @@
 | [ADR-042](ADR-042.md) | Tamper-evident audit log (hash-chain) | Accepted | Bảng `audit_log` per-tenant hash-chain (SHA256 prev_hash ‖ canonical_json), worker `audit-logger` |
 | [ADR-043](ADR-043.md) | Per-tenant learn-to-rank / personalization | Accepted | Bảng `tenant_ranking_weights` + Vespa rank-profile `personalized` (inherits `ai_augmented`) |
 | [ADR-044](ADR-044.md) | Per-tenant usage metering (billing SaaS) | Accepted | Bảng `usage_events` + rollup `usage_daily` per tenant; metrics ai_calls/searches/orders/storage_mb |
+| [ADR-045](ADR-045.md) | Workflow v2 (dual-surface) + critical-path tenant-before-payment | Accepted | (a) Workflow v2 dual-surface + FACTS gate + Single Home; (b) P0 multi-tenant TRƯỚC payment |
 
 ⚠️ **Gap:** ADR-026 … ADR-030 không tồn tại trong file gốc — không sinh số bù.
