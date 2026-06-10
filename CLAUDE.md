@@ -74,3 +74,63 @@ Known issues: <tự khai, kể cả nghi ngờ>
 ## 10. Lệnh thường dùng
 - Facts: `bash scripts/gen-facts.sh`
 - Test: `<điền lệnh test của repo>`  · Migrate: `<điền>`  · OpenAPI sync: `<điền — npm run openapi:sync>`
+
+## 11. Coding conventions (nén từ 05_CODING_CONVENTIONS — code thắng khi lệch)
+
+### TypeScript
+- ESLint+Prettier. KHÔNG `any` → `unknown` rồi narrow. KHÔNG default export (trừ Next.js page/component). Function >50 dòng → tách. Async/await, KHÔNG Promise chain.
+- Imports: node built-ins → external → internal alias (`@icp/...`) → relative.
+- DTO: NestJS `class-validator`; Python `Pydantic` (không dataclass cho payload).
+- Logging: TS Pino JSON; Python structlog. CẤM `console.log` trong production code.
+
+### Python (apps/ai, apps/mcp)
+- Black line 100 · isort · ruff. Type hints bắt buộc cho public functions.
+- Layout AI: `apps/ai/src/{main,state}.py + graphs/{router_graph,intents}/ + tools/{mcp_client,llm_client,redis_publisher}.py + observability/ + prompts/`. KHÔNG `config.py`/`exceptions.py`.
+
+### Module structure (NestJS)
+- Clean-arch 3 lớp (`application/`,`domain/`,`infrastructure/`,`dto/`) áp DẦN khi module phức tạp. Hiện: `auth/` đủ 3 lớp; `products/`,`cards/` phẳng KHÔNG subdir; `cart/`,`dashboard/`,`intent/`,`tracking/` phẳng có `dto/`. Module hạ tầng (`clients/`,`config/`,`database/`,`health/`,`idempotency/`,`observability/`) luôn phẳng.
+
+### Errors
+- Use-case ném domain error có `code`; transport map HTTP. Pattern per-module — auth: `AuthDomainError` base + subclass; products: NestJS `*Exception` trực tiếp. KHÔNG yêu cầu base class cross-service.
+
+### Testing
+- TS: **Vitest** (`*.spec.ts` cạnh source) — KHÔNG Jest (chỉ matcher `@testing-library/jest-dom` xuất hiện). Coverage target ≥70% tổng, ≥80% `domain`/`application`.
+- Python: pytest (`tests/test_*.py`), mock LLM (không call thật), integration 1 happy path / intent.
+- Test name: `it('<verb-phrase>...')`.
+
+### Config
+- Mọi config qua env vars. `.env.example` checked-in, `.env` gitignored.
+- Gateway: **fail-fast** qua Zod `EnvSchema` (`apps/gateway/src/config/env.schema.ts`).
+- AI Python: `os.getenv(KEY, DEFAULT)` per-need — KHÔNG fail-fast (chấp nhận hiện tại).
+
+### Comments
+- JSDoc/docstring cho public API: what + why.
+- Inline chỉ khi business rule KHÔNG obvious từ code.
+- TODO: `// TODO(name, YYYY-MM-DD): <description>`.
+- Mỗi service: `apps/<x>/README.md` (how to run + env + key endpoints).
+
+### Shared types / codegen
+- OpenAPI do Gateway sinh là source of truth (`@nestjs/swagger`, lệnh `pnpm openapi:sync`). TS: import `@icp/shared-types`. Behavior schemas: Zod tại `packages/shared-types/src/behavior/*` (`discriminatedUnion('event_type')`).
+
+### Async / streaming
+- SSE:
+  - Gateway: **manual** `res.setHeader('Content-Type','text/event-stream')` + `res.write(...)`, forward từ Redis pub/sub `sse:pubsub:{rid}`. KHÔNG Nest `Observable`/`@Sse`.
+  - AI: `graph.astream(...)` + generator `yield`.
+  - FE: native `EventSource` (`withCredentials: true`). KHÔNG `fetch` streaming.
+- DB connection pool: max **10**/service.
+
+### Security baseline
+- bcryptjs **cost 10** cho password.
+- JWT **HS256** (sign + verify ép `algorithms:['HS256']`). `JWT_SECRET` ≥32 chars. exp env-driven (`JWT_ACCESS_TTL_HOURS`/`JWT_REFRESH_TTL_DAYS`).
+- CORS: allow origin cụ thể qua `CORS_ORIGIN`. KHÔNG `*`.
+- Upload: ảnh base64 inline trong field `content`. Size 2 lớp: transport `useBodyParser('json', { limit: '10mb' })` + Zod `content.max(10_000_000)`. (MIME server-side cho image: chưa validate — xem BACKLOG §3 P0 #8.)
+- Pino redact paths: `password`/`*.password`, `authorization`/`*.authorization`, `token`/`*.token`, `access_token`, `refresh_token`, `jwt` (giữ `jti`). PII rộng (email/phone/name) chưa enforce — xem BACKLOG §3 P1 #21.
+
+### Performance budget (SLO target — chưa đo)
+- API p95 < **500ms** (non-AI); AI first SSE < **1s**, full response < **8s**.
+- FE bundle: < **500KB** gz/route. DB: index mọi field query, KHÔNG N+1.
+
+### File naming
+- TS: `*.module.ts`, `*.service.ts`, `*.controller.ts`, `*.use-case.ts`, `*.entity.ts`, `*.dto.ts`, `*.spec.ts`. Adapter Postgres: `postgres-*.repo.ts` (auth dùng `.store.ts` — historical, OK).
+- Python: `snake_case.py`; test `tests/test_*.py`.
+- Next.js: `app/.../page.tsx`, `components/*.tsx`.

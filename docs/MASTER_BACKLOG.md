@@ -51,7 +51,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-10 | Analytics Voice | 05 | ✅ | — |
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
-| S-META-02 | Hoà tan docs cũ | META | 🔄 | T01 ✅ · T02 ✅ · T03–T07 chờ · T08 chuẩn hoá tham chiếu (chạy cuối) chờ |
+| S-META-02 | Hoà tan docs cũ | META | 🔄 | T01 ✅ · T02 ✅ · T03 ✅ · T04–T07 chờ · T08 chuẩn hoá tham chiếu (chạy cuối) chờ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | — *(mỗi 10 slice/tháng)* |
 
 ## §3 Queue P0 → P1 → P2 (việc còn lại tới go-live)

@@ -3,12 +3,17 @@
 > Docs v1 nguyên vẹn, đã hoà tan theo Workflow v2 (ADR-045). Bảng này là INPUT cho
 > T08 (chuẩn hoá tham chiếu toàn hệ).
 
-| File cũ | Hoà tan đi đâu | Ngày | Commit |
-|---|---|---|---|
-| DECISIONS.md | docs/decisions/ (39 ADR + INDEX) | 2026-06-10 | 632b9e8 |
-| MASTER_ROADMAP.md + MASTER_SLICE_BACKLOG.md | docs/MASTER_BACKLOG.md | 2026-06-10 | c023b2c |
+| File cũ | Hoà tan đi đâu | Ngày |
+|---|---|---|
+| DECISIONS.md | docs/decisions/ (39 ADR + INDEX) | 2026-06-10 |
+| MASTER_ROADMAP.md + MASTER_SLICE_BACKLOG.md | docs/MASTER_BACKLOG.md | 2026-06-10 |
+| 05_CODING_CONVENTIONS.md | CLAUDE.md §11 | 2026-06-11 |
 
-## Luật cho task T0X tiếp theo (T03–T07)
+> Tra commit hoà tan: `git log --oneline --diff-filter=A -- docs/archive-v1/<file>` —
+> git là nguồn, không chép tay hash (hash chép tay = bản sao có thể sai — đã bắt 1
+> lỗi đúng kiểu này ở T02; fact máy ghi được thì zero-administration).
+
+## Luật cho task T0X tiếp theo (T04–T07)
 
 Mỗi task khi `mv` file vào archive-v1/ phải **append 1 dòng vào bảng trên trong cùng
 commit** — không tách commit riêng. Mục tiêu: bảng luôn complete tại HEAD, T08 chỉ
