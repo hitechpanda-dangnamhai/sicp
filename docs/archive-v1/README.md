@@ -12,6 +12,14 @@
 | 07_BEHAVIOR_LOGS.md | docs/LOG_CATALOG.md §B + CLAUDE.md §11 | 2026-06-11 |
 | 08_FE_BE_CONTRACT.md | CLAUDE.md §11 (Shared types/codegen bổ sung) | 2026-06-11 |
 | LOG_CATALOG.md | docs/LOG_CATALOG.md (promoted, không archive) | 2026-06-11 |
+| 00_CONTEXT.md ⚠️ trùng tên | docs/00_CONTEXT.md v3 (mới, file sống ở docs/) | 2026-06-11 |
+| 01_ARCHITECTURE.md | docs/00_CONTEXT.md v3 §2 (bản đồ kiến trúc) | 2026-06-11 |
+
+> ⚠️ **Ca trùng tên `00_CONTEXT.md`:** docs/00_CONTEXT.md là v3 mới (Workflow v2,
+> hiến pháp + bản đồ). Bản v1 ở docs/archive-v1/00_CONTEXT.md là fossil. Mọi
+> reference cũ tới `00_CONTEXT.md` viết TRƯỚC 2026-06-10 trỏ về v1 (đọc bản
+> archive-v1/); reference viết sau ngày này (gồm trong ADR-045/046, CLAUDE.md,
+> MASTER_BACKLOG) trỏ về v3.
 
 > Tra commit hoà tan: `git log --oneline --diff-filter=A -- docs/archive-v1/<file>` —
 > git là nguồn, không chép tay hash (hash chép tay = bản sao có thể sai — đã bắt 1
