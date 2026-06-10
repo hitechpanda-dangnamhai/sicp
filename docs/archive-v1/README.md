@@ -19,6 +19,7 @@
 | 03_API_CONTRACTS.md | code (packages/shared-types/src/{,sse,behavior,dto,api}) + apps/gateway/src + apps/mcp/src/tools/ + ADR-048 (Pattern A) + ADR-049 (idempotency per-route) | 2026-06-11 |
 | 04_INTENT_SPECS.md | code (apps/ai/src/graphs/intents/*.py + state.py) + 00_CONTEXT v3 §6 (8 intent enum) | 2026-06-11 |
 | 09_FIELD_AUDIT.md | code (infra/vespa/schemas/product.sd summary fields + packages/shared-types/src/) + ADR-025 (UI Field Audit Process) | 2026-06-11 |
+| workflow/ (workflow v1.x archive thuần) | fossil read-only — Workflow v2 hiện tại sống ở `docs/ICP_WORKFLOW_V2_WORKING.md` + `docs/ICP_PLAYBOOK_V2.2.md` + `CLAUDE.md` | 2026-06-11 |
 
 > ⚠️ **Ca trùng tên `00_CONTEXT.md`:** docs/00_CONTEXT.md là v3 mới (Workflow v2,
 > hiến pháp + bản đồ). Bản v1 ở docs/archive-v1/00_CONTEXT.md là fossil. Mọi

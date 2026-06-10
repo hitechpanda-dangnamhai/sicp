@@ -30,7 +30,7 @@
 | [ADR-022](ADR-022.md) | Phone frame wrapper cho desktop | Accepted | Desktop ≥1024px wrap mobile UI vào card 414px centered, giả lập phone frame |
 | [ADR-023](ADR-023.md) | Design system v3 LOCKED: MoMo-Inspired Premium | Accepted | Palette Pink-600 dominant + Orange-500 accent + Amber/Rose gia vị, Be Vietnam Pro |
 | [ADR-024](ADR-024.md) | Vespa Summary Fields Denormalization | Accepted | Mọi field hiển thị Product Card denormalize vào Vespa summary fields → 1 RTT |
-| [ADR-025](ADR-025.md) | UI Field Audit Process | Accepted | Trước mockup intent mới phải audit visible elements vs `09_FIELD_AUDIT.md` |
+| [ADR-025](ADR-025.md) | UI Field Audit Process | Accepted | Trước mockup intent mới phải audit visible elements vs `docs/archive-v1/09_FIELD_AUDIT.md` (field mapping fossil; code = source: `infra/vespa/schemas/product.sd` + `packages/shared-types/src/`) |
 | [ADR-031](ADR-031.md) | Thêm Google Trends như market-demand signal cho Intent 01 | Accepted | MCP tool `gtrends.interest_over_time` (mock fixture cho hackathon, prod = pytrends/SerpAPI) |
 | [ADR-032](ADR-032.md) | Shopee price source: Postgres table + local seed worker | Superseded | Superseded by ADR-039 — schema giữ, data source từ seed worker chuyển sang real crawler |
 | [ADR-033](ADR-033.md) | Component library: shadcn/ui + Tailwind CSS | Accepted | shadcn/ui (Radix + Tailwind CSS v3 copy-paste pattern) cho ownership styling 100% |

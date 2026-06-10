@@ -117,7 +117,7 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 
 ## B. Behavior Event Types
 
-Từ `07_BEHAVIOR_LOGS.md`. Format: `<domain>.<verb>`.
+Từ `docs/archive-v1/07_BEHAVIOR_LOGS.md`. Format: `<domain>.<verb>`.
 
 > **CODE (verified 2026-06-09):** nguồn sự thật = `packages/shared-types/src/behavior/catalog.ts` (`PROPERTIES_SCHEMA_MAP`) + các file `*-events.ts`. Event types đã có code: `session.started`, `product.viewed`, `cart.item_added/viewed/item_removed/qty_changed/cleared/promo_applied/promo_removed`, `auth.signed_in/signed_out/password_reset_requested`, `nav.tile_clicked/settings_section_opened`, `search.suggested_chip_tapped/followup_filter_tapped/typo_corrected/variant_degraded/first_card_rendered`, `product.import_started/import_completed/import_abandoned`, `card.shown`, `error.report_requested`… Catalog §B dưới đây phải khớp map này (event nào ở §B mà KHÔNG có trong map = CHƯA CODE).
 
