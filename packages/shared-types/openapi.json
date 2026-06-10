@@ -107,7 +107,7 @@
       "post": {
         "operationId": "IntentController_dispatch",
         "summary": "Dispatch intent to AI service",
-        "description": "Returns request_id for SSE stream pickup. See `GET /intent/stream`.",
+        "description": "Returns request_id for SSE stream pickup via GET /intent/stream?id=<rid>. S-04 T03: mode field selects Variant B (ai_augmented) or Variant A (basic_fallback) per D-S04-03 LAW Adaptive Single Endpoint. Sx05-3-CODE HOTFIX (D-S05-13 LAW): @UseGuards(JwtAuthGuard) added — req.user.id forwarded to AI as PostIntentBody.user_id so cart_by_text graph operates on correct authenticated cart.",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -126,6 +126,11 @@
         },
         "tags": [
           "intent"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
         ]
       }
     },
@@ -133,7 +138,7 @@
       "get": {
         "operationId": "IntentController_stream",
         "summary": "SSE stream of intent events",
-        "description": "Emits 10 typed events (per 03_API §3) + heartbeat keepalive. Requires icp_session cookie.",
+        "description": "Forwards Redis pub/sub channel `sse:pubsub:{rid}` to FE EventSource. S-04 T03: 17 typed event types (10 S-02 + 7 S-04) per 03_API §3. Requires icp_session cookie.",
         "parameters": [
           {
             "name": "id",
@@ -144,6 +149,107 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "intent"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/intent/{rid}/action": {
+      "post": {
+        "operationId": "IntentActionController_action",
+        "summary": "Resume interrupted intent graph with user choice",
+        "description": "Forwards action body to AI service /intent/{rid}/resume endpoint. AI calls graph.astream(Command(resume=<choice>)) to continue from Pattern P2 interrupt checkpoint. SSE events flow back via existing GET /intent/stream connection (Option Z Redis pub/sub).",
+        "parameters": [
+          {
+            "name": "rid",
+            "required": true,
+            "in": "path",
+            "description": "request_id from POST /intent response",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntentActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "intent"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/intent/{rid}/suggest-attrs": {
+      "post": {
+        "operationId": "IntentSuggestAttrsController_suggestAttrs",
+        "summary": "Request AI-suggested attribute chips for PrefillForm",
+        "description": "On-demand Gemini 2.5 Flash call to suggest 3 additional attribute chips for the merchant to add via PrefillForm \"Thêm\" button. Synchronous ~7s; idempotent via Idempotency-Key header.",
+        "parameters": [
+          {
+            "name": "rid",
+            "required": true,
+            "in": "path",
+            "description": "request_id (for traceability; graph state lookup not required)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "category"
+                ],
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "example": "nuoc_tuong"
+                  },
+                  "existing_attrs": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "example": {
+                      "brand": "Maggi",
+                      "size": "200ml"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": ""
@@ -302,6 +408,311 @@
         ]
       }
     },
+    "/api/v1/cart": {
+      "get": {
+        "operationId": "CartController_getCart",
+        "summary": "Fetch current user cart with inline stock validation",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cart"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "CartController_clear",
+        "summary": "Wipe entire cart (no-confirm path; use POST /intent with hint=cart_clear_confirm for interrupt UX)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cart"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cart/items": {
+      "post": {
+        "operationId": "CartController_addItem",
+        "summary": "Add item to cart or update qty if existing",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CartAddItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cart"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cart/items/{productId}": {
+      "patch": {
+        "operationId": "CartController_updateQty",
+        "summary": "Update item qty (qty=0 auto-removes)",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID in cart",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CartUpdateQtyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cart"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "CartController_removeItem",
+        "summary": "Remove single item from cart (idempotent)",
+        "parameters": [
+          {
+            "name": "productId",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID in cart",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cart"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cart/promo": {
+      "post": {
+        "operationId": "CartController_applyPromo",
+        "summary": "Apply promo code (exact match; LLM typo via FE retry)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CartPromoDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cart"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      },
+      "delete": {
+        "operationId": "CartController_removePromo",
+        "summary": "Remove applied promo code (idempotent)",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cart"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cards": {
+      "get": {
+        "operationId": "CardsController_list",
+        "summary": "List pending action cards for current user",
+        "description": "Returns cards in `pending` status sorted by `created_at` DESC. Per S-07 Intent 01: cards are emitted in-band via SSE during the import flow; this endpoint serves as a refresh/refetch source if the merchant returns to the page later.",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cards"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cards/{id}/accept": {
+      "post": {
+        "operationId": "CardsController_accept",
+        "summary": "Mark action card as accepted",
+        "description": "Sets card.status = accepted + resolved_at = NOW(). Idempotent: duplicate requests return {updated: false}. Optional applied_value is merged into suggestion JSONB for audit.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cards"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/cards/{id}/reject": {
+      "post": {
+        "operationId": "CardsController_reject",
+        "summary": "Mark action card as rejected",
+        "description": "Sets card.status = rejected + resolved_at = NOW(). Idempotent: duplicate requests return {updated: false}.",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "cards"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/products/{id}": {
+      "patch": {
+        "operationId": "ProductsController_update",
+        "summary": "Update an existing product (owner-merchant only)",
+        "description": "Partial update — omit any field to keep current value. Immutable: id, merchant_id, category, created_at, vespa_doc_id, rating_*, sold_count, trend_score. After PG commit (+ ProductUpdated outbox event emitted), Gateway orchestrates vespa.index re-index. PG commit always succeeds first; Vespa failure logs warning + response.indexed=false (S-06 outbox-relay-worker will retry downstream).",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product UUID (must be owned by current merchant)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "products"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
     "/api/v1/dashboard/stats": {
       "get": {
         "operationId": "DashboardController_getStats",
@@ -315,6 +726,37 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DashboardStatsDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid icp_session cookie"
+          }
+        },
+        "tags": [
+          "dashboard"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dashboard/insight": {
+      "get": {
+        "operationId": "DashboardController_getInsight",
+        "summary": "Get home hero AI insight — REAL analytics (S-10 detect_anomaly)",
+        "description": "Returns `{delta_pct, direction, cause_count, has_data}` from analytics.detect_anomaly (merchant-wide 7d-vs-prior-7d + count of flagged categories). Replaces the hard-coded \"giảm 12% / 2 nguyên nhân\" in HeroInsightCard. Same engine as /intent-07 so numbers agree. Requires icp_session cookie.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardInsightDto"
                 }
               }
             }
@@ -360,6 +802,10 @@
     {
       "name": "cart",
       "description": "Shopping cart (V-SLICE S-05)"
+    },
+    {
+      "name": "cards",
+      "description": "Action cards (V-SLICE S-07)"
     },
     {
       "name": "orders",
@@ -1403,6 +1849,2618 @@
                     "event_type",
                     "properties"
                   ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "search.suggested_chip_tapped"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "query": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "chip_label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "chip_position": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        }
+                      },
+                      "required": [
+                        "query",
+                        "chip_label",
+                        "chip_position"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "search.followup_filter_tapped"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "query": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "filter_label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "filter_position": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        }
+                      },
+                      "required": [
+                        "query",
+                        "filter_label",
+                        "filter_position"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "search.typo_corrected"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "original_query": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "corrected_query": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "confidence": {
+                          "type": "number",
+                          "minimum": 0,
+                          "exclusiveMinimum": false,
+                          "maximum": 1,
+                          "exclusiveMaximum": false
+                        },
+                        "user_choice": {
+                          "type": "string",
+                          "enum": [
+                            "accept",
+                            "reject"
+                          ]
+                        },
+                        "attempt_n": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "original_query",
+                        "corrected_query",
+                        "confidence",
+                        "user_choice",
+                        "attempt_n"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "search.variant_degraded"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "from": {
+                          "type": "string",
+                          "enum": [
+                            "ai_augmented"
+                          ]
+                        },
+                        "to": {
+                          "type": "string",
+                          "enum": [
+                            "basic_fallback"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "llm_timeout",
+                            "llm_error",
+                            "user_explicit"
+                          ]
+                        },
+                        "error_code": {
+                          "type": "string",
+                          "maxLength": 100
+                        },
+                        "trace_id": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "user_choice": {
+                          "type": "string",
+                          "enum": [
+                            "retry_ai",
+                            "continue_basic"
+                          ]
+                        },
+                        "attempt_n": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "from",
+                        "to",
+                        "reason",
+                        "user_choice",
+                        "attempt_n"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "search.first_card_rendered"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "time_to_first_card_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "total_cards_expected": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true
+                        },
+                        "mode": {
+                          "type": "string",
+                          "enum": [
+                            "ai_augmented",
+                            "basic_fallback"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "time_to_first_card_ms",
+                        "total_cards_expected",
+                        "mode"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "cart.viewed"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "item_count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        }
+                      },
+                      "required": [
+                        "item_count",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "cart.item_removed"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "product_id": {
+                          "type": "string"
+                        },
+                        "qty_removed": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": true
+                        }
+                      },
+                      "required": [
+                        "product_id",
+                        "qty_removed"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "cart.qty_changed"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "product_id": {
+                          "type": "string"
+                        },
+                        "old_qty": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "new_qty": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        }
+                      },
+                      "required": [
+                        "product_id",
+                        "old_qty",
+                        "new_qty"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "cart.cleared"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {}
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "cart.promo_applied"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "discount_amount": {
+                          "type": "integer"
+                        },
+                        "subtotal_before": {
+                          "type": "integer"
+                        },
+                        "subtotal_after": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "code",
+                        "discount_amount",
+                        "subtotal_before",
+                        "subtotal_after"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "cart.promo_removed"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "code"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "product.import_started"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "home_tile",
+                            "direct_url",
+                            "chat_cta"
+                          ]
+                        },
+                        "referrer": {
+                          "type": "string",
+                          "maxLength": 500
+                        }
+                      },
+                      "required": [
+                        "source"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "product.import_completed"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "product_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "category": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "final_price": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "elapsed_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "cards_shown_count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "cards_accepted_count": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "product_id",
+                        "category",
+                        "final_price",
+                        "elapsed_ms",
+                        "cards_shown_count",
+                        "cards_accepted_count"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "product.import_abandoned"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "abandoned_at_state": {
+                          "type": "string",
+                          "enum": [
+                            "state-0",
+                            "state-A",
+                            "state-B",
+                            "state-C-rising",
+                            "state-C-falling",
+                            "state-D",
+                            "state-E",
+                            "state-F",
+                            "state-G",
+                            "state-H",
+                            "cancelled"
+                          ]
+                        },
+                        "elapsed_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "browser_close",
+                            "in_app_navigation",
+                            "explicit_cancel"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "abandoned_at_state",
+                        "elapsed_ms",
+                        "reason"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "card.shown"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "card_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "policy_code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "variant": {
+                          "type": "string",
+                          "enum": [
+                            "SUGGEST_PRICE",
+                            "SUGGEST_ATTRS",
+                            "SUGGEST_ALTERNATIVES",
+                            "SUGGEST_CREDIT_LOAN",
+                            "SUGGEST_PROMOTION"
+                          ]
+                        },
+                        "position": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "card_id",
+                        "policy_code",
+                        "variant",
+                        "position"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "card.accepted"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "card_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "policy_code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "variant": {
+                          "type": "string",
+                          "enum": [
+                            "SUGGEST_PRICE",
+                            "SUGGEST_ATTRS",
+                            "SUGGEST_ALTERNATIVES",
+                            "SUGGEST_CREDIT_LOAN",
+                            "SUGGEST_PROMOTION"
+                          ]
+                        },
+                        "applied_value": {
+                          "type": "object",
+                          "additionalProperties": {}
+                        },
+                        "decision_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "card_id",
+                        "policy_code",
+                        "variant"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "card.rejected"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "card_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "policy_code": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "variant": {
+                          "type": "string",
+                          "enum": [
+                            "SUGGEST_PRICE",
+                            "SUGGEST_ATTRS",
+                            "SUGGEST_ALTERNATIVES",
+                            "SUGGEST_CREDIT_LOAN",
+                            "SUGGEST_PROMOTION"
+                          ]
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "not_relevant",
+                            "already_optimal",
+                            "too_aggressive",
+                            "unclear",
+                            "other"
+                          ]
+                        },
+                        "decision_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "card_id",
+                        "policy_code",
+                        "variant"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "recommendation.shown"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "image",
+                            "product",
+                            "cart"
+                          ]
+                        },
+                        "seed_product_id": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "products": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "position": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "exclusiveMinimum": false
+                              },
+                              "product_id": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string"
+                              },
+                              "match_type": {
+                                "type": "string",
+                                "enum": [
+                                  "visual",
+                                  "collab",
+                                  "trending"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "position",
+                              "product_id",
+                              "reason",
+                              "match_type"
+                            ]
+                          }
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "products",
+                        "request_id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "recommendation.clicked"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "position": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "product_id": {
+                          "type": "string"
+                        },
+                        "match_type": {
+                          "type": "string",
+                          "enum": [
+                            "visual",
+                            "collab",
+                            "trending"
+                          ]
+                        },
+                        "active_signal_filter": {
+                          "type": "string",
+                          "enum": [
+                            "visual",
+                            "collab",
+                            "trending"
+                          ]
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "position",
+                        "product_id",
+                        "match_type",
+                        "active_signal_filter",
+                        "request_id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "recommendation.dismissed"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "from_signal": {
+                          "type": "string",
+                          "enum": [
+                            "visual",
+                            "collab",
+                            "trending"
+                          ]
+                        },
+                        "to_signal": {
+                          "type": "string",
+                          "enum": [
+                            "visual",
+                            "collab",
+                            "trending"
+                          ]
+                        },
+                        "request_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "from_signal",
+                        "to_signal",
+                        "request_id"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "event_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "occurred_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "received_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "session_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "device_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "intent": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "modality": {
+                      "type": "string",
+                      "enum": [
+                        "text",
+                        "voice",
+                        "image"
+                      ]
+                    },
+                    "request_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "subject_type": {
+                      "type": "string",
+                      "enum": [
+                        "product",
+                        "cart",
+                        "order",
+                        "category",
+                        "query",
+                        "card"
+                      ]
+                    },
+                    "subject_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "user_agent": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "ip_hash": {
+                      "type": "string",
+                      "maxLength": 64
+                    },
+                    "app_version": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 20
+                    },
+                    "event_type": {
+                      "type": "string",
+                      "enum": [
+                        "intent.first_card_emitted"
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "properties": {
+                        "request_id": {
+                          "type": "string"
+                        },
+                        "time_to_first_card_ms": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "total_cards_expected": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "exclusiveMinimum": false
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "image"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "request_id",
+                        "time_to_first_card_ms",
+                        "total_cards_expected",
+                        "source"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "event_id",
+                    "occurred_at",
+                    "session_id",
+                    "app_version",
+                    "event_type",
+                    "properties"
+                  ]
                 }
               ]
             }
@@ -1426,7 +4484,7 @@
           "content": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 5000
+            "maxLength": 10000000
           },
           "hint": {
             "type": "string",
@@ -1434,12 +4492,95 @@
               "import",
               "buy",
               "search",
-              "recommend"
+              "recommend",
+              "cart_clear_confirm",
+              "cart_view_with_stock_check",
+              "analyze"
             ]
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "ai_augmented",
+              "basic_fallback"
+            ],
+            "default": "ai_augmented"
+          },
+          "text_query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "brand": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "category": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 50
+              },
+              "attributes": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              }
+            }
           }
         },
         "required": [
           "modality"
+        ]
+      },
+      "IntentActionDto": {
+        "type": "object",
+        "properties": {
+          "card_id": {
+            "type": "string"
+          },
+          "choice": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "reject",
+              "retry_ai",
+              "continue_basic",
+              "add_to_cart",
+              "skip",
+              "confirm_clear",
+              "cancel_clear",
+              "resolve_remove",
+              "resolve_replace",
+              "clarify_pick"
+            ]
+          },
+          "value": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "_meta": {
+            "type": "object",
+            "properties": {
+              "attempt_n": {
+                "type": "integer",
+                "minimum": 0,
+                "exclusiveMinimum": true
+              }
+            },
+            "required": [
+              "attempt_n"
+            ]
+          }
+        },
+        "required": [
+          "choice"
         ]
       },
       "LoginDto": {
@@ -1585,6 +4726,82 @@
           "sent"
         ]
       },
+      "CartAddItemDto": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "qty": {
+            "type": "integer",
+            "minimum": 1,
+            "exclusiveMinimum": false,
+            "maximum": 99,
+            "exclusiveMaximum": false
+          },
+          "snapshot": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "brand": {
+                "type": "string",
+                "nullable": true
+              },
+              "image_url": {
+                "type": "string",
+                "nullable": true
+              },
+              "image_gradient": {
+                "type": "string",
+                "nullable": true
+              },
+              "icon_hint": {
+                "type": "string",
+                "nullable": true
+              },
+              "original_price": {
+                "type": "integer",
+                "nullable": true
+              }
+            }
+          }
+        },
+        "required": [
+          "product_id",
+          "qty"
+        ]
+      },
+      "CartUpdateQtyDto": {
+        "type": "object",
+        "properties": {
+          "qty": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMinimum": false,
+            "maximum": 99,
+            "exclusiveMaximum": false
+          }
+        },
+        "required": [
+          "qty"
+        ]
+      },
+      "CartPromoDto": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50
+          }
+        },
+        "required": [
+          "code"
+        ]
+      },
       "DashboardStatsDto": {
         "type": "object",
         "properties": {
@@ -1616,6 +4833,10 @@
           "inventory_count",
           "currency"
         ]
+      },
+      "DashboardInsightDto": {
+        "type": "object",
+        "properties": {}
       }
     }
   }

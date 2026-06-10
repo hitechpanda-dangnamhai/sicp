@@ -2,6 +2,7 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { DashboardInsightDto } from '../models/DashboardInsightDto';
 import type { DashboardStatsDto } from '../models/DashboardStatsDto';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -17,6 +18,21 @@ export class DashboardService {
     return __request(OpenAPI, {
       method: 'GET',
       url: '/api/v1/dashboard/stats',
+      errors: {
+        401: `Missing or invalid icp_session cookie`,
+      },
+    });
+  }
+  /**
+   * Get home hero AI insight — REAL analytics (S-10 detect_anomaly)
+   * Returns `{delta_pct, direction, cause_count, has_data}` from analytics.detect_anomaly (merchant-wide 7d-vs-prior-7d + count of flagged categories). Replaces the hard-coded "giảm 12% / 2 nguyên nhân" in HeroInsightCard. Same engine as /intent-07 so numbers agree. Requires icp_session cookie.
+   * @returns DashboardInsightDto
+   * @throws ApiError
+   */
+  public static dashboardControllerGetInsight(): CancelablePromise<DashboardInsightDto> {
+    return __request(OpenAPI, {
+      method: 'GET',
+      url: '/api/v1/dashboard/insight',
       errors: {
         401: `Missing or invalid icp_session cookie`,
       },
