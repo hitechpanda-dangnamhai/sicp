@@ -70,7 +70,6 @@ if grep -rq "kafkajs" apps --include="package.json" 2>/dev/null; then
 else
   echo "- app: CHƯA WIRE (0 package.json import kafkajs)"
 fi
-docker ps --format '{{.Names}}' 2>/dev/null | grep -q redpanda && echo "- broker: container redpanda ĐANG CHẠY (infra có, app chưa dùng)" || true
 echo
 echo "<!-- END FACTS -->"
 } > "$OUT"

@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-10T16:12:10Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-10T16:20:54Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -171,6 +171,5 @@
 
 ## Kafka   <!-- grep kafkajs package.json + docker ps redpanda -->
 - app: CHƯA WIRE (0 package.json import kafkajs)
-- broker: container redpanda ĐANG CHẠY (infra có, app chưa dùng)
 
 <!-- END FACTS -->
