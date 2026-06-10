@@ -1,0 +1,45 @@
+name: guards
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  facts-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate FACTS & diff (bỏ header + section DB — CI không có DB)
+        run: |
+          cp docs/FACTS.md /tmp/committed.md
+          bash scripts/gen-facts.sh
+          strip() { awk '/^# FACTS — generated/{next} /^## DB/{skip=1} /^## Frontend/{skip=0} skip{next} {print}' "$1"; }
+          strip /tmp/committed.md > /tmp/a.md
+          strip docs/FACTS.md   > /tmp/b.md
+          if diff -u /tmp/a.md /tmp/b.md; then
+            echo "FACTS OK — không drift"
+          else
+            echo "::error::FACTS.md STALE so với code — chạy 'bash scripts/gen-facts.sh' rồi commit lại"
+            exit 1
+          fi
+
+  commit-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Lint commit messages (taxonomy v2)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="origin/${{ github.base_ref }}..HEAD"
+          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            RANGE="HEAD~1..HEAD"
+          else
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          fi
+          git log --format=%s "$RANGE" | while read -r s; do
+            echo "check: $s"
+            echo "$s" | grep -qE '^(S-[0-9]+/(T[0-9]+|HOTFIX-[0-9]+|REFACTOR-[0-9]+)|META): .+' \
+              || { echo "::error::Commit sai format taxonomy: '$s'"; exit 1; }
+          done
