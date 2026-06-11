@@ -49,8 +49,9 @@ Tôi đã đặt sẵn: scripts/gen-facts.sh và CLAUDE.md ở root.
 4. Thêm GitHub Actions workflow .github/workflows/guards.yml gồm 2 job:
    a. facts-drift: chạy gen-facts.sh rồi `git diff --exit-code docs/FACTS.md`
       (bỏ qua dòng header timestamp khi diff — dùng `grep -v '^# FACTS — generated'`)
-   b. commit-lint: check commit message của PR theo regex:
-      ^(S-\d+\/(T\d+|HOTFIX-\d+|REFACTOR-\d+)|META): .+
+   b. commit-lint: check commit message của PR theo regex (taxonomy v3 —
+      slice id cho phép prefix chữ + nhiều đoạn: S-P0-01, S-META-02, S-AUDIT):
+      ^(S-[A-Z0-9]+(-[A-Z0-9]+)*\/(T\d+|HOTFIX-\d+|REFACTOR-\d+)|META): .+
 5. Commit từng bước riêng: "META: facts: gen-facts script + first FACTS",
    "META: ci: facts-drift + commit-lint guards".
 
