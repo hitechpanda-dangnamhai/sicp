@@ -52,7 +52,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
-| S-P0-01   | Multi-tenant SaaS (V011 + RLS + tenant scope)  | 01    | 🟡                     | T01..T05 — chờ                                                          |
+| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 T01 ✅ · T02–T05 chờ | — |                                                        |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -62,7 +62,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 
 | # | Item | ADR | Status | Ghi chú (từ verify) |
 |---|---|---|---|---|
-| 1 | Multi-tenant SaaS (RLS + tenant_id) | ADR-040 | 🟡 → S-P0-01 | `tenants`/`tenant_memberships` chưa có; 0 `tenant_id` DB+gateway; target V011 |
+| 1 | Multi-tenant SaaS (RLS + tenant_id) | ADR-040 | 🟡 → S-P0-01 | V011 applied (T01 ✅): tenants/memberships + tenant_id 10 bảng + RLS + icp_app; còn wire runtime T02–T05 |
 | 2 | Payment VNPay/Momo/ZaloPay (Intent 06) | ADR-038 | 🟡 | orders/payments controller + IPN signature + idempotent dedup_key + V011 ALTER `chk_payment_method +vnpay` |
 | 3 | `payment_callbacks` + status `refunded` | ADR-038 | 🟡 | 1 txn ↔ N callback; V011 |
 | 4 | GDPR/Luật BVDLCN 2025 consent + DSAR + retention | ADR-041 | 🟡 | `consent_records`/`data_subject_requests`/`data_retention_policies` chưa có; consent gate tracking; V011 |
