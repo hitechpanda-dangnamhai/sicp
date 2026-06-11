@@ -177,6 +177,13 @@ Nếu item lớn cỡ nhiều slice → đề xuất tách, vẫn cho từng dò
 **B3 (Web):** paste báo cáo + `Đây là kết quả RECON. Đề xuất design.`
 → Web đưa 1–3 phương án + trade-off. Web cần khoét sâu → nó xuất `📥 PULL #N` → bạn lặp B2.
 
+**B3+ (Web, trước khi cut task):** với MỖI quyết định kiến trúc trong design,
+SEARCH `docs/decisions/INDEX.md` + ADR ruột liên quan. Có ADR phủ → dùng lại
+hoặc amend (append-only note). Không phủ → kiểm **4 tiêu chí** (chọn 2+ phương án
+có trade-off / lock cross-task / WHY cần lưu sau 3 tháng / security-data-tenant
+boundary). Đáp ≥1 tiêu chí → sinh ADR mới (≤30 dòng) **TRƯỚC B5**. Không đáp →
+comment trong code/migration, KHÔNG sinh ADR.
+
 **B4 (Human — cổng cứng):** `Duyệt phương án <N>` (hoặc `phương án <N> nhưng <chỉnh>`).
 Web KHÔNG được cắt task khi chưa có câu này.
 
