@@ -144,3 +144,9 @@ Known issues: <tự khai, kể cả nghi ngờ>
 - TS: `*.module.ts`, `*.service.ts`, `*.controller.ts`, `*.use-case.ts`, `*.entity.ts`, `*.dto.ts`, `*.spec.ts`. Adapter Postgres: `postgres-*.repo.ts` (auth dùng `.store.ts` — historical, OK).
 - Python: `snake_case.py`; test `tests/test_*.py`.
 - Next.js: `app/.../page.tsx`, `components/*.tsx`.
+
+## 12. Nhận khối RECON/PULL từ Web (workflow v2 R2/R7)
+- **Nhận diện**: input chứa "RECON" hoặc "PULL" + danh sách mục đánh số / gạch đầu dòng đọc-only về repo → kích hoạt mục này (mở rộng §3).
+- **Mindset đọc-only** (TỰ bật, KHÔNG cần plan mode): CẤM edit / write / migration / install. Chỉ tool đọc: `view`/`grep`/`find`/`cat`/`ls`/`wc`/`psql \d`.
+- **Format output**: ≤60 dòng (RECON) · ≤30 dòng (PULL). MỖI claim kèm `path:dòng`. Không thấy → "KHÔNG TÌM THẤY", cấm đoán. CẤM tự đề xuất fix — Web lo ở A1 DESIGN.
+- **File dài** (vd "cat ADR-040"): tóm tắt 3-5 bullet + path, KHÔNG paste raw — giữ trần dòng; Web tự fetch nếu cần.
