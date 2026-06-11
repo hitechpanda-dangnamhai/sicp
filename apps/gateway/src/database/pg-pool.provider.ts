@@ -23,8 +23,17 @@
 
 import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Pool, type PoolConfig, type QueryResult, type QueryResultRow } from 'pg';
+import {
+  Pool,
+  type PoolClient,
+  type PoolConfig,
+  type QueryResult,
+  type QueryResultRow,
+} from 'pg';
 import { createLogger, type IcpLogPayload } from '../observability';
+
+/** UUID v1-5 format guard cho tenant_id trước khi set GUC (defense-in-depth). */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class PgPool implements OnModuleDestroy {
@@ -74,6 +83,50 @@ export class PgPool implements OnModuleDestroy {
     params?: ReadonlyArray<unknown>,
   ): Promise<QueryResult<T>> {
     return this.pool.query<T>(text, params as unknown[]);
+  }
+
+  /**
+   * S-P0-01 T01 — multi-tenant enforcement helper (ADR-040 amendment i).
+   *
+   * Chạy `fn` TRONG MỘT transaction có `app.tenant_id` set transaction-local
+   * (`set_config(..., is_local=true)`). RLS policy `tenant_isolation` trên mọi
+   * bảng tenant-scoped đọc GUC này → role icp_app (NOBYPASSRLS) chỉ thấy row
+   * đúng tenant. GUC tự reset khi txn kết thúc (không rò sang query sau trên
+   * cùng pooled connection).
+   *
+   * SET LOCAL không nhận tham số → dùng `set_config($1)` để bind an toàn
+   * (chống injection); thêm UUID format guard defense-in-depth.
+   *
+   * **STATUS T01: stub khả dụng** — repos CHƯA gọi qua đây (T02/T03 wire toàn
+   * bộ repository). Runtime DATABASE_URL còn là superuser cho tới khi cutover.
+   *
+   * @example
+   *   await pg.withTenant(tenantId, async (client) => {
+   *     const r = await client.query('SELECT * FROM products WHERE id=$1', [id]);
+   *     return r.rows[0];
+   *   });
+   */
+  async withTenant<T>(
+    tenantId: string,
+    fn: (client: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    if (!UUID_RE.test(tenantId)) {
+      throw new Error(`withTenant: invalid tenant_id format: ${tenantId}`);
+    }
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      // is_local=true → GUC chỉ sống trong txn này (reset on COMMIT/ROLLBACK).
+      await client.query("SELECT set_config('app.tenant_id', $1, true)", [tenantId]);
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   /**

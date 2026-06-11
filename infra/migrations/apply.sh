@@ -28,21 +28,27 @@
 set -euo pipefail
 
 
-# === Resolve DATABASE_URL =====================================================
+# === Resolve migration connection string ====================================
+# S-P0-01 (ADR-040 amendment ii): migrations CHẠY BẰNG SUPERURL — CREATE ROLE
+# icp_app / ENABLE RLS / GRANT đòi superuser. Runtime DATABASE_URL (icp_app,
+# NOBYPASSRLS) KHÔNG đủ quyền. Ưu tiên DATABASE_URL_MIGRATE; fallback
+# DATABASE_URL cho back-compat (env cũ chưa tách 2 string).
 # Priority: explicit env > ../../.env file > error.
-# .env path is relative to script location (../../.env from infra/migrations/).
-if [ -z "${DATABASE_URL:-}" ]; then
+if [ -z "${DATABASE_URL_MIGRATE:-}" ] || [ -z "${DATABASE_URL:-}" ]; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   ENV_FILE="$SCRIPT_DIR/../../.env"
   if [ -f "$ENV_FILE" ]; then
-    # Parse only DATABASE_URL line, skip comments, export to current shell.
-    export $(grep -v '^#' "$ENV_FILE" | grep '^DATABASE_URL=' | xargs)
+    # Parse only the DB url lines, skip comments, export to current shell.
+    export $(grep -v '^#' "$ENV_FILE" | grep -E '^DATABASE_URL(_MIGRATE)?=' | xargs)
   fi
 fi
 
+# DATABASE_URL used by all psql calls below = migrate URL (superuser).
+DATABASE_URL="${DATABASE_URL_MIGRATE:-${DATABASE_URL:-}}"
+
 if [ -z "${DATABASE_URL:-}" ]; then
-  echo "ERROR: DATABASE_URL not set." >&2
-  echo "  Set via env: DATABASE_URL=postgresql://... bash apply.sh" >&2
+  echo "ERROR: neither DATABASE_URL_MIGRATE nor DATABASE_URL set." >&2
+  echo "  Set via env: DATABASE_URL_MIGRATE=postgresql://... bash apply.sh" >&2
   echo "  Or place in .env at repo root (../../.env from script)." >&2
   exit 1
 fi

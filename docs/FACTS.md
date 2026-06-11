@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-10T16:24:43Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-11T07:09:15Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -9,7 +9,8 @@
 - V008__shopee_prices_mock.sql
 - V009__auth_refresh_token.sql
 - V010__image_data_inline.sql
-- highest: V010
+- V011__multi_tenant.sql
+- highest: V011
 
 ## Gateway routes   <!-- grep @Get/@Post/@Patch/@Delete/@Put trong *.controller.ts -->
 - auth: 5 route — @Post('login') @Post('logout') @Get('me') @Post('refresh') @Post('forgot-password') 
@@ -75,7 +76,7 @@
 
 ## DB   <!-- docker exec icp-postgres psql; fallback parse migrations -->
 - nguồn: ★ DB LIVE (container icp-postgres, db icp)
-- tables: 17
+- tables: 19
   - action_cards
   - behavior_events
   - behavior_events_y2026m05
@@ -91,14 +92,16 @@
   - schema_migrations
   - sessions
   - shopee_prices_mock
+  - tenant_memberships
+  - tenants
   - transactions
   - users
 - matviews: 3
   - analytics_daily
   - analytics_daily_category
   - analytics_product_performance
-- migrations applied: 8
-- cột tenant_id: 0
+- migrations applied: 9
+- cột tenant_id: 14
 
 ## Frontend (apps/web)   <!-- find app -name page.tsx; ls components -->
 - pages (App Router): 47

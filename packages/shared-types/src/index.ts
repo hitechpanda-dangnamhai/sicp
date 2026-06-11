@@ -65,3 +65,4 @@ export * from './sse';
 export * from './cart';
 export * from './products';
 export * from './recommendations';
+export * from './tenant';

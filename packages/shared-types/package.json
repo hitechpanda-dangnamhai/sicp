@@ -32,6 +32,10 @@
       "types": "./dist/recommendations.d.ts",
       "default": "./dist/recommendations.js"
     },
+    "./tenant": {
+      "types": "./dist/tenant.d.ts",
+      "default": "./dist/tenant.js"
+    },
     "./api": {
       "types": "./dist/api/index.d.ts",
       "default": "./dist/api/index.js"

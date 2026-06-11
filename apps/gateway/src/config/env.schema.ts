@@ -26,10 +26,22 @@ export const EnvSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
 
   // Database
+  // S-P0-01 (ADR-040 amendment ii): runtime creds. Cutover sang role icp_app
+  // (NOBYPASSRLS) ở T02/T03 khi withTenant()/SET LOCAL đã wire.
   DATABASE_URL: z
     .string()
     .url()
-    .describe('Postgres connection URL, e.g. postgres://user:pass@postgres:5432/icp'),
+    .describe('Postgres runtime connection URL (icp_app sau T02/T03 cutover)'),
+
+  // DATABASE_URL_MIGRATE: superuser, CHỈ infra/migrations/apply.sh tiêu thụ —
+  // gateway runtime KHÔNG dùng. Optional ở schema này (gateway boot không cần),
+  // nhưng nếu set thì validate URL hợp lệ. Tách khỏi DATABASE_URL để CREATE
+  // ROLE/RLS/GRANT chạy bằng superuser.
+  DATABASE_URL_MIGRATE: z
+    .string()
+    .url()
+    .optional()
+    .describe('Superuser URL cho apply.sh; gateway runtime không đọc'),
 
   // Cache (idempotency + session storage)
   REDIS_URL: z
