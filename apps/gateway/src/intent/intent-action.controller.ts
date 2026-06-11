@@ -54,6 +54,7 @@ import {
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
 import { AiClient } from '../clients/ai.client';
 import { IntentActionDto } from './dto/intent-action.dto';
 
@@ -83,7 +84,7 @@ export class IntentActionController {
    * events flow to FE via existing /stream connection (no FE reconnect).
    */
   @Post(':rid/action')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantMembershipGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Resume interrupted intent graph with user choice',
@@ -124,11 +125,17 @@ export class IntentActionController {
       );
 
       try {
-        const result = await this.aiClient.postIntentResume(rid, {
-          choice: body.choice,
-          value: body.value,
-          _meta: { attempt_n: attemptN },
-        });
+        const result = await this.aiClient.postIntentResume(
+          rid,
+          {
+            choice: body.choice,
+            value: body.value,
+            _meta: { attempt_n: attemptN },
+          },
+          // S-P0-01 T02 (ADR-047/046): forward identity header X-User-Id/X-Tenant-Id.
+          // tenant = req.tenant_id do TenantMembershipGuard set (URL validated).
+          { userId, tenantId: req.tenant_id ?? null },
+        );
         return { request_id: result.request_id, status: 'accepted' as const };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);

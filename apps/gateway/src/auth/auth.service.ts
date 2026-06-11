@@ -30,6 +30,11 @@ import { LogoutUseCase, type LogoutCommand } from './application/logout.use-case
 import { GetMeUseCase, type GetMeCommand } from './application/get-me.use-case';
 import { RefreshUseCase, type RefreshCommand, type RefreshResult } from './application/refresh.use-case';
 import { ForgotPasswordUseCase, type ForgotPasswordCommand } from './application/forgot-password.use-case';
+import {
+  SwitchTenantUseCase,
+  type SwitchTenantCommand,
+  type SwitchTenantResult,
+} from './application/switch-tenant.use-case';
 import { TrackingService } from '../tracking/tracking.service';
 import type { BehaviorEvent, BehaviorEventType, PropertiesFor } from '@icp/shared-types';
 import { createLogger, type IcpLogPayload } from '../observability';
@@ -38,6 +43,7 @@ import {
   InvalidCredentialsError,
   TokenInvalidError,
   RefreshRejectedError,
+  TenantSwitchRejectedError,
 } from './domain/errors';
 import { createHash } from 'node:crypto';
 
@@ -55,10 +61,13 @@ export class AuthService {
     private readonly getMeUC: GetMeUseCase,
     private readonly refreshUC: RefreshUseCase,
     private readonly forgotPasswordUC: ForgotPasswordUseCase,
+    private readonly switchTenantUC: SwitchTenantUseCase,
     private readonly tracking: TrackingService,
   ) {}
 
-  async login(cmd: LoginCommand & { rememberMe: boolean }): Promise<LoginResult> {
+  async login(
+    cmd: LoginCommand & { rememberMe: boolean; eventTenantId?: string | null },
+  ): Promise<LoginResult> {
     try {
       const result = await this.loginUC.execute({ email: cmd.email, password: cmd.password });
       const emailHash = this.hashEmail(cmd.email);
@@ -75,11 +84,15 @@ export class AuthService {
         'auth.login_succeeded',
       );
       // S-03 T03 — emit auth.signed_in behavior event (fire-and-forget)
+      // ADR-046 amend c: KHÔNG còn "active tenant" lúc login. Event attribute
+      // theo tenant của URL request (eventTenantId resolve optional ở controller
+      // từ X-Tenant-Id); null (login ngoài storefront) → skip emit.
       void this.emitAuthEvent(
         'auth.signed_in',
         { method: 'password' },
         result.user.id,
         result.jti,
+        cmd.eventTenantId ?? null,
       );
       return result;
     } catch (err) {
@@ -96,18 +109,19 @@ export class AuthService {
     }
   }
 
-  async logout(cmd: LogoutCommand & { userId: string }): Promise<void> {
+  async logout(cmd: LogoutCommand & { userId: string; tenantId: string | null }): Promise<void> {
     await this.logoutUC.execute({ jti: cmd.jti });
     this.log.info(
       {
         message: 'auth.logout_succeeded',
         user_id: cmd.userId,
+        tenant_id: cmd.tenantId ?? undefined,
         extras: { jti_prefix: cmd.jti.slice(0, 8) },
       } as IcpLogPayload,
       'auth.logout_succeeded',
     );
     // S-03 T03 — emit auth.signed_out behavior event (fire-and-forget)
-    void this.emitAuthEvent('auth.signed_out', {}, cmd.userId, cmd.jti);
+    void this.emitAuthEvent('auth.signed_out', {}, cmd.userId, cmd.jti, cmd.tenantId);
   }
 
   async me(cmd: GetMeCommand): Promise<MeResponse> {
@@ -166,22 +180,64 @@ export class AuthService {
   }
 
   /**
+   * S-P0-01 T02 (ADR-046 amendment c) — switch shop = đổi landing hint, KHÔNG
+   * re-issue token. Verify membership → UPDATE sessions.last_active_tenant_id →
+   * trả redirect_url. Ops log tenant.switched (from→to) / tenant_switch_rejected.
+   */
+  async switchTenant(cmd: SwitchTenantCommand): Promise<SwitchTenantResult> {
+    try {
+      const result = await this.switchTenantUC.execute(cmd);
+      this.log.info(
+        {
+          message: 'tenant.switched',
+          user_id: cmd.userId,
+          tenant_id: result.tenantId,
+          extras: {
+            from_tenant_id: result.fromTenantId,
+            to_tenant_id: result.tenantId,
+            session_id: cmd.jti,
+          },
+        } as IcpLogPayload,
+        'tenant.switched',
+      );
+      return result;
+    } catch (err) {
+      if (err instanceof TenantSwitchRejectedError) {
+        this.log.warn(
+          {
+            message: 'auth.tenant_switch_rejected',
+            user_id: cmd.userId,
+            extras: { ...err.logExtras, target_tenant_id: cmd.targetTenantId },
+          } as IcpLogPayload,
+          'auth.tenant_switch_rejected',
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Stub forgot-password handler per S-03 C-03 (no SMTP, no DB query, no
    * user enumeration). Always succeeds. Emits ops log + behavior event.
    *
    * NEVER throws — controller layer catches any internal error and still
    * returns `{sent: true}` to client (prevent enumeration via error response).
    */
-  async forgotPassword(cmd: ForgotPasswordCommand): Promise<void> {
+  async forgotPassword(cmd: ForgotPasswordCommand, tenantId: string): Promise<void> {
     const result = await this.forgotPasswordUC.execute(cmd);
     // S-03 T03 — emit auth.password_reset_requested behavior event (fire-and-forget)
     // user_id = undefined (no session — anonymous endpoint per `03_API §1.1`)
     // session_id = 'system' literal (no jti available — pre-authentication flow)
+    // S-P0-01 T02 (ADR-046 amend b): tenantId resolve ở controller qua
+    // TenantResolverService (storefront gửi X-Tenant-Id) → event PERSIST đúng
+    // tenant (KHÔNG còn drop). 'system' ở đây là session_id literal, KHÔNG phải
+    // sentinel tenant.
     void this.emitAuthEvent(
       'auth.password_reset_requested',
       { email_hash: result.emailHash },
       undefined,
       'system',
+      tenantId,
     );
   }
 
@@ -202,7 +258,25 @@ export class AuthService {
     properties: PropertiesFor<T>,
     userId: string | undefined,
     sessionId: string,
+    tenantId: string | null,
   ): Promise<void> {
+    // S-P0-01 T02 — behavior_events tenant-scoped NOT NULL (ADR-046 amend b).
+    // tenantId null = customer global đăng nhập/đăng xuất ngoài context shop
+    // (loopback server-side KHÔNG có X-Tenant-Id để resolve) → SKIP emit (KHÔNG
+    // throw, KHÔNG persist NULL). Đây KHÔNG phải path /track anonymous (đã được
+    // resolver+header lo); chỉ là side-effect loopback không thuộc tenant nào.
+    if (!tenantId) {
+      this.log.debug(
+        {
+          message: 'tracker.loopback_skipped_no_tenant',
+          user_id: userId,
+          extras: { event_type: eventType },
+        } as IcpLogPayload,
+        'tracker.loopback_skipped_no_tenant',
+      );
+      return;
+    }
+
     const event = {
       event_id: randomUUID(),
       event_type: eventType,
@@ -214,7 +288,7 @@ export class AuthService {
     } as unknown as BehaviorEvent;
 
     try {
-      await this.tracking.ingest({ events: [event] }, randomUUID());
+      await this.tracking.ingest({ events: [event] }, randomUUID(), tenantId);
     } catch (err) {
       this.log.warn(
         {

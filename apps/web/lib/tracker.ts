@@ -34,6 +34,7 @@ import {
   type PropertiesFor,
   type TrackBatch,
 } from '@icp/shared-types/behavior';
+import { tenantHeaders } from './api-client';
 
 // ─────────────────────────────────────────────────────────────────────
 // Constants (per spec)
@@ -175,7 +176,9 @@ export class Tracker {
     try {
       const res = await fetch(this.endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        // S-P0-01 T02 (ADR-046 amend b): attach X-Tenant-Id cho /track anonymous
+        // (BE resolve chain JWT→X-Tenant-Id→400). Authed: cookie JWT vẫn gửi kèm.
+        headers: { 'Content-Type': 'application/json', ...tenantHeaders() },
         body: JSON.stringify(body),
         keepalive: true,
         credentials: 'same-origin',
@@ -215,7 +218,19 @@ export class Tracker {
    */
   flushBeacon(): void {
     if (this.queue.length === 0) return;
-    if (typeof navigator === 'undefined' || typeof navigator.sendBeacon !== 'function') {
+
+    // S-P0-01 T02 (ADR-046 amend b): sendBeacon KHÔNG đặt được custom header →
+    // không gửi được X-Tenant-Id. Nếu đang ở storefront anonymous (có tenant
+    // header) → dùng fetch{keepalive} (gửi được header, vẫn chạy lúc unload);
+    // ngược lại (authed: JWT cookie tự kèm) → sendBeacon như cũ.
+    const tHeaders = tenantHeaders();
+    const needsHeader = Object.keys(tHeaders).length > 0;
+
+    if (
+      needsHeader ||
+      typeof navigator === 'undefined' ||
+      typeof navigator.sendBeacon !== 'function'
+    ) {
       void this.flush();
       return;
     }

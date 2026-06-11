@@ -131,6 +131,42 @@ export class PostgresSessionRepository {
   }
 
   /**
+   * S-P0-01 T02 (ADR-046 amend c) — UPDATE landing hint khi switch-tenant.
+   * Set `sessions.last_active_tenant_id` cho session hiện tại (theo jti). KHÔNG
+   * ảnh hưởng request routing (active tenant = URL). Caller verify membership
+   * TRƯỚC khi gọi.
+   */
+  async updateLastActiveTenant(jti: string, tenantId: string): Promise<void> {
+    await this.pg.query(
+      `UPDATE sessions
+          SET last_active_tenant_id = $2
+        WHERE jti = $1
+          AND revoked_at IS NULL`,
+      [jti, tenantId],
+    );
+  }
+
+  /**
+   * S-P0-01 T02 (ADR-046 amend c) — đọc landing hint cho GET /auth/landing.
+   * Trả tenant_id + slug (join tenants) của shop dùng gần nhất ở session này,
+   * hoặc null nếu chưa từng switch / tenant đã bị xoá (FK SET NULL) / slug
+   * không còn active. null → FE landing /onboarding.
+   */
+  async getLastActiveTenant(jti: string): Promise<{ tenant_id: string; slug: string } | null> {
+    const result = await this.pg.query<{ tenant_id: string; slug: string }>(
+      `SELECT t.id AS tenant_id, t.slug AS slug
+         FROM sessions s
+         JOIN tenants t ON t.id = s.last_active_tenant_id
+        WHERE s.jti = $1
+          AND s.revoked_at IS NULL
+          AND t.status = 'active'
+        LIMIT 1`,
+      [jti],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  /**
    * /auth/me `last_login_at` = MAX(issued_at) of any non-revoked session for
    * the user. Returns null if user has no active session (shouldn't happen
    * for caller of /auth/me but defensive).

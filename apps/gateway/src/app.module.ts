@@ -32,6 +32,8 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { CartModule } from './cart';
 import { CardsModule } from './cards/cards.module';
 import { ProductsModule } from './products/products.module';
+import { TenantModule } from './tenant/tenant.module';
+import { PublicModule } from './public/public.module';
 
 @Module({
   imports: [
@@ -39,6 +41,8 @@ import { ProductsModule } from './products/products.module';
     IdempotencyModule,
     HealthModule,
     DatabaseModule,
+    TenantModule, // ← S-P0-01 T02: TenantResolverService (ADR-046 amend b)
+    PublicModule, // ← S-P0-01 T02: public tenant-by-slug bootstrap
     TrackingModule,
     IntentModule,
     CartModule, // ← S-05 T02 per D-S05-01 LAW

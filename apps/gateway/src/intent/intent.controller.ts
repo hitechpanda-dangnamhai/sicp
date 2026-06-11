@@ -76,6 +76,7 @@ import { RedisClient } from '../idempotency/redis.client';
 import { IntentRequestDto } from './dto/intent-request.dto';
 import { IntentService } from './intent.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
 
 /** Lazy tracer per C-28 LOCK. */
 function getTracer(): Tracer {
@@ -161,7 +162,7 @@ export class IntentController {
    * to Redis channel `sse:pubsub:{rid}`).
    */
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantMembershipGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Dispatch intent to AI service',
@@ -185,7 +186,13 @@ export class IntentController {
     // never sent → AI fell back to 'smoke-user-anon' → wrong cart cleared
     // per Bug #1+#2 Phiên Sx05-3-CODE manual test discovery.
     const userId = req.user?.id ?? 'anon';
-    return this.intentService.dispatch({ ...body, user_id: userId });
+    // S-P0-01 T02 (2-phase): GIỮ body.user_id (AI hiện đọc field này tới T03) +
+    // THÊM forward context → header X-User-Id/X-Tenant-Id (ADR-047/046). tenant
+    // = req.tenant_id do TenantMembershipGuard set (URL, đã validate membership).
+    return this.intentService.dispatch(
+      { ...body, user_id: userId },
+      { userId, tenantId: req.tenant_id ?? null },
+    );
   }
 
   /**

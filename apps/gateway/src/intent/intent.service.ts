@@ -41,7 +41,12 @@
 
 import { Injectable, Logger as NestLogger } from '@nestjs/common';
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
-import { AiClient, type AiIntentResponse, type PostIntentBody } from '../clients/ai.client';
+import {
+  AiClient,
+  type AiForwardContext,
+  type AiIntentResponse,
+  type PostIntentBody,
+} from '../clients/ai.client';
 import { RedisClient } from '../idempotency/redis.client';
 
 /** Lazy tracer per C-28 LOCK. */
@@ -76,7 +81,10 @@ export class IntentService {
    * GET /stream handler subscribes the channel to forward events to FE
    * EventSource (Option Z architecture per D-S04-13 LAW).
    */
-  async dispatch(body: PostIntentBody): Promise<{ request_id: string; status: 'accepted' }> {
+  async dispatch(
+    body: PostIntentBody,
+    ctx?: AiForwardContext,
+  ): Promise<{ request_id: string; status: 'accepted' }> {
     const tracer = getTracer();
     const span = tracer.startSpan('gateway.intent.dispatch');
     return context.with(trace.setSpan(context.active(), span), async () => {
@@ -86,7 +94,7 @@ export class IntentService {
       }
       const startedAt = Date.now();
       try {
-        const aiResponse = await this.aiClient.postIntent(body);
+        const aiResponse = await this.aiClient.postIntent(body, ctx);
         span.setAttribute('ai.request_id', aiResponse.request_id);
 
         // Cache request_id for SSE stream pickup gate. /stream handler checks

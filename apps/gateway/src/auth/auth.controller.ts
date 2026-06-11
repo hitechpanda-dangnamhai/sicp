@@ -29,6 +29,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -52,10 +53,13 @@ import { JwtAuthGuard, type AuthedRequest } from './jwt-auth.guard';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto, MeResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ForgotPasswordResponseDto } from './dto/forgot-password.dto';
+import { SwitchTenantRequestDto, SwitchTenantResponseDto } from './dto/switch-tenant.dto';
+import { TenantResolverService } from '../tenant/tenant-resolver.service';
 import {
   InvalidCredentialsError,
   RefreshRejectedError,
   TokenInvalidError,
+  TenantSwitchRejectedError,
 } from './domain/errors';
 import type { Env } from '../config/env.schema';
 
@@ -76,6 +80,7 @@ export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
+    private readonly tenantResolver: TenantResolverService,
     config: ConfigService<Env, true>,
   ) {
     this.cookieSecure = config.get('COOKIE_SECURE', { infer: true });
@@ -100,6 +105,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(
     @Body() body: LoginDto,
+    @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ user: LoginResponseDto['user'] }> {
     const tracer = getTracer();
@@ -110,6 +116,9 @@ export class AuthController {
           email: body.email,
           password: body.password,
           rememberMe: body.remember_me,
+          // ADR-046 amend c: login không có "active tenant". Event attribute theo
+          // X-Tenant-Id của request (storefront) nếu có; ngoài storefront → null → skip.
+          eventTenantId: this.tenantResolver.resolveOptional(req),
         });
         span.setAttribute('auth.user_id_prefix', result.user.id.slice(0, 8));
         this.setAuthCookies(res, result.accessToken, result.rawRefreshToken, body.remember_me);
@@ -154,7 +163,12 @@ export class AuthController {
     return context.with(trace.setSpan(context.active(), span), async () => {
       try {
         span.setAttribute('auth.user_id_prefix', req.user.id.slice(0, 8));
-        await this.authService.logout({ jti: req.user.jti, userId: req.user.id });
+        await this.authService.logout({
+          jti: req.user.jti,
+          userId: req.user.id,
+          // ADR-046 amend c: event tenant từ X-Tenant-Id request (optional).
+          tenantId: this.tenantResolver.resolveOptional(req),
+        });
         this.clearAuthCookies(res);
       } catch (err) {
         span.recordException(err instanceof Error ? err : new Error(String(err)));
@@ -197,6 +211,58 @@ export class AuthController {
           span.setStatus({ code: SpanStatusCode.ERROR, message: 'session_not_found' });
           throw new UnauthorizedException({
             error: { code: 'UNAUTHORIZED', message: 'Session not found' },
+          });
+        }
+        span.recordException(err instanceof Error ? err : new Error(String(err)));
+        throw err;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // POST /auth/switch-tenant — S-P0-01 T02 (ADR-046 amendment active tenant)
+  // ────────────────────────────────────────────────────────────────────────
+
+  @Post('switch-tenant')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiCookieAuth('icp_session')
+  @ApiOperation({
+    summary: 'Đổi shop — cập nhật landing hint, trả redirect_url (KHÔNG re-issue token)',
+    description:
+      'ADR-046 amend (c): active tenant = URL, KHÔNG phải claim. Verify membership → ' +
+      'UPDATE sessions.last_active_tenant_id → trả { tenant_id, slug, redirect_url } ' +
+      'để FE router.push(redirect_url). JWT/cookie KHÔNG đổi. 403 nếu không phải member.',
+  })
+  @ApiResponse({ status: 200, type: SwitchTenantResponseDto })
+  @ApiResponse({ status: 403, description: 'Not a member of target tenant' })
+  async switchTenant(
+    @Body() body: SwitchTenantRequestDto,
+    @Req() req: AuthedRequest,
+  ): Promise<SwitchTenantResponseDto> {
+    const tracer = getTracer();
+    const span = tracer.startSpan('gateway.auth.switch_tenant');
+    return context.with(trace.setSpan(context.active(), span), async () => {
+      try {
+        span.setAttribute('auth.user_id_prefix', req.user.id.slice(0, 8));
+        span.setAttribute('tenant.id', body.tenant_id);
+        const result = await this.authService.switchTenant({
+          userId: req.user.id,
+          jti: req.user.jti,
+          targetTenantId: body.tenant_id,
+        });
+        return {
+          tenant_id: result.tenantId,
+          slug: result.slug,
+          redirect_url: result.redirectUrl,
+        } as SwitchTenantResponseDto;
+      } catch (err) {
+        if (err instanceof TenantSwitchRejectedError) {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: 'tenant_switch_rejected' });
+          throw new ForbiddenException({
+            error: { code: 'FORBIDDEN', message: 'Not a member of target tenant' },
           });
         }
         span.recordException(err instanceof Error ? err : new Error(String(err)));
@@ -277,12 +343,19 @@ export class AuthController {
       'email service + reset token table.',
   })
   @ApiResponse({ status: 200, type: ForgotPasswordResponseDto })
-  async forgotPassword(@Body() body: ForgotPasswordDto): Promise<{ sent: true }> {
+  async forgotPassword(
+    @Body() body: ForgotPasswordDto,
+    @Req() req: Request,
+  ): Promise<{ sent: true }> {
     const tracer = getTracer();
     const span = tracer.startSpan('gateway.auth.forgot_password');
+    // S-P0-01 T02 (ADR-046 amend b): resolve tenant TRƯỚC try (storefront gửi
+    // X-Tenant-Id). 400 TenantContextMissing được propagate (KHÔNG bị nuốt bởi
+    // no-enumeration catch — thiếu tenant là lỗi request, không phải enumeration).
+    const { tenantId } = this.tenantResolver.resolve(req);
     return context.with(trace.setSpan(context.active(), span), async () => {
       try {
-        await this.authService.forgotPassword({ email: body.email });
+        await this.authService.forgotPassword({ email: body.email }, tenantId);
         return { sent: true as const };
       } catch (err) {
         // Catch ALL errors — do NOT leak user existence via specific responses

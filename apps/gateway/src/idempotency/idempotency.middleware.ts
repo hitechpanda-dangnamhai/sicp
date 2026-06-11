@@ -108,12 +108,16 @@ export class IdempotencyMiddleware implements NestMiddleware {
     // /intent before login), fall back to 'anon' bucket. Real userId comes
     // from JWT extracted by AuthGuard in S-03; T01 reads req['user']?.id if
     // an upstream guard has populated it.
-    const userId =
-      ((req as Request & { user?: { id?: string } }).user?.id as string | undefined) ??
-      'anon';
+    const authed = (req as Request & { user?: { id?: string } }).user;
+    const userId = (authed?.id as string | undefined) ?? 'anon';
+    // S-P0-01 T02 (ADR-046 amend c) — prefix tenant để idem bucket KHÔNG lẫn
+    // cross-tenant. Active tenant = URL → đọc header X-Tenant-Id TRỰC TIẾP
+    // (middleware chạy TRƯỚC guard nên req.user/req.tenant_id chưa có, nhưng
+    // header đã sẵn). Thiếu → bucket 'global'.
+    const tenantScope = req.header('x-tenant-id') ?? 'global';
 
-    const lockKey = `idem:lock:${userId}:${key}`;
-    const cacheKey = `idem:cache:${userId}:${key}`;
+    const lockKey = `idem:lock:${tenantScope}:${userId}:${key}`;
+    const cacheKey = `idem:cache:${tenantScope}:${userId}:${key}`;
     const keyPrefix = key.slice(0, 8);
 
     // Step 1: Cache hit?

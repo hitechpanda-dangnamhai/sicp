@@ -27,13 +27,14 @@
 
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { TenantModule } from '../tenant/tenant.module';
 import { DatabaseModule } from '../database';
 import { ClientsModule } from '../clients/clients.module';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from './dashboard.service';
 
 @Module({
-  imports: [AuthModule, DatabaseModule, ClientsModule],
+  imports: [AuthModule, DatabaseModule, ClientsModule, TenantModule],
   controllers: [DashboardController],
   providers: [DashboardService],
 })

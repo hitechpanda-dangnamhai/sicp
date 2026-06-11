@@ -64,14 +64,22 @@ export class TrackingService {
    * DB unreachable / partition missing (logged + re-raised so NestJS exception
    * filter returns 500/503).
    */
-  async ingest(batch: TrackBatch, requestId: string): Promise<TrackBatchResponse> {
+  async ingest(
+    batch: TrackBatch,
+    requestId: string,
+    tenantId: string,
+  ): Promise<TrackBatchResponse> {
     const startedAtMs = Date.now();
     const totalReceived = batch.events.length;
 
+    // S-P0-01 T02 (ADR-046 amend b): tenant resolve ở caller (TenantResolverService
+    // chain JWT→X-Tenant-Id→400). Service nhận tenantId NON-NULL — KHÔNG còn
+    // silent drop. behavior_events tenant-scoped NOT NULL → mọi row gắn tenant này.
     this.log.info(
       {
         message: 'tracker.batch_received',
         request_id: requestId,
+        tenant_id: tenantId,
         extras: { event_count: totalReceived },
       } as IcpLogPayload,
       'tracker.batch_received',
@@ -115,7 +123,7 @@ export class TrackingService {
     let insertedCount = 0;
     if (accepted.length > 0) {
       try {
-        const result = await this.repo.insertBatch(accepted);
+        const result = await this.repo.insertBatch(accepted, tenantId);
         insertedCount = result.inserted;
       } catch (err) {
         this.handlePersistError(err, requestId, accepted.length);

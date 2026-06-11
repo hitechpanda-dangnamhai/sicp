@@ -28,6 +28,7 @@ import { compare } from 'bcryptjs';
 import { ConfigService } from '@nestjs/config';
 import { PostgresUserRepository } from '../infrastructure/postgres-user.repo';
 import { PostgresSessionRepository } from '../infrastructure/postgres-session.repo';
+import { PostgresMembershipRepository } from '../infrastructure/postgres-membership.repo';
 import { RedisSessionStore } from '../infrastructure/redis-session.store';
 import { JwtHelper } from '../jwt.helper';
 import { InvalidCredentialsError } from '../domain/errors';
@@ -46,6 +47,11 @@ export interface LoginResult {
   refreshExpiresAt: Date;
   user: PublicUser;
   jti: string;
+  /**
+   * S-P0-01 T02 (ADR-046 amend c) — danh sách tenant user là member (JWT claim).
+   * KHÔNG phải active tenant. [] = customer global.
+   */
+  tenantIds: string[];
 }
 
 @Injectable()
@@ -55,6 +61,7 @@ export class LoginUseCase {
   constructor(
     private readonly users: PostgresUserRepository,
     private readonly sessions: PostgresSessionRepository,
+    private readonly memberships: PostgresMembershipRepository,
     private readonly store: RedisSessionStore,
     private readonly jwt: JwtHelper,
     config: ConfigService<Env, true>,
@@ -76,12 +83,16 @@ export class LoginUseCase {
       throw new InvalidCredentialsError('password_mismatch', emailHash);
     }
 
+    // S-P0-01 T02 (ADR-046 amend c) — list memberships → JWT.tenant_ids. KHÔNG
+    // resolve "default active" (active tenant = URL, không phải claim).
+    const tenantIds = await this.memberships.findTenantIds(user.id);
+
     const jti = randomUUID();
     const rawRefreshToken = randomUUID();
     const refreshTokenHash = createHash('sha256').update(rawRefreshToken).digest('hex');
 
     const { token: accessToken, expiresAt: accessExpiresAt } = this.jwt.sign(
-      { sub: user.id, email: user.email, role: user.role },
+      { sub: user.id, email: user.email, role: user.role, tenant_ids: tenantIds },
       jti,
     );
     const refreshExpiresAt = new Date(Date.now() + this.refreshTtlSeconds * 1000);
@@ -118,6 +129,7 @@ export class LoginUseCase {
         avatar_initials: computeAvatarInitials(user.display_name),
       },
       jti,
+      tenantIds,
     };
   }
 }

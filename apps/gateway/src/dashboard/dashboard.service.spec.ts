@@ -1,72 +1,50 @@
 /**
  * apps/gateway/src/dashboard/dashboard.service.spec.ts
  *
- * S-03 T03b Integration test — DashboardService stub.
+ * S-P0-01 T02 — DashboardService unit test (multi-tenant scope guard).
  *
- * **Strategy per Phiên 36 user decision Option (A)** (mirror `auth.service.spec.ts`
- * vitest integration pattern). Since DashboardService is a stub (D-10 MAR-1
- * Q5 RESOLVED) with hardcoded JSON return — NO PG / Redis / external deps —
- * tests are simple shape verification + schema parse assertion. Controller-
- * level AC verify (AC-21 200 with cookie + AC-22 401 without) chuyển sang
- * Batch 6 `apps/gateway/test/smoke-dashboard.sh` per repo canonical pattern
- * (smoke-auth.sh / smoke-auth-events.sh / smoke-tracker.sh precedent).
+ * Lịch sử: bản S-03 T03b kiểm "stub hardcoded 8/2.4M/142" đã LỖI THỜI sau khi
+ * Sx08-J viết lại getStats() thành query DB thật (PgPool + McpClient). T02 thêm
+ * tham số `tenantId` + chạy qua `withTenant()`. Spec này giờ kiểm nhánh KHÔNG
+ * cần DB: tenantId=null (merchant chưa có shop) → trả KPI rỗng, KHÔNG chạm pg.
+ * Nhánh có-tenant (RLS scope thật) kiểm ở integration `tenant-isolation.spec.ts`
+ * + smoke. Giữ 2 ca Zod defensive.
  *
- * Pre-conditions: none (stub service has no I/O).
- *
- * Run from host:
- *   pnpm --filter @icp/gateway test -- dashboard.service.spec
- *
- * Coverage maps to Task Pack v1.1 ACs:
- *   - DM-14 stub endpoint shape verify → it('returns DashboardStats shape')
- *   - D-10 hardcoded values match mockup → it('matches mockup StatBar values')
- *   - Schema-shape resilience → it('parses cleanly through DashboardStatsSchema')
- *
- * Target: 3/3 PASS.
- *
- * S-03 T03b emit (Phiên 36 Batch 1).
+ * Run từ host: pnpm --filter @icp/gateway test -- dashboard.service.spec
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { DashboardService } from './dashboard.service';
+import type { PgPool } from '../database';
+import type { McpClient } from '../clients/mcp.client';
 import { DashboardStatsSchema } from './dto/dashboard-stats.dto';
 
-describe('DashboardService (S-03 T03b stub)', () => {
-  const service = new DashboardService();
+/** pg giả NÉM nếu bị gọi — chứng minh nhánh null-tenant không query DB. */
+const throwingPg = {
+  query: vi.fn(() => {
+    throw new Error('pg.query must NOT be called on null-tenant path');
+  }),
+  withTenant: vi.fn(() => {
+    throw new Error('withTenant must NOT be called on null-tenant path');
+  }),
+} as unknown as PgPool;
+const noopMcp = {} as unknown as McpClient;
 
-  it('returns DashboardStats shape with all required fields', async () => {
-    const stats = await service.getStats();
+describe('DashboardService (S-P0-01 T02 — tenant scope guard)', () => {
+  const service = new DashboardService(throwingPg, noopMcp);
 
-    expect(stats).toBeDefined();
-    expect(stats).toHaveProperty('orders_today');
-    expect(stats).toHaveProperty('revenue_today');
-    expect(stats).toHaveProperty('inventory_count');
-    expect(stats).toHaveProperty('currency');
+  it('null tenant (no shop) → empty KPIs, no DB query', async () => {
+    const stats = await service.getStats('user-1', null);
 
+    expect(stats).toEqual({
+      orders_today: 0,
+      revenue_today: 0,
+      inventory_count: 0,
+      currency: 'VND',
+    });
     expect(typeof stats.orders_today).toBe('number');
-    expect(typeof stats.revenue_today).toBe('number');
-    expect(typeof stats.inventory_count).toBe('number');
-    expect(typeof stats.currency).toBe('string');
-  });
-
-  it('matches mockup StatBar values per D-10 hardcoded contract', async () => {
-    const stats = await service.getStats();
-
-    // Per `golden-reference-mockup.html` StatBar text: "8 Đơn hôm nay" /
-    // "2.4M Doanh thu" / "142 Tồn kho". 2.4M VND = 2_400_000 numeric.
-    expect(stats.orders_today).toBe(8);
-    expect(stats.revenue_today).toBe(2_400_000);
-    expect(stats.inventory_count).toBe(142);
-    expect(stats.currency).toBe('VND');
-  });
-
-  it('parses cleanly through DashboardStatsSchema (Zod shape lock)', async () => {
-    const stats = await service.getStats();
-
-    // Should NOT throw — service internal `DashboardStatsSchema.parse(stats)`
-    // already validates, but external re-parse catches any future regression
-    // where service returns raw object bypassing schema. Defensive layer.
-    const parsed = DashboardStatsSchema.parse(stats);
-    expect(parsed).toEqual(stats);
+    // Schema-valid (service parse trước khi trả; re-parse defensive).
+    expect(DashboardStatsSchema.parse(stats)).toEqual(stats);
   });
 
   it('rejects non-integer values via Zod schema (defensive)', () => {

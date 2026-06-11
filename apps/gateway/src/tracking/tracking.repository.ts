@@ -69,24 +69,34 @@ export class TrackingRepository {
    * (`tracking.service.ts`) uses for response `accepted` field together with
    * pre-INSERT drop count.
    *
-   * **Why parameterized VALUES vs single COPY:** pg-node `query()` with
-   * positional params keeps OTel pg-instrumentation span clean (each batch =
-   * 1 query span). COPY would bypass instrumentation; not needed at T06 scale
-   * (batch ≤500 events, well under PG's 32k param limit at 13 cols/event).
+   * **S-P0-01 T02 (multi-tenant):** `behavior_events` là bảng tenant-scoped
+   * (RLS + `tenant_id NOT NULL`, V011). Chạy TRONG `withTenant(tenantId)`:
+   * SET LOCAL app.tenant_id → RLS `WITH CHECK` cho INSERT pass; thêm cột
+   * `tenant_id` (giá trị chung mọi row trong batch = tenant của request đã
+   * resolve). Caller BẢO ĐẢM tenantId non-null (drop nếu unresolved).
+   *
+   * **Why parameterized VALUES vs single COPY:** pg-node `query()` với positional
+   * params giữ OTel pg-instrumentation span sạch (mỗi batch = 1 query span).
+   * COPY bypass instrumentation; không cần ở quy mô này (batch ≤500 events,
+   * 14 cols/event vẫn dưới PG 32k param limit).
    */
-  async insertBatch(events: BehaviorEvent[]): Promise<InsertResult> {
+  async insertBatch(events: BehaviorEvent[], tenantId: string): Promise<InsertResult> {
     if (events.length === 0) {
       return { attempted: 0, inserted: 0 };
     }
 
-    // Build positional placeholders: ($1,$2,...,$13), ($14,$15,...,$26), ...
+    // tenant_id là cột dẫn đầu mỗi tuple (14 cols = 1 tenant_id + 13 event cols).
+    const colsPerRow = COLS.length + 1;
     const placeholders: string[] = [];
     const params: unknown[] = [];
     events.forEach((e, idx) => {
-      const base = idx * COLS.length;
-      const rowPlaceholders = COLS.map((_, ci) => `$${base + ci + 1}`).join(', ');
+      const base = idx * colsPerRow;
+      const rowPlaceholders = Array.from({ length: colsPerRow }, (_, ci) => `$${base + ci + 1}`).join(
+        ', ',
+      );
       placeholders.push(`(${rowPlaceholders})`);
       params.push(
+        tenantId,
         e.event_id,
         e.event_type,
         e.occurred_at,
@@ -104,12 +114,12 @@ export class TrackingRepository {
     });
 
     const sql = `
-      INSERT INTO behavior_events (${COLS.join(', ')})
+      INSERT INTO behavior_events (tenant_id, ${COLS.join(', ')})
       VALUES ${placeholders.join(', ')}
       ON CONFLICT (event_id, occurred_at) DO NOTHING
     `;
 
-    const result = await this.pg.query(sql, params);
+    const result = await this.pg.withTenant(tenantId, (client) => client.query(sql, params));
     return {
       attempted: events.length,
       inserted: result.rowCount ?? 0,

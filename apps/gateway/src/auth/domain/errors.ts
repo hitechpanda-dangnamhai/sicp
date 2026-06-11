@@ -63,3 +63,15 @@ export class RefreshRejectedError extends AuthDomainError {
     this.name = 'RefreshRejectedError';
   }
 }
+
+/**
+ * S-P0-01 T02 — switch-tenant rejected: user KHÔNG phải member của tenant đích
+ * (ADR-046 amendment — verify membership trước khi re-issue token). HTTP 403
+ * (authenticated nhưng không có quyền với tenant này); ops log ghi reason.
+ */
+export class TenantSwitchRejectedError extends AuthDomainError {
+  constructor(reason: 'not_member') {
+    super('FORBIDDEN', 'Not a member of target tenant', { reason });
+    this.name = 'TenantSwitchRejectedError';
+  }
+}

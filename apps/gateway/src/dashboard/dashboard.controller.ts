@@ -42,6 +42,7 @@ import {
 } from '@nestjs/swagger';
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
+import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
 import { DashboardService } from './dashboard.service';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
 import { DashboardInsightDto } from './dto/dashboard-insight.dto';
@@ -61,7 +62,7 @@ export class DashboardController {
 
   @Get('stats')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantMembershipGuard)
   @ApiCookieAuth('icp_session')
   @ApiOperation({
     summary: 'Get dashboard KPI stats — stub per S-03 D-10',
@@ -79,7 +80,8 @@ export class DashboardController {
     return context.with(trace.setSpan(context.active(), span), async () => {
       try {
         span.setAttribute('auth.user_id_prefix', req.user.id.slice(0, 8));
-        const result = await this.dashboardService.getStats(req.user.id);
+        // req.tenant_id do TenantMembershipGuard set (đã validate ∈ tenant_ids).
+        const result = await this.dashboardService.getStats(req.user.id, req.tenant_id ?? null);
         return result as DashboardStatsDto;
       } catch (err) {
         span.recordException(err instanceof Error ? err : new Error(String(err)));

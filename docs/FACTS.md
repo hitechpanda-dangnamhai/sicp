@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-11T07:09:15Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-11T10:55:01Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -10,10 +10,13 @@
 - V009__auth_refresh_token.sql
 - V010__image_data_inline.sql
 - V011__multi_tenant.sql
-- highest: V011
+- V012__session_last_active_tenant.sql
+- V013__rls_nullif_hardening.sql
+- highest: V013
 
 ## Gateway routes   <!-- grep @Get/@Post/@Patch/@Delete/@Put trong *.controller.ts -->
-- auth: 5 route — @Post('login') @Post('logout') @Get('me') @Post('refresh') @Post('forgot-password') 
+- auth: 6 route — @Post('login') @Post('logout') @Get('me') @Post('switch-tenant') @Post('refresh') @Post('forgot-password') 
+- landing: 2 route — @Get('landing') @Get('tenants') 
 - cards: 3 route — @Get() @Post(':id/accept') @Post(':id/reject') 
 - cart: 7 route — @Get() @Post('items') @Patch('items/:productId') @Delete('items/:productId') @Delete() @Post('promo') @Delete('promo') 
 - dashboard: 2 route — @Get('stats') @Get('insight') 
@@ -22,8 +25,9 @@
 - intent-suggest-attrs: 1 route — @Post(':rid/suggest-attrs') 
 - intent: 2 route — @Post() @Get('stream') 
 - products: 1 route — @Patch(':id') 
+- public: 1 route — @Get('tenant-by-slug/:slug') 
 - tracking: 1 route — @Post() 
-- TOTAL: 25 route / 10 controller
+- TOTAL: 29 route / 12 controller
 
 ## AI graphs   <!-- ls apps/ai/src/graphs/intents/*.py -->
 - analyzing_by_voices
@@ -100,11 +104,11 @@
   - analytics_daily
   - analytics_daily_category
   - analytics_product_performance
-- migrations applied: 9
+- migrations applied: 11
 - cột tenant_id: 14
 
 ## Frontend (apps/web)   <!-- find app -name page.tsx; ls components -->
-- pages (App Router): 47
+- pages (App Router): 48
   - / (root)
   - /auth/forgot-password
   - /auth/login
@@ -152,10 +156,11 @@
   - /me/help
   - /me/notifications
   - /me/security
+  - /onboarding
 - components/ui (shadcn): 8 file
 - components/icp/atoms: 10 file
 - components/icp/molecules: 44 file
-- components/icp/organisms: 19 file
+- components/icp/organisms: 20 file
 - components/icp/layout: 5 file
 - e2e specs: 3
 - unit/__tests__: 9

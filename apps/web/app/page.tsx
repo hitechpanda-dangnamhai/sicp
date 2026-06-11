@@ -32,13 +32,40 @@ import { SplashContent } from '@/components/icp/organisms/SplashContent';
 
 const SESSION_COOKIE = 'icp_session';
 
-export default function RootPage() {
-  // Server-side cookie presence check (Edge runtime fast O(1) lookup).
-  // Validity check happens at BE per protected request via JwtAuthGuard;
-  // here we only gate splash render vs dashboard redirect.
-  if (cookies().has(SESSION_COOKIE)) {
-    redirect('/home');
+/**
+ * Gateway URL cho server-side fetch. Trong docker, server (Next) gọi gateway
+ * qua DNS `gateway:3001`; dev host = localhost:3001. NEXT_PUBLIC_GATEWAY_URL
+ * dùng chung với client config (query-provider).
+ */
+const GATEWAY_URL =
+  process.env.GATEWAY_INTERNAL_URL ??
+  process.env.NEXT_PUBLIC_GATEWAY_URL ??
+  'http://localhost:3001';
+
+export default async function RootPage() {
+  // S-P0-01 T02 (ADR-046 amend c): root URL không có /s/<slug> → hỏi BE landing.
+  // Server-side fetch (forward cookie) — đây là QUYẾT ĐỊNH routing, không phải
+  // REST data call trong component (generated client là client-only nên dùng
+  // raw fetch ở Server Component này).
+  const store = cookies();
+  if (!store.has(SESSION_COOKIE)) {
+    return <SplashContent />;
   }
 
-  return <SplashContent />;
+  let redirectUrl = '/onboarding'; // fail-safe: authed nhưng không resolve được
+  try {
+    const res = await fetch(`${GATEWAY_URL}/api/v1/auth/landing`, {
+      headers: { cookie: store.toString() },
+      cache: 'no-store',
+    });
+    if (res.ok) {
+      const body = (await res.json()) as { redirect_url?: string };
+      if (typeof body.redirect_url === 'string' && body.redirect_url.length > 0) {
+        redirectUrl = body.redirect_url;
+      }
+    }
+  } catch {
+    // Gateway unreachable → onboarding (an toàn; user chọn shop thủ công).
+  }
+  redirect(redirectUrl);
 }

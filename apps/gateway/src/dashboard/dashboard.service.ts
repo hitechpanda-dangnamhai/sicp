@@ -50,10 +50,27 @@ export class DashboardService {
   /**
    * Aggregate dashboard KPIs for the given merchant from live DB tables.
    *
+   * S-P0-01 T02 — chạy TRONG withTenant(tenantId): orders/products là bảng
+   * tenant-scoped (RLS). Dưới role icp_app, SET LOCAL app.tenant_id ép RLS chỉ
+   * thấy row của tenant này; WHERE user_id/merchant_id giữ scope theo merchant
+   * TRONG tenant. tenantId=null (merchant chưa có shop) → trả KPI rỗng (không
+   * query — withTenant đòi UUID).
+   *
    * @param userId authenticated merchant id (orders.user_id / products.merchant_id)
+   * @param tenantId active tenant từ URL (req.tenant_id, TenantMembershipGuard set)
    * @returns DashboardStatsType matching DashboardStatsSchema
    */
-  async getStats(userId: string): Promise<DashboardStatsType> {
+  async getStats(userId: string, tenantId: string | null): Promise<DashboardStatsType> {
+    if (!tenantId) {
+      const empty: DashboardStatsType = {
+        orders_today: 0,
+        revenue_today: 0,
+        inventory_count: 0,
+        currency: 'VND',
+      };
+      DashboardStatsSchema.parse(empty);
+      return empty;
+    }
     // Orders + revenue: paid orders created today (HCMC tz). Single row.
     const ordersSql = `
       SELECT
@@ -73,10 +90,13 @@ export class DashboardService {
         AND status = 'active'
     `;
 
-    const [ordersRes, inventoryRes] = await Promise.all([
-      this.pg.query<{ orders_today: number; revenue_today: string }>(ordersSql, [userId]),
-      this.pg.query<{ inventory_count: string }>(inventorySql, [userId]),
-    ]);
+    // Cả 2 query phải dùng CÙNG client trong transaction để chia sẻ GUC SET LOCAL.
+    const [ordersRes, inventoryRes] = await this.pg.withTenant(tenantId, (client) =>
+      Promise.all([
+        client.query<{ orders_today: number; revenue_today: string }>(ordersSql, [userId]),
+        client.query<{ inventory_count: string }>(inventorySql, [userId]),
+      ]),
+    );
 
     // pg returns BIGINT as string → Number() (values well within JS safe-int
     // for Hackathon scale: revenue/stock far below 2^53).

@@ -43,6 +43,7 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { TenantModule } from '../tenant/tenant.module';
 import { ClientsModule } from '../clients/clients.module';
 import { IdempotencyModule } from '../idempotency/idempotency.module';
 import { IntentActionIdempotencyMiddleware } from './intent-action-idempotency.middleware';
@@ -52,7 +53,7 @@ import { IntentService } from './intent.service';
 import { IntentSuggestAttrsController } from './intent-suggest-attrs.controller';
 
 @Module({
-  imports: [ClientsModule, IdempotencyModule, AuthModule],
+  imports: [ClientsModule, IdempotencyModule, AuthModule, TenantModule],
   controllers: [
     IntentController,
     IntentActionController,

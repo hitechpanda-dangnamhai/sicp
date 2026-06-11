@@ -161,6 +161,31 @@ export interface PostIntentBody {
  * internal `POST /intent/{rid}/resume`. Shape mirrors
  * `apps/gateway/src/intent/dto/intent-action.dto.ts`.
  */
+/**
+ * S-P0-01 T02 — identity forward context cho Gateway→AI (ADR-047 + ADR-046).
+ *
+ * Gateway = security perimeter resolve user_id + tenant_id (JWT claim) rồi
+ * forward qua HTTP header `X-User-Id` / `X-Tenant-Id`. AI service tin header
+ * (KHÔNG verify JWT). tenantId null = customer global.
+ *
+ * **2-PHASE (S-P0-01 T02 → T03):** T02 THÊM header (parallel) NHƯNG GIỮ
+ * `body.user_id` để AI hiện tại (`apps/ai/src/main.py` đọc payload.user_id)
+ * không gãy. T03 chuyển AI sang đọc header rồi MỚI xoá `body.user_id`
+ * (CLAUDE.md §shared-types: field remove = breaking → 2-phase).
+ */
+export interface AiForwardContext {
+  userId: string;
+  tenantId: string | null;
+}
+
+/** Build forward headers từ context (bỏ qua X-Tenant-Id khi customer global). */
+function forwardHeaders(ctx?: AiForwardContext): Record<string, string> {
+  if (!ctx) return {};
+  const headers: Record<string, string> = { 'x-user-id': ctx.userId };
+  if (ctx.tenantId) headers['x-tenant-id'] = ctx.tenantId;
+  return headers;
+}
+
 export interface PostIntentResumeBody {
   /**
    * Resume choice for Pattern A interrupt+resume per D-S04-13 LAW + S-05 T02
@@ -315,7 +340,7 @@ export class AiClient {
    *
    * Span: `gateway.client.ai.post_intent` (manual) + auto child fetch span.
    */
-  async postIntent(body: PostIntentBody): Promise<AiIntentResponse> {
+  async postIntent(body: PostIntentBody, ctx?: AiForwardContext): Promise<AiIntentResponse> {
     const tracer = getTracer();
     const span = tracer.startSpan('gateway.client.ai.post_intent');
     return context.with(trace.setSpan(context.active(), span), async () => {
@@ -326,6 +351,9 @@ export class AiClient {
       if (body.mode) {
         span.setAttribute('ai.mode', body.mode);
       }
+      if (ctx?.tenantId) {
+        span.setAttribute('tenant.id', ctx.tenantId);
+      }
       const startedAt = Date.now();
 
       const controller = new AbortController();
@@ -334,7 +362,9 @@ export class AiClient {
       try {
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          // S-P0-01 T02: +X-User-Id/X-Tenant-Id forward (ADR-047). body.user_id
+          // GIỮ tới T03 cutover (2-phase).
+          headers: { 'content-type': 'application/json', ...forwardHeaders(ctx) },
           body: JSON.stringify(body),
           signal: controller.signal,
         });
@@ -426,6 +456,7 @@ export class AiClient {
   async postIntentResume(
     rid: string,
     body: PostIntentResumeBody,
+    ctx?: AiForwardContext,
   ): Promise<AiIntentResumeResponse> {
     const tracer = getTracer();
     const span = tracer.startSpan('gateway.client.ai.post_intent_resume');
@@ -443,7 +474,8 @@ export class AiClient {
       try {
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          // S-P0-01 T02: +X-User-Id/X-Tenant-Id forward (ADR-047), 2-phase.
+          headers: { 'content-type': 'application/json', ...forwardHeaders(ctx) },
           body: JSON.stringify(body),
           signal: AbortSignal.timeout(RESUME_TIMEOUT_MS),
         });

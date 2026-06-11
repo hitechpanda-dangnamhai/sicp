@@ -22,8 +22,9 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 > **Verified TRỰC TIẾP code 2026-06-09** — grep structlog `apps/ai`+`apps/mcp` = **90 event-name**; pino `apps/gateway` = **83 event-name**. **Tên event dưới = tên THẬT trong code.** Service: `gateway` (TS/pino) · `ai` (py/structlog) · `mcp` (py/structlog). Cột `fields` = mức spec (tên đã verify; payload chi tiết cần đọc từng call). **Worker logs + Kafka = 🟡 CHƯA CODE** (workers skeleton, Kafka chưa wire). **Graph→log mapping verified per-file:** analyze.*=analyzing_by_voices · voice.*=buying_by_voices · parse_filters/typo/per_product_reason/copurchase/mcp.error=searching_by_text · generate_description/import/vision_analyze.no_image=importing_by_images · recommend.*=recommend_by_images · cart.cleared_via_graph/cart_graph=cart_by_text · llm.*=tools/llm_client. *(Lưu ý: grep tên là line-based → có thể sót log multi-line; LLM đã đủ 9 tên gồm fallback_to_openai/json_parse_failed verified qua orchestration.)*
 
 ### Auth (gateway) ✅
-`auth.login_succeeded` · `auth.login_failed` · `auth.logout_succeeded` · `auth.token_invalid` · `auth.token_refreshed` · `auth.refresh_rejected` · `auth.me_served` · `auth.password_reset_requested`.
+`auth.login_succeeded` · `auth.login_failed` · `auth.logout_succeeded` · `auth.token_invalid` · `auth.token_refreshed` · `auth.refresh_rejected` · `auth.me_served` · `auth.password_reset_requested` · `auth.tenant_switch_rejected`.
 - **reason values thật (bare):** `invalid_credentials` / `refresh_missing` / `session_not_found`.
+- **`auth.tenant_switch_rejected.reason`:** `not_member` (S-P0-01 T02 — POST /auth/switch-tenant verify membership; ADR-046 amend c). Switch THÀNH CÔNG = `tenant.switched` (Tenant section).
 - 🟡 **CHƯA CODE:** `auth.session_revoked`.
 
 ### Idempotency (gateway) ✅
@@ -112,8 +113,18 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 - 🟡 **CHƯA CODE:** `kafka.consumer_lag_high` (Kafka chưa wire).
 
 ### Tracker / Behavior Ingest (gateway) ✅
-`tracker.batch_received` · `tracker.batch_persisted` · `tracker.event_dropped` · `tracker.persist_failed` · `tracker.loopback_failed`; `db.behavior_partition_missing` · `db.pool_idle_client_error` · `db.pool_closed`.
+`tracker.batch_received` · `tracker.batch_persisted` · `tracker.event_dropped` · `tracker.persist_failed` · `tracker.loopback_failed` · `tracker.loopback_skipped_no_tenant`; `db.behavior_partition_missing` · `db.pool_idle_client_error` · `db.pool_closed`.
 - **`tracker.event_dropped.reason` (closed set):** `properties_schema_mismatch` / `occurred_at_future` / `occurred_at_too_old` (07_BEHAVIOR §9.2).
+- **`tracker.loopback_skipped_no_tenant`** (S-P0-01 T02): loopback auth event (signed_in/out) của customer GLOBAL (JWT tenant_id=null, không context shop) → SKIP emit, KHÔNG persist NULL. KHÔNG áp dụng cho /track (đã resolve qua chain JWT→X-Tenant-Id→400, ADR-046 amend b).
+
+### Tenant resolution (gateway) ✅ — NEW (S-P0-01 T02, amend c)
+`tenant.resolved` · `tenant.context_missing` · `tenant.membership_denied` · `tenant.switched` · `tenant.landing_resolved`; `public.tenant_not_found`.
+- **`tenant.resolved.source`:** `header` (ADR-046 amend c: active tenant = URL/X-Tenant-Id; JWT KHÔNG mang active tenant).
+- **`tenant.context_missing`**: endpoint cần tenant nhưng thiếu X-Tenant-Id → 400 `TENANT_CONTEXT_MISSING` (CẤM silent drop / NULL persist).
+- **`tenant.membership_denied`**: TenantMembershipGuard — URL tenant ∉ jwt.tenant_ids → 403 `TENANT_FORBIDDEN`.
+- **`tenant.switched`** (fields: `from_tenant_id`, `to_tenant_id`, `session_id`): POST /auth/switch-tenant cập nhật sessions.last_active_tenant_id (KHÔNG re-issue token).
+- **`tenant.landing_resolved.source` (closed set):** `last_active` | `onboarding` — GET /auth/landing redirect resolution.
+- **`public.tenant_not_found`**: GET /public/tenant-by-slug/:slug không khớp tenant active → 404.
 
 ## B. Behavior Event Types
 

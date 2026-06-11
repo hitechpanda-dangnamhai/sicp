@@ -45,6 +45,42 @@
         ]
       }
     },
+    "/api/v1/public/tenant-by-slug/{slug}": {
+      "get": {
+        "operationId": "PublicController_tenantBySlug",
+        "summary": "Resolve tenant_id từ slug (public, no auth)",
+        "description": "FE storefront /s/<slug> gọi 1 lần để lấy tenant_id rồi attach X-Tenant-Id cho request anonymous (tracking/public). KHÔNG auth, KHÔNG tenant context (bootstrap). 404 nếu slug không tồn tại hoặc tenant không active. ADR-046 amend (b).",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "description": "DNS-safe tenant slug (a-z0-9-)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantBySlugResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tenant not found or not active"
+          }
+        },
+        "tags": [
+          "public"
+        ]
+      }
+    },
     "/api/v1/track": {
       "post": {
         "operationId": "TrackingController_ingest",
@@ -356,6 +392,47 @@
         ]
       }
     },
+    "/api/v1/auth/switch-tenant": {
+      "post": {
+        "operationId": "AuthController_switchTenant",
+        "summary": "Đổi shop — cập nhật landing hint, trả redirect_url (KHÔNG re-issue token)",
+        "description": "ADR-046 amend (c): active tenant = URL, KHÔNG phải claim. Verify membership → UPDATE sessions.last_active_tenant_id → trả { tenant_id, slug, redirect_url } để FE router.push(redirect_url). JWT/cookie KHÔNG đổi. 403 nếu không phải member.",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwitchTenantRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwitchTenantResponseDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a member of target tenant"
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
     "/api/v1/auth/refresh": {
       "post": {
         "operationId": "AuthController_refresh",
@@ -405,6 +482,68 @@
         },
         "tags": [
           "auth"
+        ]
+      }
+    },
+    "/api/v1/auth/landing": {
+      "get": {
+        "operationId": "LandingController_landing",
+        "summary": "Resolve landing redirect (last shop hoặc onboarding)",
+        "description": "ADR-046 amend (c): đọc sessions.last_active_tenant_id → redirect_url `/s/<slug>` (last_active) hoặc `/onboarding` (chưa có hint). Dùng cho root URL.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LandingResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/tenants": {
+      "get": {
+        "operationId": "LandingController_myTenants",
+        "summary": "Danh sách shop user là member (onboarding/switcher)",
+        "description": "ADR-046 amend (c): FE không đọc được tenant_ids (httpOnly JWT) → endpoint join slug/name. Dùng cho /onboarding (chọn shop) + tenant-switcher.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyTenantsResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "icp_session": []
+          }
         ]
       }
     },
@@ -828,6 +967,22 @@
       }
     },
     "schemas": {
+      "TenantBySlugResponseDto": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "name"
+        ]
+      },
       "TrackBatchDto": {
         "type": "object",
         "properties": {
@@ -4702,6 +4857,38 @@
           "session_expires_at"
         ]
       },
+      "SwitchTenantRequestDto": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "tenant_id"
+        ]
+      },
+      "SwitchTenantResponseDto": {
+        "type": "object",
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "redirect_url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "slug",
+          "redirect_url"
+        ]
+      },
       "ForgotPasswordDto": {
         "type": "object",
         "properties": {
@@ -4724,6 +4911,56 @@
         },
         "required": [
           "sent"
+        ]
+      },
+      "LandingResponseDto": {
+        "type": "object",
+        "properties": {
+          "redirect_url": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "last_active",
+              "onboarding"
+            ]
+          }
+        },
+        "required": [
+          "redirect_url",
+          "source"
+        ]
+      },
+      "MyTenantsResponseDto": {
+        "type": "object",
+        "properties": {
+          "tenants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tenant_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tenant_id",
+                "slug",
+                "name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "tenants"
         ]
       },
       "CartAddItemDto": {

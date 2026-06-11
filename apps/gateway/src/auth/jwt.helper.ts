@@ -35,12 +35,21 @@ export interface JwtPayload {
   sub: string;          // user.id (UUID)
   email: string;
   role: 'merchant' | 'customer' | 'admin';
+  /**
+   * S-P0-01 T02 (ADR-046 amendment c) — MEMBERSHIP LIST, KHÔNG phải active
+   * tenant. Danh sách tenant_id user là member (merchant/staff). Customer
+   * global = [] (không membership). Active tenant KHÔNG ở JWT — nó là URL
+   * (/s/<slug>), validate qua TenantMembershipGuard (tenant_id ∈ tenant_ids).
+   * Refresh re-lookup memberships (không cache active). Supersedes amend (a)
+   * "active-tenant claim" — Linear/Vercel/GitHub pattern.
+   */
+  tenant_ids: string[];
   jti: string;          // session jti for revocation lookup
   iat: number;          // issued at (seconds)
   exp: number;          // expires at (seconds)
 }
 
-export type JwtPayloadInput = Pick<JwtPayload, 'sub' | 'email' | 'role'>;
+export type JwtPayloadInput = Pick<JwtPayload, 'sub' | 'email' | 'role' | 'tenant_ids'>;
 
 @Injectable()
 export class JwtHelper {
@@ -92,7 +101,11 @@ export class JwtHelper {
         typeof payload.sub !== 'string' ||
         typeof payload.email !== 'string' ||
         typeof payload.role !== 'string' ||
-        typeof payload.jti !== 'string'
+        typeof payload.jti !== 'string' ||
+        // tenant_ids phải là string[] (membership list; [] = customer global).
+        // Token cũ thiếu field / sai shape → malformed → 401 → buộc re-login.
+        !(Array.isArray(payload.tenant_ids) &&
+          payload.tenant_ids.every((t) => typeof t === 'string'))
       ) {
         throw new TokenInvalidError('jwt_malformed');
       }

@@ -115,6 +115,16 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: process.env.CORS_ORIGIN ?? 'http://localhost:3000',
     credentials: true,
+    // S-P0-01 T02 (ADR-046 amend b): +X-Tenant-Id để FE attach tenant cho
+    // request anonymous. Liệt kê tường minh các custom header đang dùng
+    // (Idempotency-Key, X-Request-Id) để không vỡ khi set allowedHeaders.
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Idempotency-Key',
+      'X-Request-Id',
+      'X-Tenant-Id',
+    ],
   });
 
   // S-03 T02 — Global cookie-parser middleware (replaces S-02 T07 inline

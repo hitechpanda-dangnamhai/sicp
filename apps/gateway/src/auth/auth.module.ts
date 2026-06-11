@@ -40,7 +40,9 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '../database';
 import { IdempotencyModule } from '../idempotency/idempotency.module';
 import { TrackingModule } from '../tracking/tracking.module';
+import { TenantModule } from '../tenant/tenant.module';
 import { AuthController } from './auth.controller';
+import { LandingController } from './landing.controller';
 import { AuthService } from './auth.service';
 import { JwtHelper } from './jwt.helper';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -49,13 +51,15 @@ import { LogoutUseCase } from './application/logout.use-case';
 import { GetMeUseCase } from './application/get-me.use-case';
 import { RefreshUseCase } from './application/refresh.use-case';
 import { ForgotPasswordUseCase } from './application/forgot-password.use-case';
+import { SwitchTenantUseCase } from './application/switch-tenant.use-case';
 import { PostgresUserRepository } from './infrastructure/postgres-user.repo';
 import { PostgresSessionRepository } from './infrastructure/postgres-session.repo';
+import { PostgresMembershipRepository } from './infrastructure/postgres-membership.repo';
 import { RedisSessionStore } from './infrastructure/redis-session.store';
 
 @Module({
-  imports: [ConfigModule, DatabaseModule, IdempotencyModule, TrackingModule],
-  controllers: [AuthController],
+  imports: [ConfigModule, DatabaseModule, IdempotencyModule, TrackingModule, TenantModule],
+  controllers: [AuthController, LandingController],
   providers: [
     AuthService,
     JwtHelper,
@@ -65,8 +69,10 @@ import { RedisSessionStore } from './infrastructure/redis-session.store';
     GetMeUseCase,
     RefreshUseCase,
     ForgotPasswordUseCase,
+    SwitchTenantUseCase,
     PostgresUserRepository,
     PostgresSessionRepository,
+    PostgresMembershipRepository,
     RedisSessionStore,
   ],
   exports: [JwtAuthGuard, JwtHelper, RedisSessionStore, PostgresSessionRepository],

@@ -35,13 +35,17 @@ import {
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { TrackingService } from './tracking.service';
+import { TenantResolverService } from '../tenant/tenant-resolver.service';
 import { TrackBatchDto } from './dto/track-batch.dto';
 import type { TrackBatchResponse } from '@icp/shared-types';
 
 @ApiTags('tracker')
 @Controller('api/v1/track')
 export class TrackingController {
-  constructor(private readonly trackingService: TrackingService) {}
+  constructor(
+    private readonly trackingService: TrackingService,
+    private readonly tenantResolver: TenantResolverService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.ACCEPTED)
@@ -86,6 +90,9 @@ export class TrackingController {
       ? upstreamRequestId
       : randomUUID();
 
-    return this.trackingService.ingest(body, requestId);
+    // S-P0-01 T02 (ADR-046 amend b): resolve tenant theo chain JWT→X-Tenant-Id→400.
+    // KHÔNG silent drop — thiếu tenant context = 400 TenantContextMissing.
+    const { tenantId } = this.tenantResolver.resolve(req);
+    return this.trackingService.ingest(body, requestId, tenantId);
   }
 }

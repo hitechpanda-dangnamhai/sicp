@@ -42,6 +42,24 @@ export interface AuthedUser {
   role: 'merchant' | 'customer' | 'admin';
   display_name: string;
   jti: string;
+  /**
+   * S-P0-01 T02 (ADR-046 amend c) — MEMBERSHIP LIST từ JWT. KHÔNG phải active
+   * tenant. Active tenant = URL (resolve qua TenantResolverService); TenantMembershipGuard
+   * validate tenant_id ∈ tenant_ids → 403. [] = customer global.
+   */
+  tenant_ids: string[];
+}
+
+/**
+ * S-P0-01 T02 (ADR-046 amend c) — active tenant resolve từ URL/header (gắn bởi
+ * TenantMembershipGuard). Tách khỏi AuthedUser: tenant_ids = quyền (membership),
+ * tenant_id = ngữ cảnh request (URL).
+ */
+declare module 'express' {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface Request {
+    tenant_id?: string;
+  }
 }
 
 /**
@@ -103,7 +121,7 @@ export class JwtAuthGuard implements CanActivate {
 
     // Revocation check — try Redis fast path first.
     const cached = await this.sessionStore.get(payload.jti);
-    let displayName = cached?.display_name ?? '';
+    const displayName = cached?.display_name ?? '';
     if (!cached) {
       // Redis miss → fallback PG (Redis TTL may have expired naturally, but
       // PG row may still be valid within its expires_at window).
@@ -127,6 +145,7 @@ export class JwtAuthGuard implements CanActivate {
       role: payload.role,
       display_name: displayName,
       jti: payload.jti,
+      tenant_ids: payload.tenant_ids,
     };
 
     return true;

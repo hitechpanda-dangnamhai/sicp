@@ -59,23 +59,28 @@ import { RedisClient } from '../idempotency/redis.client';
 import { JwtHelper } from './jwt.helper';
 import { PostgresUserRepository } from './infrastructure/postgres-user.repo';
 import { PostgresSessionRepository } from './infrastructure/postgres-session.repo';
+import { PostgresMembershipRepository } from './infrastructure/postgres-membership.repo';
 import { RedisSessionStore } from './infrastructure/redis-session.store';
 import { LoginUseCase } from './application/login.use-case';
 import { LogoutUseCase } from './application/logout.use-case';
 import { GetMeUseCase } from './application/get-me.use-case';
 import { RefreshUseCase } from './application/refresh.use-case';
 import { ForgotPasswordUseCase } from './application/forgot-password.use-case';
+import { SwitchTenantUseCase } from './application/switch-tenant.use-case';
 import { TrackingRepository } from '../tracking/tracking.repository';
 import { TrackingService } from '../tracking/tracking.service';
 import { AuthService } from './auth.service';
 import {
   InvalidCredentialsError,
   RefreshRejectedError,
+  TenantSwitchRejectedError,
 } from './domain/errors';
 
 const TEST_EMAIL = 'merchant1@demo.icp';
 const TEST_PASSWORD = 'demo1234';
 const TEST_DISPLAY_NAME = 'Anh Nam';
+/** V011 backfill anchor — merchant1 là owner tenant demo (S-P0-01). */
+const DEMO_TENANT_ID = '11111111-1111-1111-1111-111111111111';
 
 /** Wait helper — give fire-and-forget loopback emit time to complete PG INSERT. */
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -122,6 +127,7 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
   let jwtHelper: JwtHelper;
   let userRepo: PostgresUserRepository;
   let sessionRepo: PostgresSessionRepository;
+  let membershipRepo: PostgresMembershipRepository;
   let sessionStore: RedisSessionStore;
   let trackingRepo: TrackingRepository;
   let trackingService: TrackingService;
@@ -171,6 +177,7 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
     );
     userRepo = new PostgresUserRepository(pgPool);
     sessionRepo = new PostgresSessionRepository(pgPool);
+    membershipRepo = new PostgresMembershipRepository(pgPool);
     sessionStore = new RedisSessionStore(redisClient);
 
     // T03 — Tracking layer (real PG insert path for loopback emit).
@@ -180,6 +187,7 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
     const loginUC = new LoginUseCase(
       userRepo,
       sessionRepo,
+      membershipRepo,
       sessionStore,
       jwtHelper,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -190,12 +198,14 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
     const refreshUC = new RefreshUseCase(
       userRepo,
       sessionRepo,
+      membershipRepo,
       sessionStore,
       jwtHelper,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       config as any,
     );
     forgotPasswordUC = new ForgotPasswordUseCase();
+    const switchTenantUC = new SwitchTenantUseCase(membershipRepo, sessionRepo);
 
     authService = new AuthService(
       loginUC,
@@ -203,6 +213,7 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
       getMeUC,
       refreshUC,
       forgotPasswordUC,
+      switchTenantUC,
       trackingService,
     );
 
@@ -257,6 +268,10 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
     expect(payload.email).toBe(TEST_EMAIL);
     expect(payload.role).toBe('merchant');
     expect(payload.jti).toBe(result.jti);
+    // S-P0-01 T02 (ADR-046 amend c) — merchant1 là member tenant demo → tenant_ids
+    // chứa DEMO (membership list, KHÔNG phải active claim).
+    expect(result.tenantIds).toContain(DEMO_TENANT_ID);
+    expect(payload.tenant_ids).toContain(DEMO_TENANT_ID);
 
     // PG persisted
     const pgRow = await pool.query<{ jti: string; refresh_token_hash: string; revoked_at: Date | null }>(
@@ -353,7 +368,7 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
     });
     expect(await sessionStore.get(login.jti)).not.toBeNull();
 
-    await authService.logout({ jti: login.jti, userId: login.user.id });
+    await authService.logout({ jti: login.jti, userId: login.user.id, tenantId: DEMO_TENANT_ID });
 
     // Redis gone
     expect(await sessionStore.get(login.jti)).toBeNull();
@@ -421,6 +436,9 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
       email: TEST_EMAIL,
       password: TEST_PASSWORD,
       rememberMe: false,
+      // ADR-046 amend c: event tenant từ request (X-Tenant-Id). Spec truyền DEMO
+      // để loopback persist (login ngoài storefront → null → skip emit).
+      eventTenantId: DEMO_TENANT_ID,
     });
 
     // Wait for fire-and-forget loopback to complete PG INSERT
@@ -445,7 +463,7 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
       password: TEST_PASSWORD,
       rememberMe: false,
     });
-    await authService.logout({ jti: login.jti, userId: login.user.id });
+    await authService.logout({ jti: login.jti, userId: login.user.id, tenantId: DEMO_TENANT_ID });
 
     // Wait for both signed_in (from login) + signed_out (from logout) to flush
     await sleep(LOOPBACK_FLUSH_MS);
@@ -463,27 +481,79 @@ describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + T
   // ──────────────────────────────────────────────────────────────────────
   // AC-12.c + AC-13 — forgotPassword emits behavior event + NO user lookup
   // ──────────────────────────────────────────────────────────────────────
-  it('AC-12.c + AC-13: forgotPassword emits auth.password_reset_requested with email_hash, no DB user lookup', async () => {
+  it('AC-12.c + AC-13: forgotPassword emits auth.password_reset_requested (persisted under resolved tenant), no DB user lookup', async () => {
     // Spy: UserRepo.findByEmail must NOT be called (no enumeration)
     const findByEmailSpy = vi.spyOn(userRepo, 'findByEmail');
 
-    await authService.forgotPassword({ email: TEST_EMAIL });
+    // S-P0-01 T02 (ADR-046 amend b): tenant resolve ở controller (X-Tenant-Id từ
+    // storefront). Spec gọi service trực tiếp → truyền DEMO_TENANT_ID. Event giờ
+    // PERSIST (revert drop): behavior_events.tenant_id = tenant resolve.
+    await authService.forgotPassword({ email: TEST_EMAIL }, DEMO_TENANT_ID);
 
-    // No user lookup — endpoint is anonymous, no DB query for enumeration
+    // No user lookup — endpoint is anonymous, no DB query for enumeration (AC-13).
     expect(findByEmailSpy).not.toHaveBeenCalled();
     findByEmailSpy.mockRestore();
 
     // Wait for fire-and-forget loopback
     await sleep(LOOPBACK_FLUSH_MS);
 
-    const rows = await pool.query<{ event_type: string; user_id: string | null; session_id: string; properties: Record<string, string> }>(
-      `SELECT event_type, user_id, session_id, properties FROM behavior_events
+    const rows = await pool.query<{ event_type: string; user_id: string | null; session_id: string; tenant_id: string; properties: Record<string, string> }>(
+      `SELECT event_type, user_id, session_id, tenant_id, properties FROM behavior_events
        WHERE event_type = 'auth.password_reset_requested' AND session_id = 'system'`,
     );
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0].user_id).toBeNull(); // No session yet — anonymous endpoint
     expect(rows.rows[0].session_id).toBe('system');
-    expect(rows.rows[0].properties.email_hash).toMatch(/^[0-9a-f]{16}$/); // SHA-256 hex 16 chars
+    expect(rows.rows[0].tenant_id).toBe(DEMO_TENANT_ID); // persisted under resolved tenant
+    expect(rows.rows[0].properties.email_hash).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // AC-T02.a — switch-tenant (member): update landing hint + redirect_url,
+  // NO token re-issue (ADR-046 amend c)
+  // ──────────────────────────────────────────────────────────────────────
+  it('AC-T02.a: switchTenant (member) updates sessions.last_active_tenant_id + returns redirect_url, no token', async () => {
+    const login = await authService.login({
+      email: TEST_EMAIL,
+      password: TEST_PASSWORD,
+      rememberMe: false,
+    });
+    const switched = await authService.switchTenant({
+      userId: login.user.id,
+      jti: login.jti,
+      targetTenantId: DEMO_TENANT_ID,
+    });
+    expect(switched.tenantId).toBe(DEMO_TENANT_ID);
+    expect(switched.slug).toBe('demo');
+    expect(switched.redirectUrl).toBe('/s/demo');
+    // KHÔNG re-issue token — switched không có accessToken (chỉ landing hint).
+    expect((switched as Record<string, unknown>).accessToken).toBeUndefined();
+
+    // Landing hint persisted ở session row.
+    const row = await pool.query<{ last_active_tenant_id: string | null }>(
+      `SELECT last_active_tenant_id FROM sessions WHERE jti = $1`,
+      [login.jti],
+    );
+    expect(row.rows[0].last_active_tenant_id).toBe(DEMO_TENANT_ID);
+  });
+
+  // ──────────────────────────────────────────────────────────────────────
+  // AC-T02.b — switch-tenant to a non-member tenant is rejected (authz)
+  // ──────────────────────────────────────────────────────────────────────
+  it('AC-T02.b: switchTenant to a tenant the user is NOT a member of throws TenantSwitchRejectedError', async () => {
+    const login = await authService.login({
+      email: TEST_EMAIL,
+      password: TEST_PASSWORD,
+      rememberMe: false,
+    });
+    const STRANGER_TENANT = '22222222-2222-2222-2222-222222222222';
+    await expect(
+      authService.switchTenant({
+        userId: login.user.id,
+        jti: login.jti,
+        targetTenantId: STRANGER_TENANT,
+      }),
+    ).rejects.toBeInstanceOf(TenantSwitchRejectedError);
   });
 });
 

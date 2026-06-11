@@ -36,6 +36,7 @@
 import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OpenAPI } from '@icp/shared-types/api';
+import { configureTenantHeader } from '@/lib/api-client';
 
 // Configure OpenAPI codegen client to send icp_session cookie cross-origin.
 // Side-effect runs ONCE on module load (top-level mutation safe — OpenAPI is
@@ -48,6 +49,9 @@ if (typeof window !== 'undefined') {
   if (process.env.NEXT_PUBLIC_GATEWAY_URL) {
     OpenAPI.BASE = process.env.NEXT_PUBLIC_GATEWAY_URL;
   }
+  // S-P0-01 T02 (ADR-046 amend b): attach X-Tenant-Id cho request anonymous
+  // (storefront /s/<slug>). BE ưu tiên JWT nên header vô hại với authed request.
+  configureTenantHeader();
 }
 
 export interface QueryProviderProps {

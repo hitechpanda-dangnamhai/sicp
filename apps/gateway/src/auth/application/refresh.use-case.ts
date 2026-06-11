@@ -32,6 +32,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { ConfigService } from '@nestjs/config';
 import { PostgresUserRepository } from '../infrastructure/postgres-user.repo';
 import { PostgresSessionRepository } from '../infrastructure/postgres-session.repo';
+import { PostgresMembershipRepository } from '../infrastructure/postgres-membership.repo';
 import { RedisSessionStore } from '../infrastructure/redis-session.store';
 import { JwtHelper } from '../jwt.helper';
 import { RefreshRejectedError } from '../domain/errors';
@@ -59,6 +60,7 @@ export class RefreshUseCase {
   constructor(
     private readonly users: PostgresUserRepository,
     private readonly sessions: PostgresSessionRepository,
+    private readonly memberships: PostgresMembershipRepository,
     private readonly store: RedisSessionStore,
     private readonly jwt: JwtHelper,
     config: ConfigService<Env, true>,
@@ -89,12 +91,17 @@ export class RefreshUseCase {
       throw new RefreshRejectedError('refresh_unknown');
     }
 
+    // S-P0-01 T02 (ADR-046 amend c) — re-lookup memberships mỗi refresh (KHÔNG
+    // cache active; active tenant = URL). Membership thay đổi (thêm/xoá shop) →
+    // phản ánh ngay ở token mới.
+    const tenantIds = await this.memberships.findTenantIds(user.id);
+
     const newJti = randomUUID();
     const newRawRefreshToken = randomUUID();
     const newRefreshHash = createHash('sha256').update(newRawRefreshToken).digest('hex');
 
     const { token: accessToken, expiresAt: accessExpiresAt } = this.jwt.sign(
-      { sub: user.id, email: user.email, role: user.role },
+      { sub: user.id, email: user.email, role: user.role, tenant_ids: tenantIds },
       newJti,
     );
     const refreshExpiresAt = new Date(Date.now() + this.refreshTtlSeconds * 1000);

@@ -23,9 +23,13 @@ import { DatabaseModule } from '../database';
 import { TrackingController } from './tracking.controller';
 import { TrackingService } from './tracking.service';
 import { TrackingRepository } from './tracking.repository';
+import { TenantModule } from '../tenant/tenant.module';
 
 @Module({
-  imports: [DatabaseModule],
+  // S-P0-01 T02: TenantModule cung cấp TenantResolverService để /track resolve
+  // tenant theo chain JWT→X-Tenant-Id→400 (ADR-046 amend b). KHÔNG import
+  // AuthModule (tránh circular: AuthModule → TrackingModule).
+  imports: [DatabaseModule, TenantModule],
   controllers: [TrackingController],
   providers: [TrackingService, TrackingRepository],
   exports: [TrackingService],
