@@ -90,6 +90,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 21 | Regex-PII redactor (bổ sung Pino path-redact) | — | 🟡 | — |
 | 22 | A11y audit (reduced-motion + WCAG AA + aria) | — | 🟡 | — |
 | 23 | Redis HA (Sentinel/Cluster) | — | 🟡 | RedisSaver + pub/sub SPOF |
+| 31 | Idempotency MW order: chạy SAU JwtAuthGuard | — | 🟡 | MW hiện trước guard → userId='anon' luôn + tenantScope từ header client-controlled (idempotency.middleware.ts:111-155); cache-hit serve trước auth. Pre-existing trước T02. Fix cần refactor MW chain order (RECON T02 Issue #4) |
 
 ### P2 / TÙY CHỌN — khi scale
 
@@ -102,6 +103,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 28 | gtrends real API / Image CDN / dark mode / i18n / token contract test | — | 🔵 | — |
 | 29 | Đồng bộ log level enum structlog→Pino (warning→warn, critical→fatal) | — | 🔵 | query Loki hiện phải OR 2 enum |
 | 30 | Inline comment pattern voice:context Redis FIFO 5 turns TTL 30min (Intent 02 + 07) | — | 🔵 | thêm note tại `_node_load_voice_context` 2 graph khi chạm code; "KHÔNG đổi schema mà không bump version" |
+| 32 | `nest build` emit không hoạt động, dùng `tsc` trực tiếp | — | 🔵 | xoá `tsconfig.tsbuildinfo` cache + tsc emit thay nest CLI; CI docker build path không affected; dev local annoyance (Issue #5 T02) |
 
 ## §4 Done gần đây
 
