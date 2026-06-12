@@ -52,7 +52,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
-| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ⬜ · T03–T05 ⬜ |
+| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03–T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -103,10 +103,16 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 28 | gtrends real API / Image CDN / dark mode / i18n / token contract test | — | 🔵 | — |
 | 29 | Đồng bộ log level enum structlog→Pino (warning→warn, critical→fatal) | — | 🔵 | query Loki hiện phải OR 2 enum |
 | 30 | Inline comment pattern voice:context Redis FIFO 5 turns TTL 30min (Intent 02 + 07) | — | 🔵 | thêm note tại `_node_load_voice_context` 2 graph khi chạm code; "KHÔNG đổi schema mà không bump version" |
-| 32 | `nest build` emit không hoạt động, dùng `tsc` trực tiếp | — | 🔵 | xoá `tsconfig.tsbuildinfo` cache + tsc emit thay nest CLI; CI docker build path không affected; dev local annoyance (Issue #5 T02) |
+| 32 | `nest build` emit không hoạt động, dùng `tsc` trực tiếp | — | 🔵 | docker build có-cache ship dist stale (bằng chứng smoke T02c 06-12); TIỀN-ĐIỀU-KIỆN T03 — fix trước khi bật enforcement |
 
 ## §4 Done gần đây
 
+- **2026-06-12 · S-P0-01/T02c** (`937378e`, `a76c0aa`): Gateway→MCP tenant
+  propagation — helper buildMcpIdentityHeaders 1 nơi, áp cả mcp.client lẫn
+  cart.service raw-fetch; params user_id giữ song song (xoá T03); smoke live
+  xác nhận 2 header trên wire. Phát sinh: BACKLOG #32 nâng mức — docker build
+  CÓ cache vẫn ship dist stale (nest build emit no-op) → #32 = tiền-điều-kiện
+  cứng của T03.
 - **2026-06-10 · S-META-02/T01** (`632b9e8`): tách `docs/legacy/DECISIONS.md` thành
   39 file ADR riêng tại `docs/decisions/` + INDEX.md; gỡ 7 dòng "Trạng thái triển khai
   (verified...)" khỏi ADR-002/006/040/041/042/043/044 (Single Home); mv file gốc sang
