@@ -19,3 +19,16 @@
  *   với plain assertions (no migration needed).
  */
 import '@testing-library/jest-dom/vitest';
+
+// S-P0-02/T05 (W-61 bump vitest 3.2.6 vá CVE GHSA): jsdom KHÔNG implement
+// ResizeObserver; radix-ui (react-use-size) gọi khi mount → ReferenceError.
+// Polyfill no-op cho test (jsdom không đo size thật). Gỡ ~3 web test crash
+// pre-existing. (2 test còn red = router/RHF harness = W-75 pre-existing debt.)
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class ResizeObserverMock {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+}

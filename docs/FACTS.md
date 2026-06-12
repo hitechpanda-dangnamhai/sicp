@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-12T19:59:23Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-12T20:45:35Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -40,7 +40,7 @@
 - TOTAL: 6 graph
 
 ## MCP tools   <!-- grep 'register("' apps/mcp/src -->
-- TOTAL: 37 tool (unique)
+- TOTAL: 39 tool (unique)
 - analytics.aggregate
 - analytics.co_purchased
 - analytics.detect_anomaly
@@ -66,7 +66,9 @@
 - gtrends.interest_over_time
 - policies.find_matching
 - products.create
+- products.decrement_stock
 - products.get
+- products.restock
 - products.update
 - shopee.price_range
 - speech.synthesize

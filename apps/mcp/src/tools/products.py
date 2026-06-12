@@ -523,3 +523,98 @@ def _normalize_snapshot(row: dict[str, Any]) -> dict[str, Any]:
 register("products.update", update)
 
 register("products.create", create)
+
+
+# ---------------------------------------------------------------------------
+# products.decrement_stock / restock — S-P0-02/T05 W-85 (thi hành ADR-055)
+# ---------------------------------------------------------------------------
+# Trừ kho = single-statement ATOMIC `UPDATE ... WHERE stock >= n` (tenant-scoped).
+# KHÔNG SELECT FOR UPDATE (không ôm lock qua external call), KHÔNG trừ ở validate
+# (cart.validate_stock chỉ advisory/UX). Invariant: stock KHÔNG BAO GIỜ âm —
+# enforced tại DB statement, không tại app logic. rowcount 0 → OUT_OF_STOCK.
+#
+# ⚠️ WIRING (T05 report): checkout/payment/order-placement = C4 CHƯA BUILD →
+# CHƯA có caller trừ kho thật để chuyển đổi. Đây là PRIMITIVE atomic; C4 sẽ wire
+# vào order use-case (kèm restock cho rollback/cancel). cart.validate_stock GIỮ
+# advisory (KHÔNG phải chốt an toàn — comment tại cart.py).
+
+def decrement_stock(params: dict[str, Any]) -> dict[str, Any]:
+    """products.decrement_stock — trừ kho atomic (ADR-055). rowcount 0 →
+    OUT_OF_STOCK (hết kho HOẶC product/tenant không khớp). tenant-scoped:
+    RLS (tenant_connection) + explicit `tenant_id` filter (defense-in-depth).
+    """
+    product_id = params.get("product_id")
+    qty = params.get("quantity")
+    if not isinstance(product_id, str):
+        raise ValueError("'product_id' required (string UUID)")
+    if isinstance(qty, bool) or not isinstance(qty, int) or qty <= 0:
+        raise ValueError("'quantity' required (positive integer)")
+
+    tenant = current_tenant()
+    with tenant_connection(tenant) as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                UPDATE products
+                   SET stock = stock - %s, updated_at = now()
+                 WHERE id = %s AND tenant_id = %s AND stock >= %s
+                RETURNING id::text, stock
+                """,
+                (qty, product_id, tenant, qty),
+            )
+            row = cur.fetchone()
+
+    if row is None:
+        # Atomic guard không match → KHÔNG trừ (stock không âm). Cross-tenant
+        # (tenant A trừ product tenant B) cũng rơi vào đây (RLS + tenant_id loại).
+        _logger.warning(
+            "product.decrement.out_of_stock", product_id=product_id, requested=qty
+        )
+        raise ValueError(
+            f"OUT_OF_STOCK: product {product_id} insufficient stock (requested {qty})"
+        )
+
+    _logger.info(
+        "product.decremented", product_id=product_id, qty=qty, remaining=row["stock"]
+    )
+    return {"product_id": row["id"], "stock_remaining": row["stock"], "decremented": qty}
+
+
+def restock(params: dict[str, Any]) -> dict[str, Any]:
+    """products.restock — tăng kho atomic (rollback decrement / cancel order).
+    KHÔNG cần stock>= guard (tăng luôn hợp lệ). tenant-scoped. NOT_FOUND nếu
+    product không thuộc tenant.
+    """
+    product_id = params.get("product_id")
+    qty = params.get("quantity")
+    if not isinstance(product_id, str):
+        raise ValueError("'product_id' required (string UUID)")
+    if isinstance(qty, bool) or not isinstance(qty, int) or qty <= 0:
+        raise ValueError("'quantity' required (positive integer)")
+
+    tenant = current_tenant()
+    with tenant_connection(tenant) as conn:
+        with conn.cursor(row_factory=dict_row) as cur:
+            cur.execute(
+                """
+                UPDATE products
+                   SET stock = stock + %s, updated_at = now()
+                 WHERE id = %s AND tenant_id = %s
+                RETURNING id::text, stock
+                """,
+                (qty, product_id, tenant),
+            )
+            row = cur.fetchone()
+
+    if row is None:
+        raise ValueError(f"NOT_FOUND: product {product_id} (tenant scope)")
+
+    _logger.info(
+        "product.restocked", product_id=product_id, qty=qty, remaining=row["stock"]
+    )
+    return {"product_id": row["id"], "stock_remaining": row["stock"], "restocked": qty}
+
+
+register("products.decrement_stock", decrement_stock)
+
+register("products.restock", restock)

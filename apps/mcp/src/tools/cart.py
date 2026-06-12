@@ -315,6 +315,12 @@ def _validate_stock_inline(
 ) -> list[dict[str, Any]]:
     """Re-query Postgres products table for stock status per A4 spec.
 
+    ⚠️ ADVISORY ONLY (ADR-055, S-P0-02/T05 W-85): đây là kiểm kho UX (hiển thị
+    in_stock/available_stock cho FE) — KHÔNG PHẢI chốt an toàn chống oversell.
+    Chốt an toàn = `products.decrement_stock` atomic (UPDATE ... WHERE stock>=n)
+    tại điểm trừ kho thật (checkout/order, C4). SELECT-only ở đây có TOCTOU race;
+    KHÔNG dựa vào nó để quyết định trừ kho.
+
     For each cart item, set in_stock + available_stock based on current
     Postgres row. Item snapshot fields (title, brand, image_url, unit_price)
     are NOT mutated — they were captured at add-to-cart time per

@@ -78,6 +78,7 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 
 ### Products (gateway + mcp) ✅ — NEW
 `products.update.vespa_reindex_failed` (gateway) · `product.fetched` · `product.not_found` (mcp).
+- **S-P0-02/T05 W-85 (ADR-055) — stock atomic** (mcp): `product.decremented` (fields `product_id`, `qty`, `remaining`) · `product.restocked` (`product_id`, `qty`, `remaining`) · `product.decrement.out_of_stock` (warn; `product_id`, `requested` — hết kho HOẶC cross-tenant không khớp → tool ném OUT_OF_STOCK). Emit bởi `products.decrement_stock`/`restock` (primitive, chưa wire — checkout C4).
 
 ### Dashboard (gateway) ✅ — NEW
 `dashboard.stats_served` · `dashboard.insight_served` · `dashboard.insight_degraded`.

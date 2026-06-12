@@ -63,7 +63,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
-| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ⬜ |
+| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ⬜ *(cart contract regression, phát hiện T05 smoke)* |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -132,7 +132,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 
 | Cluster | Tên | IDs (∑) | Slice |
 |---|---|---|---|
-| **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58✅,59,60✅,61,62✅,63✅,66✅,67✅,85,94✅,104✅ · A16✅,A17✅,A18✅ (**14**) | **S-P0-02** (active) |
+| **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58✅,59✅,60✅,61🟡,62✅,63✅,66✅,67✅,85✅,94✅,104✅ · A16✅,A17✅,A18✅ (**14**) | **S-P0-02** (active) |
 | **C2** | Safety-net (test/CI/eval/golden + obs cost-trace) — TRƯỚC AI-refactor | A13 · W-32,37,40,46,54,55,56,74,75,76,77,78,79,80,81,93 (**17**) | — |
 | **C3** | Async backbone & event integrity (Kafka/outbox/relay/DLQ/envelope/retry-CB/events-partition) — XONG TRƯỚC payment | A7,A10,A11,A12,A15,A20,A21 · W-44,68,70,71,72,73 (**13**) | — |
 | **C3-RT** | Runtime-prod hardening & backpressure (flask→gunicorn/MCP-pool/Redis-HA/SSE-cap/deadlock-retry/load-shed) — *split của C3 per Plan KI#3* | A1,A3,A4,A5 · W-86,95,96,97 (**8**) | — |
@@ -148,7 +148,10 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 relay (W-68) + envelope (W-44) + events-partition (A7) → **C3** (KHÔNG C5: async backbone
 ≤C3, trước media/cache C5 + payment C4). **Runtime-prod tách hàng riêng C3-RT** (gunicorn
 A1/MCP-pool A3/Redis-HA A4/SSE-cap A5 + backpressure W-86/95/96/97) — theo điều kiện KI#3.
-**W-61** primary C1 (critical+high vá ngay), residual moderate/pip → C8. **W-104**
+**W-61** primary C1 (critical npm→0 ở T05: next 14.2.25 + vitest 3.2.6), residual npm
+high/moderate → C8; **pip CVE langgraph** (4, AI; PYSEC-2026-83 + CVE-2025-64439 +
+CVE-2026-27794) → **C7** (kernel refactor C7 bump langgraph major tất yếu, vá CVE đi cùng
+chuyến; MCP pip = 0). **W-104**
 🟡 **deferred→C8 (risk-accepted)** — key Gemini/OpenAI đã lộ trong audit output;
 **Human chấp nhận rủi ro 2026-06-13** (key paid có limit chi tiêu); runbook rotate =
 `docs/RUNBOOK_SECRETS.md` (T04); rotate THẬT + secret-manager khi làm C8.
