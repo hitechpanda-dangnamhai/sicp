@@ -46,6 +46,8 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { tenantHref } from '@/lib/tenant-href';
+import { useTenant } from '@/lib/providers/tenant-provider';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
@@ -92,7 +94,7 @@ import {
 
 import type { CartItem } from '@icp/shared-types/cart';
 
-import styles from '../home/home.module.css';
+import styles from '../../home/home.module.css';
 
 // ─── Local helpers ───────────────────────────────────────────────────────
 
@@ -118,6 +120,7 @@ function gradientFor(item: CartItem): string | undefined {
 
 export default function Intent05Page() {
   const router = useRouter();
+  const tenant = useTenant();
   const queryClient = useQueryClient();
 
   // ─── TanStack Query: server cart truth ──────────────────────────────────
@@ -405,11 +408,11 @@ export default function Intent05Page() {
   }, [cartQuery.data?.promo?.code, deletePromoMut]);
 
   const handleCheckout = useCallback(() => {
-    router.push('/intent-06');
+    router.push(tenantHref('/intent/06', tenant?.slug));
   }, [router]);
 
   const handleBack = useCallback(() => {
-    router.push('/home');
+    router.push(tenantHref('/home', tenant?.slug));
   }, [router]);
 
   // ─── Derived render flags ──────────────────────────────────────────────
@@ -551,21 +554,21 @@ export default function Intent05Page() {
               actions={
                 <div className="flex flex-col gap-2.5 w-full max-w-[300px]">
                   <Link
-                    href="/intent-03"
+                    href={tenantHref('/intent/03', tenant?.slug)}
                     className="bg-gradient-to-br from-icp-pink-500 to-icp-rose-500 text-white px-4 py-3 rounded-2xl text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_8px_22px_rgba(233,30,99,0.35)]"
                   >
                     <Icon name="search" size={16} />
                     Tìm sản phẩm
                   </Link>
                   <Link
-                    href="/intent-04"
+                    href={tenantHref('/intent/04', tenant?.slug)}
                     className="bg-white border-[0.5px] border-icp-pink-200 text-icp-pink-700 px-4 py-3 rounded-2xl text-[13px] font-semibold flex items-center justify-center gap-2"
                   >
                     <Icon name="sparkles" size={16} />
                     Gợi ý sản phẩm
                   </Link>
                   <Link
-                    href="/intent-06"
+                    href={tenantHref('/intent/06', tenant?.slug)}
                     className="bg-white border-[0.5px] border-icp-pink-200 text-icp-pink-700 px-4 py-3 rounded-2xl text-[13px] font-semibold flex items-center justify-center gap-2"
                   >
                     <Icon name="credit-card" size={16} />

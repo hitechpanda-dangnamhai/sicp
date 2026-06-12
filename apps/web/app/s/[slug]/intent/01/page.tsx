@@ -58,6 +58,8 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { tenantHref } from '@/lib/tenant-href';
+import { useTenant } from '@/lib/providers/tenant-provider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMe } from '@/lib/dashboard/use-me';
 import { SearchHeader } from '@/components/icp/organisms';
@@ -95,7 +97,7 @@ import {
 } from '@/src/features/import/tracking-hooks';
 import type { ProductDraft } from '@icp/shared-types';
 import { cn } from '@/lib/utils';
-import styles from '../home/home.module.css';
+import styles from '../../home/home.module.css';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -113,6 +115,7 @@ const PHASE_LABEL_FALLBACK: Record<0 | 1 | 2 | 3, string> = {
 
 export default function Intent01Page() {
   const router = useRouter();
+  const tenant = useTenant();
   const meQuery = useMe();
   const flow = useImportFlow();
   const { state } = flow;
@@ -422,7 +425,7 @@ export default function Intent01Page() {
       <div className={cn(styles.phoneFrame, 'flex flex-col min-h-[600px]')}>
         <SearchHeader
           initials={initials}
-          onBack={() => router.push('/home')}
+          onBack={() => router.push(tenantHref('/home', tenant?.slug))}
           onProfileClick={() => router.push('/me')}
         />
 

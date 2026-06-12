@@ -159,7 +159,7 @@ export function HeroInsightCard({ className }: HeroInsightCardProps) {
       <div className="relative flex gap-2">
         <button
           type="button"
-          onClick={() => router.push(tenantHref('/intent-07?preset=revenue_7d', tenant?.slug))}
+          onClick={() => router.push(tenantHref('/intent/07?preset=revenue_7d', tenant?.slug))}
           className={cn(
             'flex-1 bg-white border-none text-pink-700 py-3 rounded-2xl',
             'text-[13px] font-bold flex items-center justify-center gap-1.5',

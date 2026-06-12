@@ -38,6 +38,8 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { tenantHref } from '@/lib/tenant-href';
+import { useTenant } from '@/lib/providers/tenant-provider';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ProductCard,
@@ -72,7 +74,7 @@ import {
 } from '@/src/features/recommend/tracking-hooks';
 import { usePostCartItem } from '@/src/features/cart/use-cart-mutations';
 import { cn } from '@/lib/utils';
-import styles from '../home/home.module.css';
+import styles from '../../home/home.module.css';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -136,6 +138,7 @@ const DEFAULT_PHASES: PhaseItem[] = [
 
 export default function Intent04Page() {
   const router = useRouter();
+  const tenant = useTenant();
   const stream = useRecommendStream();
   const addItemMut = usePostCartItem();
 
@@ -349,7 +352,7 @@ export default function Intent04Page() {
   );
 
   const handleBack = useCallback(() => {
-    router.push('/home');
+    router.push(tenantHref('/home', tenant?.slug));
   }, [router]);
 
   const handleEmptyCaptureAgain = useCallback(() => {
@@ -357,11 +360,11 @@ export default function Intent04Page() {
   }, [stream]);
 
   const handleEmptyToTextSearch = useCallback(() => {
-    router.push('/intent-03');
+    router.push(tenantHref('/intent/03', tenant?.slug));
   }, [router]);
 
   const handleEmptyToImport = useCallback(() => {
-    router.push('/intent-01');
+    router.push(tenantHref('/intent/01', tenant?.slug));
   }, [router]);
 
   const handleErrorRetry = useCallback(() => {

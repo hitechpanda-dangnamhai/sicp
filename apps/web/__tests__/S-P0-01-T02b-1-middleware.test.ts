@@ -36,11 +36,11 @@ describe('middleware dual-shim (ADR-046 amend d)', () => {
     expect(res.headers.get('location')).toContain('/auth/login');
   });
 
-  it('forward-rewrites /s/<slug>/intent-01 to bare /intent-01 (not yet migrated)', async () => {
-    const res = await middleware(req('/s/demo/intent-01', { session: true }));
-    const rewrite = res.headers.get('x-middleware-rewrite');
-    expect(rewrite).toContain('/intent-01');
-    expect(rewrite).not.toContain('/s/');
+  // T02b-2: forward-rewrite ĐÃ BỎ — intent giờ là route thật /s/<slug>/intent/0X.
+  it('passes /s/<slug>/intent/01 through without rewrite (T02b-2 real route)', async () => {
+    const res = await middleware(req('/s/demo/intent/01', { session: true }));
+    expect(res.headers.get('x-middleware-next')).toBe('1');
+    expect(res.headers.get('x-middleware-rewrite')).toBeNull();
   });
 
   it('passes /s/<slug>/home through without rewrite (already migrated)', async () => {

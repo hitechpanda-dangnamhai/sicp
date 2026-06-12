@@ -37,6 +37,8 @@
  */
 
 import { useRouter } from 'next/navigation';
+import { tenantHref } from '@/lib/tenant-href';
+import { useTenant } from '@/lib/providers/tenant-provider';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMe } from '@/lib/dashboard/use-me';
 import { getTracker } from '@/lib/tracker';
@@ -68,7 +70,7 @@ import {
 } from '@/src/features/search/search-state-machine';
 import { usePostCartItem } from '@/src/features/cart/use-cart-mutations';
 import { cn } from '@/lib/utils';
-import styles from '../home/home.module.css';
+import styles from '../../home/home.module.css';
 
 // ─── D-S04-12 LAW Part 2: 3 hardcoded suggested query chips (page-level default) ──
 
@@ -101,6 +103,7 @@ const MATCH_TIER_CHIPS: ReadonlyArray<{
 
 export default function Intent03Page() {
   const router = useRouter();
+  const tenant = useTenant();
   const meQuery = useMe();
 
   const stream = useSearchStream();
@@ -449,7 +452,7 @@ export default function Intent03Page() {
       <div className={cn(styles.phoneFrame, 'flex flex-col min-h-[600px]')}>
         <SearchHeader
           initials={initials}
-          onBack={() => router.push('/home')}
+          onBack={() => router.push(tenantHref('/home', tenant?.slug))}
           onProfileClick={() => router.push('/me')}
         />
 
@@ -1074,7 +1077,7 @@ export default function Intent03Page() {
           {/* Trang chính (inactive) */}
           <button
             type="button"
-            onClick={() => router.push('/home')}
+            onClick={() => router.push(tenantHref('/home', tenant?.slug))}
             className="flex-1 bg-transparent border-0 flex flex-col items-center gap-0.5 px-1 py-1"
           >
             <div className="h-[3px]" />
@@ -1101,7 +1104,7 @@ export default function Intent03Page() {
           {/* Đề xuất (inactive, badge=2 decorative per S-03 D-13 inherit) */}
           <button
             type="button"
-            onClick={() => router.push('/intent-04')}
+            onClick={() => router.push(tenantHref('/intent/04', tenant?.slug))}
             className="flex-1 bg-transparent border-0 flex flex-col items-center gap-0.5 px-1 py-1 relative"
           >
             <div className="h-[3px]" />

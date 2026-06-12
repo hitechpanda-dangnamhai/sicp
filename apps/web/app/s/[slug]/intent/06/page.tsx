@@ -15,8 +15,9 @@
  */
 
 import Link from 'next/link';
+import { tenantHref } from '@/lib/tenant-href';
 
-export default function Intent06PlaceholderPage() {
+export default function Intent06PlaceholderPage({ params }: { params: { slug: string } }) {
   return (
     <div className="min-h-screen bg-pink-50/40 flex flex-col items-center justify-center px-6 text-center">
       <div className="text-6xl mb-4">💳</div>
@@ -25,7 +26,7 @@ export default function Intent06PlaceholderPage() {
         Tính năng thanh toán đang được phát triển. Vui lòng quay lại sau.
       </p>
       <Link
-        href="/home"
+        href={tenantHref('/home', params.slug)}
         className="bg-gradient-to-r from-pink-600 to-orange-400 text-white text-[13px] font-semibold px-5 py-2.5 rounded-full shadow-[0_6px_16px_rgba(233,30,99,0.25)]"
       >
         ← Trang chính

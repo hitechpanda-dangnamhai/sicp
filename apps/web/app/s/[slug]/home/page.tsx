@@ -42,12 +42,12 @@ type IntentId = PropertiesFor<'nav.tile_clicked'>['intent_id'];
 type TileSource = PropertiesFor<'nav.tile_clicked'>['source'];
 
 const TILE_MAPPING: Record<TileId, { tile_id: TileId; intent_id: IntentId; source: TileSource; route: string }> = {
-  nhap_hang: { tile_id: 'nhap_hang', intent_id: 'intent-01', source: 'hero_tile', route: '/intent-01' },
-  phan_tich: { tile_id: 'phan_tich', intent_id: 'intent-07', source: 'hero_tile', route: '/intent-07' },
-  tim_san_pham: { tile_id: 'tim_san_pham', intent_id: 'intent-03', source: 'list_tile', route: '/intent-03' },
-  mua_hang: { tile_id: 'mua_hang', intent_id: 'intent-02', source: 'list_tile', route: '/intent-02' },
-  goi_y_san_pham: { tile_id: 'goi_y_san_pham', intent_id: 'intent-04', source: 'list_tile', route: '/intent-04' },
-  gio_hang: { tile_id: 'gio_hang', intent_id: 'intent-05', source: 'list_tile', route: '/intent-05' },
+  nhap_hang: { tile_id: 'nhap_hang', intent_id: 'intent-01', source: 'hero_tile', route: '/intent/01' },
+  phan_tich: { tile_id: 'phan_tich', intent_id: 'intent-07', source: 'hero_tile', route: '/intent/07' },
+  tim_san_pham: { tile_id: 'tim_san_pham', intent_id: 'intent-03', source: 'list_tile', route: '/intent/03' },
+  mua_hang: { tile_id: 'mua_hang', intent_id: 'intent-02', source: 'list_tile', route: '/intent/02' },
+  goi_y_san_pham: { tile_id: 'goi_y_san_pham', intent_id: 'intent-04', source: 'list_tile', route: '/intent/04' },
+  gio_hang: { tile_id: 'gio_hang', intent_id: 'intent-05', source: 'list_tile', route: '/intent/05' },
 };
 
 export default function HomeDashboardPage() {

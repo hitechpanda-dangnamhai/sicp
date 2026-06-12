@@ -34,9 +34,11 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { tenantHref } from '@/lib/tenant-href';
+import { useTenant } from '@/lib/providers/tenant-provider';
 
 import { cn } from '@/lib/utils';
-import styles from '../home/home.module.css';
+import styles from '../../home/home.module.css';
 
 import {
   OrbPulse,
@@ -167,6 +169,7 @@ function voiceRemovedCount(
 
 export default function Intent02VoiceBuyPage(): React.ReactElement {
   const router = useRouter();
+  const tenant = useTenant();
   const { state, submitUtterance, dispatch } = useVoiceStream();
   const { data: cart } = useCart();
   const ctx = useVoiceContext(state);
@@ -270,7 +273,7 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
           <button
           type="button"
           aria-label="Quay lại"
-          onClick={() => router.push('/home')}
+          onClick={() => router.push(tenantHref('/home', tenant?.slug))}
           className="w-[38px] h-[38px] rounded-full bg-white border-[0.5px] border-icp-pink-200 flex items-center justify-center text-icp-pink-700 shadow-[0_2px_8px_rgba(233,30,99,0.1)]"
         >
           {/* chevron-left stroke #BE185D per mockup */}
@@ -285,7 +288,7 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
         <button
           type="button"
           aria-label="Gõ tay"
-          onClick={() => router.push('/intent-03')}
+          onClick={() => router.push(tenantHref('/intent/03', tenant?.slug))}
           className="w-[38px] h-[38px] rounded-full bg-white/70 border-[0.5px] border-icp-pink-200 flex items-center justify-center text-icp-pink-700"
         >
           {/* No 'keyboard' IconName — inline SVG (mockup text-input fallback glyph). */}
@@ -448,7 +451,7 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
             {/* persistent cart pill (if cart has items) */}
             {cart && cart.items.length > 0 ? (
               <div className="mt-4">
-                <CartCountPill onClick={() => router.push('/intent-05')} />
+                <CartCountPill onClick={() => router.push(tenantHref('/intent/05', tenant?.slug))} />
               </div>
             ) : null}
           </div>
@@ -803,7 +806,7 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
             return (
           <div className="flex-1 flex flex-col gap-3 pt-2">
             <div className="flex justify-end">
-              <CartCountPill bump deltaLabel={`+${addedCount}`} onClick={() => router.push('/intent-05')} />
+              <CartCountPill bump deltaLabel={`+${addedCount}`} onClick={() => router.push(tenantHref('/intent/05', tenant?.slug))} />
             </div>
 
             <div className="flex gap-2">
@@ -850,7 +853,7 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/intent-06')}
+                onClick={() => router.push(tenantHref('/intent/06', tenant?.slug))}
                 className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-icp-pink-500 to-icp-amber-400 text-white font-bold text-[14px] shadow-[0_6px_16px_rgba(233,30,99,0.3)]"
               >
                 Thanh toán →
@@ -870,7 +873,7 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
             return (
           <div className="flex-1 flex flex-col gap-3 pt-2">
             <div className="flex justify-end">
-              <CartCountPill bump deltaLabel={`−${removedCount}`} onClick={() => router.push('/intent-05')} />
+              <CartCountPill bump deltaLabel={`−${removedCount}`} onClick={() => router.push(tenantHref('/intent/05', tenant?.slug))} />
             </div>
 
             <div className="flex gap-2">
@@ -900,7 +903,7 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/intent-05')}
+                onClick={() => router.push(tenantHref('/intent/05', tenant?.slug))}
                 className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-icp-pink-500 to-icp-amber-400 text-white font-bold text-[14px] shadow-[0_6px_16px_rgba(233,30,99,0.3)]"
               >
                 Xem giỏ →
@@ -996,7 +999,7 @@ export default function Intent02VoiceBuyPage(): React.ReactElement {
               </button>
               <button
                 type="button"
-                onClick={() => router.push('/intent-03')}
+                onClick={() => router.push(tenantHref('/intent/03', tenant?.slug))}
                 className="flex-1 py-3 rounded-2xl bg-white border-[0.5px] border-icp-pink-200 text-icp-pink-700 font-semibold text-[14px]"
               >
                 Gõ tay thay

@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-12T00:46:04Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-12T01:19:34Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -108,7 +108,7 @@
 - cột tenant_id: 14
 
 ## Frontend (apps/web)   <!-- find app -name page.tsx; ls components -->
-- pages (App Router): 48
+- pages (App Router): 49
   - / (root)
   - /auth/forgot-password
   - /auth/login
@@ -144,26 +144,27 @@
   - /dev/organism-smoke/login-form
   - /dev/organism-smoke/order-summary
   - /dev/preview-frame
-  - /intent-01
-  - /intent-02
-  - /intent-03
-  - /intent-04
-  - /intent-05
-  - /intent-06
-  - /intent-07
   - /me
   - /me/help
   - /me/notifications
   - /me/security
   - /onboarding
+  - /s/[slug]
   - /s/[slug]/home
+  - /s/[slug]/intent/01
+  - /s/[slug]/intent/02
+  - /s/[slug]/intent/03
+  - /s/[slug]/intent/04
+  - /s/[slug]/intent/05
+  - /s/[slug]/intent/06
+  - /s/[slug]/intent/07
 - components/ui (shadcn): 8 file
 - components/icp/atoms: 10 file
 - components/icp/molecules: 44 file
 - components/icp/organisms: 20 file
 - components/icp/layout: 5 file
 - e2e specs: 3
-- unit/__tests__: 12
+- unit/__tests__: 14
 
 ## Vespa rank-profiles   <!-- grep rank-profile product.sd -->
 - ai_augmented

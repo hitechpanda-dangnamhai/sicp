@@ -2,22 +2,22 @@
  * apps/web/middleware.ts — Next.js middleware.
  *
  * Slice: S-03 T03b/T04 — auth-gate (presence `icp_session` → /home + intent + /me).
- *        S-P0-01 T02b-1 (ADR-046 amend d) — multi-tenant route scheme + dual-shim.
+ *        S-P0-01 T02b-1/2 (ADR-046 amend d) — multi-tenant route scheme + shim.
  *
  * **Auth gate** (S-03 DM-13): route được bảo vệ mà thiếu cookie `icp_session`
  * → redirect `/auth/login`. Chỉ check PRESENCE (validity do BE JwtAuthGuard lo
  * mỗi request) — đủ cho UI gate, không flash UI authed cho người chưa đăng nhập.
  *
- * **Dual-shim migration** (ADR-046 amend d — tránh big-bang ~4600 dòng, nav
- * không vỡ giữa các task T02b-1/2/3):
- *  (i)  forward-rewrite `/s/<slug>/X` → `/X` cho nhóm CHƯA migrate (intent-*):
- *       browser URL giữ `/s/<slug>` (slug đọc được) còn page cũ `app/intent-0X`
- *       vẫn render. Mỗi task migrate xoá dần prefix khỏi NOT_MIGRATED.
- *  (ii) legacy redirect 308 bare `/X` → `/s/<last_active_slug>/X` cho nhóm ĐÃ
- *       migrate (/home): giữ bookmark/deep-link cũ sống. Slug từ
- *       `sessions.last_active_tenant_id` — Edge KHÔNG đọc DB & JWT KHÔNG chứa
- *       slug nên gọi BE `GET /api/v1/auth/landing` (same-origin proxy, forward
- *       cookie) để resolve. 308 (permanent, giữ method) đúng amend d.
+ * **Migration shim** (ADR-046 amend d — tránh big-bang ~4600 dòng):
+ *  - T02b-1 dùng forward-rewrite cho intent (chưa migrate). T02b-2 đã mv intent
+ *    → `app/s/[slug]/intent/0X` (route thật) nên **forward-rewrite XOÁ** —
+ *    `/s/<slug>/*` chỉ còn auth-gate + pass-through.
+ *  - (ii) legacy redirect 308 bare `/X` → `/s/<last_active_slug>/<subpath>` giữ
+ *    bookmark/deep-link cũ sống VĨNH VIỄN (giữ ở T02b-3). Path flat cũ đổi sang
+ *    nested: `/intent-0X` → `/intent/0X` (LEGACY_REDIRECTS map). Slug từ
+ *    `sessions.last_active_tenant_id` — Edge KHÔNG đọc DB & JWT KHÔNG chứa slug
+ *    nên gọi BE `GET /api/v1/auth/landing` (same-origin proxy, forward cookie).
+ *    308 (permanent, giữ method) đúng amend d.
  *
  * **Cache-Control: no-store trên 308** — đích redirect biến thiên theo user
  * (last_active mỗi người mỗi khác); cấm browser/CDN cache 308 này, nếu không
@@ -30,17 +30,20 @@ const SESSION_COOKIE = 'icp_session';
 const LOGIN_PATH = '/auth/login';
 
 /**
- * Route tenant-scoped ĐÃ migrate vào `/s/<slug>/*`. Bare URL của chúng nhận
- * legacy redirect 308 (ii). T02b-2 thêm `/intent-0X`; T02b sau khi xong → đây
- * là toàn bộ nhóm tenant-scoped.
+ * Map bare-URL (flat, route cũ) → subpath tenant-scoped mới dưới `/s/<slug>`.
+ * Bare URL của route ĐÃ migrate nhận legacy redirect 308 (ii). Path flat→nested:
+ * `/intent-0X` → `/intent/0X` (T02b-2 mv). GIỮ vĩnh viễn cho bookmark (T02b-3).
  */
-const MIGRATED_ROUTES = new Set<string>(['/home']);
-
-/**
- * Prefix tenant-scoped CHƯA migrate (vẫn ở `app/intent-0X`). Khi vào qua
- * `/s/<slug>/intent-0X` → forward-rewrite (i) về page bare. T02b-2 xoá entry này.
- */
-const NOT_MIGRATED_PREFIXES = ['/intent-'];
+const LEGACY_REDIRECTS: Record<string, string> = {
+  '/home': '/home',
+  '/intent-01': '/intent/01',
+  '/intent-02': '/intent/02',
+  '/intent-03': '/intent/03',
+  '/intent-04': '/intent/04',
+  '/intent-05': '/intent/05',
+  '/intent-06': '/intent/06',
+  '/intent-07': '/intent/07',
+};
 
 function redirectLogin(req: NextRequest): NextResponse {
   return NextResponse.redirect(new URL(LOGIN_PATH, req.url));
@@ -70,33 +73,28 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
   const { pathname } = req.nextUrl;
   const hasSession = req.cookies.has(SESSION_COOKIE);
 
-  // --- Storefront tenant-scoped `/s/<slug>/*` ---
+  // --- Storefront tenant-scoped `/s/<slug>/*` — auth-gate, route thật (T02b-2
+  // bỏ forward-rewrite: intent giờ là page thật dưới /s/<slug>/intent/0X) ---
   if (pathname.startsWith('/s/')) {
     if (!hasSession) return redirectLogin(req);
-    const sub = pathname.replace(/^\/s\/[^/]+/, ''); // '' | '/home' | '/intent-01' | ...
-    // (i) forward-rewrite cho nhóm chưa migrate.
-    if (NOT_MIGRATED_PREFIXES.some((p) => sub.startsWith(p))) {
-      const url = req.nextUrl.clone();
-      url.pathname = sub;
-      return NextResponse.rewrite(url);
-    }
     return NextResponse.next();
   }
 
-  // --- Bare route ĐÃ migrate → legacy redirect 308 (ii) ---
-  if (MIGRATED_ROUTES.has(pathname)) {
+  // --- Bare legacy route (đã migrate) → 308 /s/<last_active_slug>/<subpath> (ii) ---
+  const subpath = LEGACY_REDIRECTS[pathname];
+  if (subpath) {
     if (!hasSession) return redirectLogin(req);
     const slug = await resolveLastActiveSlug(req);
     if (!slug) {
       // Chưa có last_active (chưa từng switch / customer global / tenant đã xoá).
       return NextResponse.redirect(new URL('/onboarding', req.url));
     }
-    const res = NextResponse.redirect(new URL(`/s/${slug}${pathname}`, req.url), 308);
+    const res = NextResponse.redirect(new URL(`/s/${slug}${subpath}`, req.url), 308);
     res.headers.set('Cache-Control', 'no-store');
     return res;
   }
 
-  // --- Bare route chưa migrate (intent-*) + account (/me*): auth-gate presence ---
+  // --- Account (/me*) + còn lại: auth-gate presence ---
   if (!hasSession) return redirectLogin(req);
   return NextResponse.next();
 }
@@ -115,6 +113,7 @@ export const config = {
     '/intent-03',
     '/intent-04',
     '/intent-05',
+    '/intent-06',
     '/intent-07',
     '/me',
     '/me/notifications',

@@ -33,6 +33,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { tenantHref } from '@/lib/tenant-href';
+import { useTenant } from '@/lib/providers/tenant-provider';
 
 import { useVoiceRecorder } from '@/src/features/voice-buy/use-voice-recorder';
 import { useAnalyzeStream } from '@/src/features/voice-analyze/use-analyze-stream';
@@ -91,6 +93,7 @@ const PRESET_QUESTIONS: Record<string, string> = {
 
 export default function Intent07AnalyzePage() {
   const router = useRouter();
+  const tenant = useTenant();
   const stream = useAnalyzeStream();
   const recorder = useVoiceRecorder();
   const lastSubmittedRef = React.useRef<string | null>(null);
@@ -147,7 +150,7 @@ export default function Intent07AnalyzePage() {
         {/* Header */}
         <header className="flex items-center justify-between px-4 py-3 border-b border-pink-100/70 bg-white/60 backdrop-blur">
           <button
-            onClick={() => router.push('/home')}
+            onClick={() => router.push(tenantHref('/home', tenant?.slug))}
             className="text-[13px] text-rose-700 font-medium"
             aria-label="Trang chính"
           >
@@ -168,7 +171,7 @@ export default function Intent07AnalyzePage() {
             renderListening(recorder.durationMs, handleStop, handleCancel)}
           {status === 'analyzing' && renderAnalyzing(stream.state)}
           {status === 'result' && renderResult(stream.state, stream.dispatch)}
-          {status === 'empty' && renderEmpty(handleStart)}
+          {status === 'empty' && renderEmpty(handleStart, tenantHref('/home', tenant?.slug))}
           {status === 'clarify' && renderClarify(stream.state, handleStart)}
           {status === 'error' && renderError(stream.state, handleStart, handleCancel)}
         </main>
@@ -569,7 +572,7 @@ function CardActions({
 }
 
 // === state-F: empty ========================================================
-function renderEmpty(onStart: () => void) {
+function renderEmpty(onStart: () => void, homeHref: string) {
   return (
     <div className="pt-8">
       <EmptyState
@@ -579,7 +582,7 @@ function renderEmpty(onStart: () => void) {
         actions={
           <div className="flex flex-col gap-2 w-full max-w-xs">
             <Link
-              href="/home"
+              href={homeHref}
               className="text-center py-2.5 rounded-full text-[13px] font-bold text-white bg-gradient-to-r from-rose-600 to-orange-400"
             >
               Nhập sản phẩm mới
