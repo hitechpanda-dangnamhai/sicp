@@ -58,6 +58,7 @@ import {
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TenantResolverService } from '../tenant/tenant-resolver.service';
 import { CartService } from './cart.service';
 import { CartAddItemDto } from './dto/cart-add-item.dto';
 import { CartUpdateQtyDto } from './dto/cart-update-qty.dto';
@@ -74,7 +75,10 @@ function getTracer(): Tracer {
 export class CartController {
   private readonly nestLogger = new NestLogger(CartController.name);
 
-  constructor(private readonly cartService: CartService) {}
+  constructor(
+    private readonly cartService: CartService,
+    private readonly tenant: TenantResolverService,
+  ) {}
 
   /**
    * GET /api/v1/cart — fetch current user's cart.
@@ -102,7 +106,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.get(userId);
+        return await this.cartService.get(userId, this.tenant.resolveOptional(req));
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -150,6 +154,7 @@ export class CartController {
       try {
         return await this.cartService.addItem(
           userId,
+          this.tenant.resolveOptional(req),
           body.product_id,
           body.qty,
           body.snapshot,
@@ -191,7 +196,12 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.updateQty(userId, productId, body.qty);
+        return await this.cartService.updateQty(
+          userId,
+          this.tenant.resolveOptional(req),
+          productId,
+          body.qty,
+        );
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -226,7 +236,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.remove(userId, productId);
+        return await this.cartService.remove(userId, this.tenant.resolveOptional(req), productId);
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -266,7 +276,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.clear(userId);
+        return await this.cartService.clear(userId, this.tenant.resolveOptional(req));
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -305,7 +315,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.applyPromo(userId, body.code);
+        return await this.cartService.applyPromo(userId, this.tenant.resolveOptional(req), body.code);
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -335,7 +345,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.removePromo(userId);
+        return await this.cartService.removePromo(userId, this.tenant.resolveOptional(req));
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;

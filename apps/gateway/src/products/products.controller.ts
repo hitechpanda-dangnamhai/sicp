@@ -46,6 +46,8 @@ import { ApiCookieAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger'
 
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { McpClient, McpError } from '../clients/mcp.client';
+import type { McpIdentity } from '../clients/mcp-identity';
+import { TenantResolverService } from '../tenant/tenant-resolver.service';
 
 /**
  * Whitelisted updatable fields per C-S07-N. Frontend should send any subset;
@@ -79,7 +81,15 @@ interface ProductUpdateResult {
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/products')
 export class ProductsController {
-  constructor(private readonly mcp: McpClient) {}
+  constructor(
+    private readonly mcp: McpClient,
+    private readonly tenant: TenantResolverService,
+  ) {}
+
+  /** S-P0-01 T02c — identity header cho MCP (tenant header-only, non-throw). */
+  private identity(req: AuthedRequest): McpIdentity {
+    return { userId: req.user.id, tenantId: this.tenant.resolveOptional(req) };
+  }
 
   /**
    * PATCH /api/v1/products/:id — partial update for owner-merchant only.
@@ -135,7 +145,7 @@ export class ProductsController {
       snapshot: Record<string, unknown>;
     };
     try {
-      updateRes = await this.mcp.call('products.update', updateParams);
+      updateRes = await this.mcp.call('products.update', updateParams, this.identity(req));
     } catch (err) {
       // McpError data may contain semantic codes (NOT_FOUND / FORBIDDEN)
       if (err instanceof McpError) {
@@ -167,7 +177,7 @@ export class ProductsController {
     let indexed = false;
     if (updateRes.updated && updateRes.snapshot) {
       try {
-        await this.mcp.call('vespa.index', { product: updateRes.snapshot });
+        await this.mcp.call('vespa.index', { product: updateRes.snapshot }, this.identity(req));
         indexed = true;
       } catch (err) {
         // Log via console fallback; structured logger is configured app-wide.

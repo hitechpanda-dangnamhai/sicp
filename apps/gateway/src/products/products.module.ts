@@ -35,11 +35,13 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ClientsModule } from '../clients/clients.module';
 import { IdempotencyModule } from '../idempotency/idempotency.module';
+import { TenantModule } from '../tenant/tenant.module';
 
 import { ProductsController } from './products.controller';
 
 @Module({
-  imports: [ClientsModule, IdempotencyModule, AuthModule],
+  // TenantModule exports TenantResolverService — S-P0-01 T02c identity header.
+  imports: [ClientsModule, IdempotencyModule, AuthModule, TenantModule],
   controllers: [ProductsController],
 })
 export class ProductsModule {}

@@ -43,6 +43,7 @@ import {
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
+import { TenantResolverService } from '../tenant/tenant-resolver.service';
 import { DashboardService } from './dashboard.service';
 import { DashboardStatsDto } from './dto/dashboard-stats.dto';
 import { DashboardInsightDto } from './dto/dashboard-insight.dto';
@@ -54,7 +55,10 @@ function getTracer(): Tracer {
 @ApiTags('dashboard')
 @Controller('api/v1/dashboard')
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(
+    private readonly dashboardService: DashboardService,
+    private readonly tenant: TenantResolverService,
+  ) {}
 
   // ────────────────────────────────────────────────────────────────────────
   // GET /dashboard/stats
@@ -121,7 +125,12 @@ export class DashboardController {
     return context.with(trace.setSpan(context.active(), span), async () => {
       try {
         span.setAttribute('auth.user_id_prefix', req.user.id.slice(0, 8));
-        const result = await this.dashboardService.getInsight(req.user.id);
+        // getInsight chỉ JwtAuthGuard (không TenantMembershipGuard) → tenant
+        // header-only qua resolveOptional (non-throw). S-P0-01 T02c.
+        const result = await this.dashboardService.getInsight(
+          req.user.id,
+          this.tenant.resolveOptional(req),
+        );
         return result as DashboardInsightDto;
       } catch (err) {
         span.recordException(err instanceof Error ? err : new Error(String(err)));

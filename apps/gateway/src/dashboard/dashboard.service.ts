@@ -133,7 +133,7 @@ export class DashboardService {
    * Defensive: any MCP/shape failure degrades to has_data=false so the home
    * page never errors on the hero card.
    */
-  async getInsight(userId: string): Promise<DashboardInsightType> {
+  async getInsight(userId: string, tenantId: string | null): Promise<DashboardInsightType> {
     let insight: DashboardInsightType = {
       delta_pct: null,
       direction: 'flat',
@@ -142,10 +142,15 @@ export class DashboardService {
     };
 
     try {
+      // S-P0-01 T02c — identity header cho MCP (analytics.detect_anomaly = Postgres).
       const res = await this.mcp.call<{
         merchant?: { delta_pct?: number; recent_rev?: number; prior_rev?: number };
         categories?: Array<{ severity?: string }>;
-      }>('analytics.detect_anomaly', { merchant_id: userId, window_days: 7 });
+      }>(
+        'analytics.detect_anomaly',
+        { merchant_id: userId, window_days: 7 },
+        { userId, tenantId },
+      );
 
       const merchant = res?.merchant;
       const categories = res?.categories ?? [];

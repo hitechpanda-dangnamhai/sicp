@@ -40,6 +40,7 @@ import {
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import { propagation } from '@opentelemetry/api';
 import { randomUUID } from 'node:crypto';
+import { buildMcpIdentityHeaders, type McpIdentity } from '../clients/mcp-identity';
 
 const MCP_DEFAULT_URL = 'http://mcp:5050/rpc';
 const MCP_TIMEOUT_MS = 10_000;
@@ -88,6 +89,7 @@ export class CartService {
   private async callMcp<T = unknown>(
     method: string,
     params: Record<string, unknown>,
+    identity?: McpIdentity,
   ): Promise<T> {
     const tracer = getTracer();
     const span = tracer.startSpan(`gateway.cart.mcp.${method}`);
@@ -104,9 +106,11 @@ export class CartService {
         params,
       };
 
-      // Inject W3C trace context into outbound headers.
+      // Inject W3C trace context + S-P0-01 T02c identity header (X-User-Id/
+      // X-Tenant-Id) into outbound headers.
       const headers: Record<string, string> = {
         'content-type': 'application/json',
+        ...buildMcpIdentityHeaders(identity),
       };
       propagation.inject(context.active(), headers);
 
@@ -206,12 +210,17 @@ export class CartService {
   // 7 tool wrappers (1:1 mapping to MCP cart.* tools)
   // -----------------------------------------------------------------------
 
-  async get(userId: string): Promise<unknown> {
-    return this.callMcp('cart.get', { user_id: userId });
+  // S-P0-01 T02c — mỗi wrapper nhận `tenantId` (active tenant từ
+  // cart.controller resolveOptional) → identity header X-User-Id/X-Tenant-Id.
+  // GIỮ `user_id` trong params song song (2-phase, xoá ở T03).
+
+  async get(userId: string, tenantId: string | null): Promise<unknown> {
+    return this.callMcp('cart.get', { user_id: userId }, { userId, tenantId });
   }
 
   async addItem(
     userId: string,
+    tenantId: string | null,
     productId: string,
     qty: number,
     snapshot?: Record<string, unknown>,
@@ -224,37 +233,46 @@ export class CartService {
     if (snapshot) {
       params.snapshot = snapshot;
     }
-    return this.callMcp('cart.update_qty', params);
+    return this.callMcp('cart.update_qty', params, { userId, tenantId });
   }
 
   async updateQty(
     userId: string,
+    tenantId: string | null,
     productId: string,
     qty: number,
   ): Promise<unknown> {
-    return this.callMcp('cart.update_qty', {
-      user_id: userId,
-      product_id: productId,
-      qty,
-    });
+    return this.callMcp(
+      'cart.update_qty',
+      {
+        user_id: userId,
+        product_id: productId,
+        qty,
+      },
+      { userId, tenantId },
+    );
   }
 
-  async remove(userId: string, productId: string): Promise<unknown> {
-    return this.callMcp('cart.remove', {
-      user_id: userId,
-      product_id: productId,
-    });
+  async remove(userId: string, tenantId: string | null, productId: string): Promise<unknown> {
+    return this.callMcp(
+      'cart.remove',
+      {
+        user_id: userId,
+        product_id: productId,
+      },
+      { userId, tenantId },
+    );
   }
 
-  async clear(userId: string): Promise<unknown> {
-    return this.callMcp('cart.clear', { user_id: userId });
+  async clear(userId: string, tenantId: string | null): Promise<unknown> {
+    return this.callMcp('cart.clear', { user_id: userId }, { userId, tenantId });
   }
 
-  async applyPromo(userId: string, code: string): Promise<unknown> {
-    return this.callMcp('cart.apply_promo', { user_id: userId, code });
+  async applyPromo(userId: string, tenantId: string | null, code: string): Promise<unknown> {
+    return this.callMcp('cart.apply_promo', { user_id: userId, code }, { userId, tenantId });
   }
 
-  async removePromo(userId: string): Promise<unknown> {
-    return this.callMcp('cart.remove_promo', { user_id: userId });
+  async removePromo(userId: string, tenantId: string | null): Promise<unknown> {
+    return this.callMcp('cart.remove_promo', { user_id: userId }, { userId, tenantId });
   }
 }

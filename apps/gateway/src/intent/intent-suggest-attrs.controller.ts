@@ -57,6 +57,7 @@ import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api'
 
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { McpClient } from '../clients/mcp.client';
+import { TenantResolverService } from '../tenant/tenant-resolver.service';
 
 /** Lazy tracer per C-28 LOCK (same pattern intent-action.controller uses). */
 function getTracer(): Tracer {
@@ -91,7 +92,10 @@ interface SuggestAttrsResponse {
 export class IntentSuggestAttrsController {
   private readonly nestLogger = new NestLogger(IntentSuggestAttrsController.name);
 
-  constructor(private readonly mcp: McpClient) {}
+  constructor(
+    private readonly mcp: McpClient,
+    private readonly tenant: TenantResolverService,
+  ) {}
 
   /**
    * POST /api/v1/intent/:rid/suggest-attrs — request 3 AI-suggested chip
@@ -171,10 +175,14 @@ export class IntentSuggestAttrsController {
       );
 
       try {
-        const mcpResult = (await this.mcp.call('vision.suggest_attributes', {
-          category: body.category,
-          existing_attrs: normalizedExisting,
-        })) as SuggestAttrsResponse;
+        const mcpResult = (await this.mcp.call(
+          'vision.suggest_attributes',
+          {
+            category: body.category,
+            existing_attrs: normalizedExisting,
+          },
+          { userId, tenantId: this.tenant.resolveOptional(req) },
+        )) as SuggestAttrsResponse;
 
         // Defensive — MCP normalization should already guarantee shape, but
         // surface gracefully if Gemini returned 0 items (edge case).

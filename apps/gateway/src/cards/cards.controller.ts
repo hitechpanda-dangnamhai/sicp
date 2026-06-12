@@ -39,13 +39,23 @@ import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { McpClient } from '../clients/mcp.client';
+import type { McpIdentity } from '../clients/mcp-identity';
+import { TenantResolverService } from '../tenant/tenant-resolver.service';
 
 @ApiTags('cards')
 @ApiCookieAuth('icp_session')
 @UseGuards(JwtAuthGuard)
 @Controller('api/v1/cards')
 export class CardsController {
-  constructor(private readonly mcp: McpClient) {}
+  constructor(
+    private readonly mcp: McpClient,
+    private readonly tenant: TenantResolverService,
+  ) {}
+
+  /** S-P0-01 T02c — identity header cho MCP (tenant header-only, non-throw). */
+  private identity(req: AuthedRequest): McpIdentity {
+    return { userId: req.user.id, tenantId: this.tenant.resolveOptional(req) };
+  }
 
   @Get()
   @ApiOperation({
@@ -61,10 +71,14 @@ export class CardsController {
     @Query('limit') limitRaw?: string,
   ): Promise<unknown> {
     const limit = limitRaw ? Math.max(1, Math.min(200, Number(limitRaw) || 50)) : 50;
-    return this.mcp.call('cards.list_pending', {
-      user_id: req.user.id,
-      limit,
-    });
+    return this.mcp.call(
+      'cards.list_pending',
+      {
+        user_id: req.user.id,
+        limit,
+      },
+      this.identity(req),
+    );
   }
 
   @Post(':id/accept')
@@ -77,14 +91,19 @@ export class CardsController {
       'is merged into suggestion JSONB for audit.',
   })
   async accept(
+    @Req() req: AuthedRequest,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() body: { applied_value?: Record<string, unknown> } = {},
   ): Promise<unknown> {
-    return this.mcp.call('cards.update_status', {
-      card_id: id,
-      status: 'accepted',
-      applied_value: body.applied_value ?? null,
-    });
+    return this.mcp.call(
+      'cards.update_status',
+      {
+        card_id: id,
+        status: 'accepted',
+        applied_value: body.applied_value ?? null,
+      },
+      this.identity(req),
+    );
   }
 
   @Post(':id/reject')
@@ -96,11 +115,16 @@ export class CardsController {
       'duplicate requests return {updated: false}.',
   })
   async reject(
+    @Req() req: AuthedRequest,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<unknown> {
-    return this.mcp.call('cards.update_status', {
-      card_id: id,
-      status: 'rejected',
-    });
+    return this.mcp.call(
+      'cards.update_status',
+      {
+        card_id: id,
+        status: 'rejected',
+      },
+      this.identity(req),
+    );
   }
 }

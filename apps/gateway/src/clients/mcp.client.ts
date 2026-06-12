@@ -25,6 +25,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { trace, SpanStatusCode } from '@opentelemetry/api';
+import { buildMcpIdentityHeaders, type McpIdentity } from './mcp-identity';
 
 const _tracer = trace.getTracer('gateway.client.mcp');
 const _logger = new Logger('McpClient');
@@ -70,6 +71,9 @@ export class McpClient {
    *
    * @param method - JSON-RPC method name (e.g. "cards.list_pending")
    * @param params - method params object (MCP convention: object, not array)
+   * @param identity - S-P0-01 T02c: user_id + tenant_id → forward header
+   *                   X-User-Id/X-Tenant-Id (ADR-047 amend). Vắng = không gửi
+   *                   (caller chưa wire); MCP chưa enforce nên an toàn.
    * @returns the `result` field of the JSON-RPC response envelope
    * @throws McpError if MCP returns an `error` envelope
    * @throws Error (with span recordException) on transport failure / timeout
@@ -77,6 +81,7 @@ export class McpClient {
   async call<TResult = unknown>(
     method: string,
     params: Record<string, unknown> = {},
+    identity?: McpIdentity,
   ): Promise<TResult> {
     const requestId = Math.floor(Math.random() * 1_000_000);
     const body = {
@@ -97,7 +102,7 @@ export class McpClient {
       try {
         const resp = await fetch(this.url, {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: { 'content-type': 'application/json', ...buildMcpIdentityHeaders(identity) },
           body: JSON.stringify(body),
           signal: controller.signal,
         });

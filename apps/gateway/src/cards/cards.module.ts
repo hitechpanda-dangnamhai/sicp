@@ -37,11 +37,13 @@ import { AuthModule } from '../auth/auth.module';
 import { ClientsModule } from '../clients/clients.module';
 import { IdempotencyModule } from '../idempotency/idempotency.module';
 import { IdempotencyMiddleware } from '../idempotency/idempotency.middleware';
+import { TenantModule } from '../tenant/tenant.module';
 
 import { CardsController } from './cards.controller';
 
 @Module({
-  imports: [ClientsModule, IdempotencyModule, AuthModule],
+  // TenantModule exports TenantResolverService — S-P0-01 T02c identity header.
+  imports: [ClientsModule, IdempotencyModule, AuthModule, TenantModule],
   controllers: [CardsController],
 })
 export class CardsModule implements NestModule {
