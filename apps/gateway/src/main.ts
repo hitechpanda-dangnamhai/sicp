@@ -35,6 +35,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { patchNestJsSwagger } from 'nestjs-zod';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { AppModule } from './app.module';
@@ -126,6 +127,23 @@ async function bootstrap(): Promise<void> {
       'X-Tenant-Id',
     ],
   });
+
+  // S-P0-02/T03 W-62 — helmet security headers. HSTS + X-Frame-Options + nosniff
+  // BẬT NGAY. CSP rollout an toàn: Report-Only mặc định (env CSP_MODE) → enforce
+  // sau khi report sạch (quyết định sau). CSP useDefaults trong report-only KHÔNG
+  // block FE (chỉ báo cáo) — tránh vỡ âm thầm (slice T03 §3).
+  const cspMode = process.env.CSP_MODE ?? 'report-only';
+  app.use(
+    helmet({
+      hsts: { maxAge: 15_552_000, includeSubDomains: true }, // 180 ngày
+      frameguard: { action: 'deny' }, // X-Frame-Options: DENY
+      noSniff: true, // X-Content-Type-Options: nosniff
+      contentSecurityPolicy:
+        cspMode === 'off'
+          ? false
+          : { useDefaults: true, reportOnly: cspMode === 'report-only' },
+    }),
+  );
 
   // S-03 T02 — Global cookie-parser middleware (replaces S-02 T07 inline
   // readCookie helper per C-13 RESOLVED). JwtAuthGuard reads req.cookies.icp_session.

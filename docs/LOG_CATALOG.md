@@ -128,6 +128,10 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 - **`tenant.landing_resolved.source` (closed set):** `last_active` | `onboarding` — GET /auth/landing redirect resolution.
 - **`public.tenant_not_found`**: GET /public/tenant-by-slug/:slug không khớp tenant active → 404.
 
+### Rate limiting / Hardening (gateway) ✅ — NEW (S-P0-02/T03)
+`throttle.limit_exceeded`.
+- **`throttle.limit_exceeded`** (fields: `extras.{throttler,tracker,method,path,ttl_ms}`): IcpThrottlerGuard (W-60) chặn request vượt giới hạn → 429 `RATE_LIMITED` + `Retry-After`. `throttler` = short|long; `tracker` = `ip:<ip>` (pre-auth) hoặc `u:<userId>`. KHÔNG log PII (chỉ IP/userId-prefix). W-58 (ValidationPipe 400) + W-63 (upload 415/413) = HttpException response, KHÔNG ops-log riêng (4xx client error; access-log đủ).
+
 ### Housekeeper worker (workers) ✅ — NEW (S-P0-02/T02)
 `housekeeper.started` · `housekeeper.leader_acquired` · `housekeeper.tick_skipped_not_leader` · `housekeeper.partition_ensured` · `housekeeper.partition_ensure_failed` · `housekeeper.matview_refreshed` · `housekeeper.matview_refresh_failed` · `housekeeper.shutting_down` · `housekeeper.bootstrap_failed`.
 - **`housekeeper.partition_ensured`** (fields: `ok`, `duration_ms`, `extras.{count,names}`): cron tạo partition `behavior_events` rolling +N tháng (idempotent CREATE IF NOT EXISTS) — gỡ bom W-66. Pair với `db.behavior_partition_missing` (gateway-side: nếu worker chết, gateway vẫn phát hiện INSERT thiếu partition).

@@ -45,6 +45,8 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { THROTTLE_LOGIN, THROTTLE_FORGOT } from '../common/throttler/throttle.config';
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import type { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
@@ -93,6 +95,7 @@ export class AuthController {
   // ────────────────────────────────────────────────────────────────────────
 
   @Post('login')
+  @Throttle(THROTTLE_LOGIN) // W-60: 5/min/IP + 20/h/IP brute-force guard
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Authenticate user (email + password) — issue session cookies',
@@ -332,6 +335,8 @@ export class AuthController {
   // ────────────────────────────────────────────────────────────────────────
 
   @Post('forgot-password')
+  @Throttle(THROTTLE_FORGOT) // W-60: 3/h/IP
+  @SkipThrottle({ short: true }) // chỉ cửa sổ giờ — bỏ qua short 100/min
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Request password reset — stub (no real SMTP)',

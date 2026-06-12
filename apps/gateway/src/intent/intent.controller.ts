@@ -69,6 +69,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
+import { ConfigService } from '@nestjs/config';
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import type { Request, Response } from 'express';
 import { AiClient } from '../clients/ai.client';
@@ -77,6 +79,9 @@ import { IntentRequestDto } from './dto/intent-request.dto';
 import { IntentService } from './intent.service';
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { IntentPolicyGuard } from './intent-policy.guard';
+import { THROTTLE_INTENT } from '../common/throttler/throttle.config';
+import { assertValidImageUpload } from './image-upload.validator';
+import type { Env } from '../config/env.schema';
 
 /** Lazy tracer per C-28 LOCK. */
 function getTracer(): Tracer {
@@ -114,6 +119,7 @@ export class IntentController {
     private readonly intentService: IntentService,
     private readonly aiClient: AiClient,
     private readonly redis: RedisClient,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   /**
@@ -132,6 +138,7 @@ export class IntentController {
    * to Redis channel `sse:pubsub:{rid}`).
    */
   @Post()
+  @Throttle(THROTTLE_INTENT) // W-60: 20/min (per-user nếu authed, else IP)
   @UseGuards(JwtAuthGuard, IntentPolicyGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
@@ -159,6 +166,11 @@ export class IntentController {
     // never sent → AI fell back to 'smoke-user-anon' → wrong cart cleared
     // per Bug #1+#2 Phiên Sx05-3-CODE manual test discovery.
     const userId = req.user?.id ?? 'anon';
+    // S-P0-02/T03 W-63: magic-byte + size cap TRƯỚC khi forward AI→vision.
+    // Sai → 415/413 ngay tại perimeter (đóng BACKLOG #8). Chỉ modality='image'.
+    if (body.modality === 'image' && body.content) {
+      assertValidImageUpload(body.content, this.config.get('IMAGE_MAX_BYTES', { infer: true }));
+    }
     // S-P0-01 T02 (2-phase): GIỮ body.user_id (AI hiện đọc field này tới T03) +
     // THÊM forward context → header X-User-Id/X-Tenant-Id (ADR-047/046). tenant
     // = req.tenant_id do IntentPolicyGuard set (URL, tenant strict — ADR-050 §1).
@@ -185,6 +197,7 @@ export class IntentController {
    *   - Cleanup unsubscribe on: final event detected / req.close / timeout
    */
   @Get('stream')
+  @SkipThrottle() // SSE long-lived connection ≠ request thường — KHÔNG đếm throttle
   @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'SSE stream of intent events',

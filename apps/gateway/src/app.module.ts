@@ -21,7 +21,10 @@
  */
 
 import { Module } from '@nestjs/common';
+import { APP_PIPE } from '@nestjs/core';
 import { ConfigModule } from './config/config.module';
+import { ZodValidationPipe } from './common/zod-validation.pipe';
+import { ThrottlerAppModule } from './common/throttler/throttler-app.module';
 import { IdempotencyModule } from './idempotency/idempotency.module';
 import { HealthModule } from './health/health.module';
 import { DatabaseModule } from './database';
@@ -38,6 +41,7 @@ import { PublicModule } from './public/public.module';
 @Module({
   imports: [
     ConfigModule,
+    ThrottlerAppModule, // ← S-P0-02/T03 W-60: throttler + Redis storage + APP_GUARD
     IdempotencyModule,
     HealthModule,
     DatabaseModule,
@@ -51,5 +55,8 @@ import { PublicModule } from './public/public.module';
     AuthModule,
     DashboardModule,
   ],
+  // S-P0-02/T03 W-58: global ZodValidationPipe (APP-level) — mọi createZodDto
+  // body sai schema → 400 envelope { error: { code, message } }.
+  providers: [{ provide: APP_PIPE, useClass: ZodValidationPipe }],
 })
 export class AppModule {}

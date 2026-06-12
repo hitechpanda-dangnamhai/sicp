@@ -102,6 +102,34 @@ export const EnvSchema = z.object({
 
   // CORS (dev only — per 03_API §8)
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
+
+  // ── S-P0-02/T03 W-62 helmet CSP mode ──────────────────────────────────────
+  // CSP rollout an toàn: 'report-only' 2 tuần đầu (header Content-Security-Policy-
+  // Report-Only, KHÔNG block) → 'enforce' khi report sạch. 'off' = không gửi CSP.
+  // HSTS/X-Frame-Options/nosniff luôn bật (không qua flag này).
+  // ⚠️ GATE (ratify Plan KI#3 T03): CẤM đặt CSP_MODE=enforce trong mọi task
+  // tương lai mà KHÔNG có phán quyết Plan riêng. Lý do: enforce +
+  // upgrade-insecure-requests sẽ vỡ HTTP dev — cần report sạch 2 tuần + quyết
+  // định tường minh trước khi enforce.
+  CSP_MODE: z.enum(['off', 'report-only', 'enforce']).default('report-only'),
+
+  // ── S-P0-02/T03 W-60 throttle (env-tunable) ───────────────────────────────
+  // 2 cửa sổ global: short (per-min) + long (per-hour). Per-route override ở
+  // decorator. Per-tenant quota KHÔNG ở đây (W-99/C-tenant).
+  THROTTLE_SHORT_LIMIT: z.coerce.number().int().positive().default(100),
+  THROTTLE_SHORT_TTL_MS: z.coerce.number().int().positive().default(60_000),
+  THROTTLE_LONG_LIMIT: z.coerce.number().int().positive().default(1000),
+  THROTTLE_LONG_TTL_MS: z.coerce.number().int().positive().default(3_600_000),
+  THROTTLE_LOGIN_LIMIT: z.coerce.number().int().positive().default(5),
+  THROTTLE_LOGIN_HOURLY_LIMIT: z.coerce.number().int().positive().default(20),
+  THROTTLE_FORGOT_HOURLY_LIMIT: z.coerce.number().int().positive().default(3),
+  THROTTLE_INTENT_LIMIT: z.coerce.number().int().positive().default(20),
+
+  // ── S-P0-02/T03 W-63 image upload guard ───────────────────────────────────
+  // Size cap RAW bytes sau decode-prefix (kiểm độ dài base64 TRƯỚC decode để
+  // không nạp payload khổng lồ). Default 8MB raw (~10.7MB base64 — dưới trần
+  // transport 10MB của intent-request.dto).
+  IMAGE_MAX_BYTES: z.coerce.number().int().positive().default(8_000_000),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

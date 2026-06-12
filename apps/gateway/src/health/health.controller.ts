@@ -24,6 +24,7 @@
 import { Controller, Get, HttpCode, HttpStatus, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { SkipThrottle } from '@nestjs/throttler';
 import { trace, context, type Tracer } from '@opentelemetry/api';
 import { HealthService } from './health.service';
 
@@ -41,6 +42,7 @@ function getTracer(): Tracer {
 }
 
 @ApiTags('health')
+@SkipThrottle() // W-60: health probe (k8s/compose) — KHÔNG throttle
 @Controller('api/v1/health')
 export class HealthController {
   constructor(private readonly health: HealthService) {}

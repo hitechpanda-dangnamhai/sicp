@@ -27,6 +27,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiBody,
   ApiOperation,
@@ -40,6 +41,7 @@ import { TrackBatchDto } from './dto/track-batch.dto';
 import type { TrackBatchResponse } from '@icp/shared-types';
 
 @ApiTags('tracker')
+@SkipThrottle() // W-60: behavior ingest 100% capture (CLAUDE.md) — CẤM throttle/drop
 @Controller('api/v1/track')
 export class TrackingController {
   constructor(

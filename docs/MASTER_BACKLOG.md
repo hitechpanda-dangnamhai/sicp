@@ -63,7 +63,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
-| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ✅ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
+| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ⬜ · T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -80,7 +80,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | 5 | Auth hardening (rate-limit + refresh rotation + CORS/CSP) | — | 🟡 | `@nestjs/throttler`+Redis; reuse-detection trên `sessions.refresh_token_hash` UNIQUE (V009 đã có) |
 | 6 | DR / backup / PITR | — | 🟡 | pg_dump + WAL-G + restore runbook; Vespa/Redis snapshot |
 | 7 | Grafana Alerting + SLO/error-budget + production dashboards | — | 🟡 | alert p95/error-rate/payment/aggregator; dashboards Service map (RED), Intent latency, LLM cost, Behavior funnel, per-tenant panel |
-| 8 | File upload validate (MIME + size) | — | 🟡 | reject oversize trước Gemini vision |
+| 8 | File upload validate (MIME + size) | — | ✅ | DONE S-P0-02/T03 (W-63): magic-byte png/jpeg/webp + size cap TRƯỚC decode/vision → 415/413 (`intent/image-upload.validator.ts`) |
 | 9 | Tenant-scoped analytics matview | — | 🟡 | matview +`tenant_id` GROUP BY (sau S-tenant) |
 | 31 | Idempotency MW order: chạy SAU JwtAuthGuard | — | 🟡 | MW hiện trước guard → userId='anon' luôn + tenantScope từ header client-controlled (idempotency.middleware.ts:111-155); cache-hit serve trước auth. Pre-existing trước T02. Fix cần refactor MW chain order (RECON T02 Issue #4). cross-tenant risk: cache scope theo header client tự khai → thủng isolation S-P0-01 đang xây |
 
@@ -132,7 +132,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 
 | Cluster | Tên | IDs (∑) | Slice |
 |---|---|---|---|
-| **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58,59,60,61,62,63,66✅,67✅,85,94,104 · A16,A17,A18 (**14**) | **S-P0-02** (active) |
+| **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58✅,59,60✅,61,62✅,63✅,66✅,67✅,85,94,104 · A16,A17,A18 (**14**) | **S-P0-02** (active) |
 | **C2** | Safety-net (test/CI/eval/golden + obs cost-trace) — TRƯỚC AI-refactor | A13 · W-32,37,40,46,54,55,56,74,75,76,77,78,79,80,81,93 (**17**) | — |
 | **C3** | Async backbone & event integrity (Kafka/outbox/relay/DLQ/envelope/retry-CB/events-partition) — XONG TRƯỚC payment | A7,A10,A11,A12,A15,A20,A21 · W-44,68,70,71,72,73 (**13**) | — |
 | **C3-RT** | Runtime-prod hardening & backpressure (flask→gunicorn/MCP-pool/Redis-HA/SSE-cap/deadlock-retry/load-shed) — *split của C3 per Plan KI#3* | A1,A3,A4,A5 · W-86,95,96,97 (**8**) | — |
