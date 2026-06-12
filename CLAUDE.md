@@ -33,6 +33,7 @@
 - [ ] Idempotency nơi side-effect lặp được (IPN, webhook, consumer)
 - [ ] Migration: forward-only, số kế tiếp theo FACTS, kèm rollback note trong commit body
 - [ ] Sau V011: mọi query data path có tenant scope (RLS/tenant_id) + isolation test
+- [ ] Task đổi bề mặt FACTS (migration/route/graph/MCP tool/page/test) → `bash scripts/gen-facts.sh` + commit `docs/FACTS.md` trong CÙNG squash commit (guard facts-drift chạy mỗi push, không chỉ lúc đóng slice)
 
 ## 6. COMMIT
 - Trong task: commit nháp tuỳ ý. ĐÓNG TASK: **squash về đúng 1 commit**.

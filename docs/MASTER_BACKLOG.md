@@ -52,7 +52,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
-| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 T01 ✅ · T02–T05 chờ | — |                                                        |
+| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1 ✅ · T02b-2/3 + T03–T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -71,6 +71,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 7 | Grafana Alerting + SLO/error-budget + production dashboards | — | 🟡 | alert p95/error-rate/payment/aggregator; dashboards Service map (RED), Intent latency, LLM cost, Behavior funnel, per-tenant panel |
 | 8 | File upload validate (MIME + size) | — | 🟡 | reject oversize trước Gemini vision |
 | 9 | Tenant-scoped analytics matview | — | 🟡 | matview +`tenant_id` GROUP BY (sau S-tenant) |
+| 31 | Idempotency MW order: chạy SAU JwtAuthGuard | — | 🟡 | MW hiện trước guard → userId='anon' luôn + tenantScope từ header client-controlled (idempotency.middleware.ts:111-155); cache-hit serve trước auth. Pre-existing trước T02. Fix cần refactor MW chain order (RECON T02 Issue #4). cross-tenant risk: cache scope theo header client tự khai → thủng isolation S-P0-01 đang xây |
 
 ### P1 — nên có
 
@@ -90,7 +91,6 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 21 | Regex-PII redactor (bổ sung Pino path-redact) | — | 🟡 | — |
 | 22 | A11y audit (reduced-motion + WCAG AA + aria) | — | 🟡 | — |
 | 23 | Redis HA (Sentinel/Cluster) | — | 🟡 | RedisSaver + pub/sub SPOF |
-| 31 | Idempotency MW order: chạy SAU JwtAuthGuard | — | 🟡 | MW hiện trước guard → userId='anon' luôn + tenantScope từ header client-controlled (idempotency.middleware.ts:111-155); cache-hit serve trước auth. Pre-existing trước T02. Fix cần refactor MW chain order (RECON T02 Issue #4) |
 
 ### P2 / TÙY CHỌN — khi scale
 
