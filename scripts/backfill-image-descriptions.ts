@@ -1,5 +1,12 @@
 #!/usr/bin/env tsx
 /**
+ * ⚠️ TOMBSTONE (S-P0-01 T03d, 2026-06-12) — CẤM CHẠY tới khi rework (BACKLOG #33).
+ *   Dưới icp_app: RLS → SELECT products 0 rows, script chết lành.
+ *   Dưới role owner/admin: RLS không áp → đọc products MỌI tenant + ghi
+ *   Vespa-direct cross-tenant = Ô NHIỄM DỮ LIỆU.
+ *   Script PG-direct + Vespa-direct bypass MCP — vi phạm ADR-003 pre-existing.
+ *   Rework: per-tenant + identity header + đi qua MCP.
+ *
  * scripts/backfill-image-descriptions.ts — S-09 D-S09-NN-D LAW Step 2.
  *
  * Slice: S-09 First Image-Based Product Recommendation (Intent 04 V-SLICE).

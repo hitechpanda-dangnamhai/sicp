@@ -195,6 +195,14 @@ BACKLOG §2.
 **B6 (tay, 1 phút):** save `docs/slices/S-XX.md` + dán dòng BACKLOG + commit
 `META: plan S-XX`.
 
+**R2-INV — invariant cross-cutting:** slice chạm invariant xuyên hệ (tenant,
+authz, idempotency, logging/trace) → RECON bắt buộc kiểu INVENTORY trước khi
+cắt task: đếm đóng mọi đường đi của invariant (mọi caller của boundary, mọi
+key/channel, mọi connect-site), mỗi mục kèm path. Slice file phải chứa tuyên
+bố đóng inventory + evidence. Cắt task = mỗi bề mặt propagate 1 task, enforce
+= task cuối, prereq = inventory đã đóng. Mặc định: cross-cutting cỡ slice,
+không phải task.
+
 # R3 — CHẠY TASK (Code)
 
 ```

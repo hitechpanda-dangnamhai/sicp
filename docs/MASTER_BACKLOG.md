@@ -52,7 +52,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
-| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03b ⬜ · T04–T05 ⬜ |
+| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ⬜ · T03b ⬜ · T04–T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -91,6 +91,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 21 | Regex-PII redactor (bổ sung Pino path-redact) | — | 🟡 | — |
 | 22 | A11y audit (reduced-motion + WCAG AA + aria) | — | 🟡 | — |
 | 23 | Redis HA (Sentinel/Cluster) | — | 🟡 | RedisSaver + pub/sub SPOF |
+| 33 | Script `backfill-image-descriptions` rework | — | 🟡 | per-tenant + identity header + đi qua MCP (hiện PG-direct + Vespa-direct, vi phạm ADR-003, không tenant — tombstoned T03d) hoặc retire |
 
 ### P2 / TÙY CHỌN — khi scale
 
