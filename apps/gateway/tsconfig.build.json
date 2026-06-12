@@ -1,4 +1,10 @@
 {
   "extends": "./tsconfig.json",
+  // S-P0-01/META #32: incremental:false override (tsconfig.json đặt true) —
+  // KHÔNG ghi tsconfig.tsbuildinfo → mỗi build là full emit, không reuse cache
+  // cũ (docker layer hay local). `build` = tsc -p file này (thay nest build).
+  "compilerOptions": {
+    "incremental": false
+  },
   "exclude": ["node_modules", "dist", "**/*.spec.ts", "**/*.test.ts", "vitest.config.ts"]
 }

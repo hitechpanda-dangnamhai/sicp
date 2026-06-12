@@ -51,7 +51,12 @@ COPY packages/shared-types ./packages/shared-types
 RUN pnpm --filter @icp/shared-types build
 # Build gateway → emits apps/gateway/dist/.
 WORKDIR /workspace/apps/gateway
-RUN pnpm build
+# S-P0-01/META #32 (bằng chứng smoke T02c 06-12): incremental tsc
+# (tsconfig.tsbuildinfo) + docker layer cache → build CÓ cache ship dist STALE
+# (deploy code cũ, header T02c vắng trên wire). Bảo đảm = CLEAN BUILD: rm mọi
+# output cũ + `pnpm build` = `tsc -p tsconfig.build.json` (incremental:false) →
+# emit tươi mỗi lần, không dựa cache/assert.
+RUN rm -rf dist tsconfig.tsbuildinfo && pnpm build
 # ──────── Stage 2: Runtime ────────
 FROM node:20-alpine AS runtime
 WORKDIR /workspace
