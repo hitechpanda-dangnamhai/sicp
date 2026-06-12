@@ -52,7 +52,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
-| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ⬜ · T03b ✅ *(nợ SSE e2e live → T05)* · T04–T05 ⬜ |
+| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ⬜ · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -109,6 +109,11 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 
 ## §4 Done gần đây
 
+- **2026-06-12 · S-P0-01/T04** (`8e4f066`): Vespa + analytics tenant scope —
+  product.sd +tenant_id, 4 query tool ép inject_tenant_filter + index ghi tenant,
+  matview filter app-level, backfill CLI PARTIAL-UPDATE (ADR-036), NN
+  approximate:false (Sx09-F guard); ADR-040 amend MIGRATE role scope; nợ live
+  verify (0-row/matview/backfill) → T05.
 - **2026-06-12 · S-P0-01/T02c** (`937378e`, `a76c0aa`): Gateway→MCP tenant
   propagation — helper buildMcpIdentityHeaders 1 nơi, áp cả mcp.client lẫn
   cart.service raw-fetch; params user_id giữ song song (xoá T03); smoke live
