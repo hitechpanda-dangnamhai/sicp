@@ -59,6 +59,7 @@ import { IntentPolicyGuard } from './intent-policy.guard';
 import { AiClient } from '../clients/ai.client';
 import { IntentService } from './intent.service';
 import { IntentActionDto } from './dto/intent-action.dto';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 
 /** Lazy tracer per C-28 LOCK. */
 function getTracer(): Tracer {
@@ -89,6 +90,7 @@ export class IntentActionController {
    * events flow to FE via existing /stream connection (no FE reconnect).
    */
   @Post(':rid/action')
+  @Idempotent({ strategy: 'intent-action' }) // #31/ADR-048/049: composite key {tenant}:{rid}:{attempt_n} 5min, tenant verified
   @UseGuards(JwtAuthGuard, IntentPolicyGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({

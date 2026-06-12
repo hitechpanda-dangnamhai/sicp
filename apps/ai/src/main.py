@@ -81,6 +81,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import threading
 import uuid
 from typing import Any, AsyncIterator
 
@@ -109,6 +110,14 @@ _SSE_HEARTBEAT_S = 15.0
 # How long to wait for the first event before giving up on the channel and closing.
 # If graph crashes before any publish, we don't want to hang indefinitely.
 _SSE_FIRST_EVENT_TIMEOUT_S = 30.0
+
+# S-P0-02/T04 W-94 — bounded concurrency cho graph-thread spawn (/intent).
+# TRƯỚC: spawn 1 daemon-thread/request KHÔNG giới hạn → cạn OS thread khi tải
+# (service sập ĐẦU TIÊN). BoundedSemaphore cap số graph chạy đồng thời; bão hoà
+# → 503 + Retry-After (load-shed tối thiểu; đầy đủ = W-97/C3-RT). Graph đang chạy
+# KHÔNG bị ảnh hưởng (semaphore chỉ gate spawn mới; release khi thread xong).
+_AI_MAX_CONCURRENCY = int(os.getenv("AI_MAX_CONCURRENCY", "32"))
+_graph_semaphore = threading.BoundedSemaphore(_AI_MAX_CONCURRENCY)
 
 
 def _redis_url() -> str:
@@ -219,8 +228,11 @@ async def _sse_subscribe_stream(
             pass
 
 
-def _drive_graph_async(initial_state: dict[str, Any]) -> None:
+def _drive_graph_async(initial_state: dict[str, Any]) -> bool:
     """Spawn an asyncio task that runs the search graph to completion.
+
+    S-P0-02/T04 W-94: trả `False` nếu bão hoà concurrency (caller → 503), `True`
+    nếu đã spawn (slot release khi graph thread xong, ở `_runner` finally).
 
     Per D-S04-13 LAW Pattern A: graph publishes SSE events directly to Redis
     pub/sub during its execution; this function does not collect results — it
@@ -236,7 +248,10 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
     INSIDE the new event loop — direct constructor leaves the internal Redis
     client uninitialized, causing "no running event loop" at first aput().
     """
-    import threading
+    # W-94 load-shed: gate spawn (non-blocking). Bão hoà → False (caller → 503);
+    # KHÔNG treo, KHÔNG tạo thread. release ở _runner finally khi graph xong.
+    if not _graph_semaphore.acquire(blocking=False):
+        return False
 
     redis_url = _redis_url()
     request_id = initial_state["request_id"]
@@ -461,9 +476,16 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                 loop.close()
             except Exception:  # noqa: BLE001
                 pass
+            # W-94: release slot khi graph thread kết thúc (success/error đều release).
+            _graph_semaphore.release()
 
     t = threading.Thread(target=_runner, daemon=True, name=f"graph-{request_id}")
-    t.start()
+    try:
+        t.start()
+    except Exception:  # noqa: BLE001 — spawn fail: release slot, không treo cap.
+        _graph_semaphore.release()
+        raise
+    return True
 
 
 def _drive_graph_resume_async(
@@ -752,8 +774,20 @@ def create_app() -> Flask:
                 "voice_text": text_query or None,
             }
 
-            # Drive search graph async in background thread.
-            _drive_graph_async(initial_state)
+            # Drive search graph async in background thread. W-94 load-shed:
+            # bão hoà concurrency → 503 + Retry-After (KHÔNG spawn, KHÔNG treo).
+            if not _drive_graph_async(initial_state):
+                structlog.get_logger().warning(
+                    "ai.load_shed",
+                    request_id=request_id,
+                    max_concurrency=_AI_MAX_CONCURRENCY,
+                )
+                span.set_attribute("ai.load_shed", True)
+                return (
+                    jsonify({"error": {"code": "AI_BUSY", "message": "AI service at capacity"}}),
+                    503,
+                    {"Retry-After": "5"},
+                )
 
             # Stream SSE events forwarded from Redis pub/sub channel.
             def _sse_generator() -> Any:

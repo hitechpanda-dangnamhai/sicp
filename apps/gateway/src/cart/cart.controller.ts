@@ -59,6 +59,7 @@ import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api'
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantResolverService } from '../tenant/tenant-resolver.service';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 import { CartService } from './cart.service';
 import { CartAddItemDto } from './dto/cart-add-item.dto';
 import { CartUpdateQtyDto } from './dto/cart-update-qty.dto';
@@ -132,6 +133,7 @@ export class CartController {
    * Returns the fresh Cart with totals recomputed.
    */
   @Post('items')
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Add item to cart or update qty if existing' })
   @ApiBody({ type: CartAddItemDto })
@@ -180,6 +182,7 @@ export class CartController {
    * qty=0 auto-removes (per D-S05-02 LAW sugar). Cap 99.
    */
   @Patch('items/:productId')
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard
   @ApiOperation({ summary: 'Update item qty (qty=0 auto-removes)' })
   @ApiParam({ name: 'productId', description: 'Product UUID in cart' })
   @ApiBody({ type: CartUpdateQtyDto })
@@ -223,6 +226,7 @@ export class CartController {
    * Idempotent — removing absent item returns current cart unchanged.
    */
   @Delete('items/:productId')
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard
   @ApiOperation({ summary: 'Remove single item from cart (idempotent)' })
   @ApiParam({ name: 'productId', description: 'Product UUID in cart' })
   async removeItem(
@@ -264,6 +268,7 @@ export class CartController {
    * Returns `{cleared: true, user_id: <user_id>}`.
    */
   @Delete()
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard
   @ApiOperation({
     summary:
       'Wipe entire cart (no-confirm path; use POST /intent ' +
@@ -302,6 +307,7 @@ export class CartController {
    * LLM typo correction is FE-side retry (out-of-scope this endpoint).
    */
   @Post('promo')
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard
   @ApiOperation({ summary: 'Apply promo code (exact match; LLM typo via FE retry)' })
   @ApiBody({ type: CartPromoDto })
   async applyPromo(
@@ -337,6 +343,7 @@ export class CartController {
    * Idempotent — removing absent promo returns current cart unchanged.
    */
   @Delete('promo')
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard
   @ApiOperation({ summary: 'Remove applied promo code (idempotent)' })
   async removePromo(@Req() req: Request): Promise<unknown> {
     const tracer = getTracer();

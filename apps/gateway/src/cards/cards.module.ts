@@ -26,36 +26,20 @@
  *   - apps/gateway/src/clients/clients.module.ts (S-02 T05 + S-07 T01.E amend)
  */
 
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module';
 import { ClientsModule } from '../clients/clients.module';
 import { IdempotencyModule } from '../idempotency/idempotency.module';
-import { IdempotencyMiddleware } from '../idempotency/idempotency.middleware';
 import { TenantModule } from '../tenant/tenant.module';
 
 import { CardsController } from './cards.controller';
 
+// S-P0-02/T04 (#31): idempotency accept/reject = `@Idempotent()` decorator trên
+// route + global IdempotencyInterceptor (SAU guard) — KHÔNG còn middleware forRoutes.
 @Module({
   // TenantModule exports TenantResolverService — S-P0-01 T02c identity header.
   imports: [ClientsModule, IdempotencyModule, AuthModule, TenantModule],
   controllers: [CardsController],
 })
-export class CardsModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    // Apply IdempotencyMiddleware to mutating routes (POST accept + reject)
-    // per ADR-004 + S-02 T01 pattern. GET /cards is read-only — no middleware.
-    // Route paths literal per codebase convention (cart.module.ts precedent).
-    consumer
-      .apply(IdempotencyMiddleware)
-      .forRoutes(
-        { path: 'api/v1/cards/:id/accept', method: RequestMethod.POST },
-        { path: 'api/v1/cards/:id/reject', method: RequestMethod.POST },
-      );
-  }
-}
+export class CardsModule {}

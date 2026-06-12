@@ -49,6 +49,7 @@ import { McpClient, McpError } from '../clients/mcp.client';
 import type { McpIdentity } from '../clients/mcp-identity';
 import { TenantResolverService } from '../tenant/tenant-resolver.service';
 import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 
 /**
  * Whitelisted updatable fields per C-S07-N. Frontend should send any subset;
@@ -102,6 +103,7 @@ export class ProductsController {
    * same transaction). Vespa re-index is best-effort post-commit.
    */
   @Patch(':id')
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard (scope verified)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Update an existing product (owner-merchant only)',

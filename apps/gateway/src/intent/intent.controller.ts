@@ -81,6 +81,7 @@ import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { IntentPolicyGuard } from './intent-policy.guard';
 import { THROTTLE_INTENT } from '../common/throttler/throttle.config';
 import { assertValidImageUpload } from './image-upload.validator';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 import type { Env } from '../config/env.schema';
 
 /** Lazy tracer per C-28 LOCK. */
@@ -138,6 +139,7 @@ export class IntentController {
    * to Redis channel `sse:pubsub:{rid}`).
    */
   @Post()
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard (scope verified)
   @Throttle(THROTTLE_INTENT) // W-60: 20/min (per-user nếu authed, else IP)
   @UseGuards(JwtAuthGuard, IntentPolicyGuard)
   @HttpCode(HttpStatus.ACCEPTED)

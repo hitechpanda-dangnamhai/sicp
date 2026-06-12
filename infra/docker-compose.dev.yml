@@ -1,0 +1,19 @@
+# =============================================================================
+# infra/docker-compose.dev.yml — override CHỈ cho DEBUG LOCAL (S-P0-02/T04)
+# =============================================================================
+# ADR-047 enforce: docker-compose.yml KHÔNG expose port AI(5001)/MCP(5050) ra
+# host (perimeter = Gateway duy nhất). File override này TÁI expose port cho
+# debug local (curl trực tiếp AI/MCP, gắn debugger). KHÔNG dùng ở production /
+# staging / CI smoke ADR-047 (sẽ làm acceptance "host:5001 refused" FAIL).
+#
+# Dùng:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Mặc định (KHÔNG có -f dev) = ADR-047 enforced (port đóng).
+# =============================================================================
+services:
+  ai:
+    ports:
+      - "5001:5001"
+  mcp:
+    ports:
+      - "5050:5050"

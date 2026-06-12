@@ -42,6 +42,7 @@ import { McpClient } from '../clients/mcp.client';
 import type { McpIdentity } from '../clients/mcp-identity';
 import { TenantResolverService } from '../tenant/tenant-resolver.service';
 import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
+import { Idempotent } from '../idempotency/idempotent.decorator';
 
 @ApiTags('cards')
 @ApiCookieAuth('icp_session')
@@ -87,6 +88,7 @@ export class CardsController {
   }
 
   @Post(':id/accept')
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard (scope verified)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Mark action card as accepted',
@@ -112,6 +114,7 @@ export class CardsController {
   }
 
   @Post(':id/reject')
+  @Idempotent() // #31/ADR-049: idempotency interceptor SAU guard (scope verified)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Mark action card as rejected',

@@ -29,20 +29,17 @@
  *      JwtAuthGuard + idempotency middleware composition pattern)
  */
 
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ClientsModule } from '../clients/clients.module';
 import { IdempotencyModule } from '../idempotency/idempotency.module';
-import { IdempotencyMiddleware } from '../idempotency/idempotency.middleware';
 import { TenantModule } from '../tenant/tenant.module';
 import { CartController } from './cart.controller';
 import { CartService } from './cart.service';
 
+// S-P0-02/T04 (#31): idempotency cart write = `@Idempotent()` decorator trên
+// route (cart.controller) + global IdempotencyInterceptor — KHÔNG còn middleware
+// forRoutes ở đây (interceptor chạy SAU guard → scope user/tenant verified).
 @Module({
   // TenantModule exports TenantResolverService — S-P0-01 T02c identity header.
   imports: [ClientsModule, IdempotencyModule, AuthModule, TenantModule],
@@ -50,20 +47,4 @@ import { CartService } from './cart.service';
   providers: [CartService],
   exports: [CartService],
 })
-export class CartModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    // Apply IdempotencyMiddleware (S-02 T01) to cart write endpoints. Read
-    // endpoints (GET /cart) do not need Idempotency-Key per ADR-004 — only
-    // mutations require dedup.
-    consumer
-      .apply(IdempotencyMiddleware)
-      .forRoutes(
-        { path: 'api/v1/cart/items', method: RequestMethod.POST },
-        { path: 'api/v1/cart/items/:productId', method: RequestMethod.PATCH },
-        { path: 'api/v1/cart/items/:productId', method: RequestMethod.DELETE },
-        { path: 'api/v1/cart', method: RequestMethod.DELETE },
-        { path: 'api/v1/cart/promo', method: RequestMethod.POST },
-        { path: 'api/v1/cart/promo', method: RequestMethod.DELETE },
-      );
-  }
-}
+export class CartModule {}

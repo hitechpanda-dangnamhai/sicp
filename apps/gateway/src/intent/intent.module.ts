@@ -20,39 +20,35 @@
  *   - RedisClient via IdempotencyModule (T01 line 28 exports)
  *   - JwtAuthGuard via AuthModule (S-03 T02 exports — used on /action + /suggest-attrs)
  *
- * Middleware registration:
- *   - Base `IdempotencyMiddleware` (S-02 T01) ALREADY covers POST /api/v1/intent
- *     via `idempotency.module.ts` line 36 — no change needed.
- *   - `IntentActionIdempotencyMiddleware` applies ONLY to
- *     `POST /api/v1/intent/:rid/action` — distinct composite key namespace.
- *   - NEW `/api/v1/intent/:rid/suggest-attrs` uses the BASE S-02
- *     IdempotencyMiddleware (simple `idem:cache:{userId}:{key}` namespace) —
- *     no composite key needed because this is NOT a graph resume action.
- *     Wired automatically via base idempotency.module RequestMethod.ALL coverage
- *     on `api/v1/*` POST routes (verified existing pattern S-02 T01).
+ * Idempotency (S-P0-02/T04 #31 — interceptor, KHÔNG middleware):
+ *   - POST /api/v1/intent → `@Idempotent()` (standard 24h).
+ *   - POST /api/v1/intent/:rid/action → `@Idempotent({strategy:'intent-action'})`
+ *     (composite key {tenant}:{rid}:{attempt_n} 5min, ADR-048).
+ *   - POST /api/v1/intent/:rid/suggest-attrs = **KHÔNG idempotent** (đính chính
+ *     KI#6 T04: comment cũ SAI — base middleware forRoutes `api/v1/intent` KHÔNG
+ *     match sub-path nên suggest-attrs CHƯA TỪNG được cover thật). Candidate
+ *     idempotent sau nếu cần (gắn @Idempotent()), không tạo task riêng.
  *
  * @see slices/S-04_decisions-log.md D-S04-13 LAW (Pattern A + Option α + composite key)
  * @see slices/S-07_decisions-log.md C-S07-O (Sx07-G hotfix — separate endpoint)
  * @see apps/gateway/src/idempotency/idempotency.module.ts (base S-02 middleware)
  */
 
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { TenantModule } from '../tenant/tenant.module';
 import { ClientsModule } from '../clients/clients.module';
 import { IdempotencyModule } from '../idempotency/idempotency.module';
-import { IntentActionIdempotencyMiddleware } from './intent-action-idempotency.middleware';
 import { IntentActionController } from './intent-action.controller';
 import { IntentController } from './intent.controller';
 import { IntentService } from './intent.service';
 import { IntentPolicyGuard } from './intent-policy.guard';
 import { IntentSuggestAttrsController } from './intent-suggest-attrs.controller';
 
+// S-P0-02/T04 (#31, ADR-049 amend): POST /intent = `@Idempotent()`, POST
+// /intent/:rid/action = `@Idempotent({strategy:'intent-action'})` (composite key
+// {tenant}:{rid}:{attempt_n} TTL 5min, ADR-048) — decorator + global
+// IdempotencyInterceptor (SAU guard). KHÔNG còn IntentActionIdempotencyMiddleware.
 @Module({
   imports: [ClientsModule, IdempotencyModule, AuthModule, TenantModule],
   controllers: [
@@ -60,15 +56,6 @@ import { IntentSuggestAttrsController } from './intent-suggest-attrs.controller'
     IntentActionController,
     IntentSuggestAttrsController,
   ],
-  providers: [IntentService, IntentPolicyGuard, IntentActionIdempotencyMiddleware],
+  providers: [IntentService, IntentPolicyGuard],
 })
-export class IntentModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(IntentActionIdempotencyMiddleware)
-      .forRoutes({
-        path: 'api/v1/intent/:rid/action',
-        method: RequestMethod.POST,
-      });
-  }
-}
+export class IntentModule {}

@@ -210,8 +210,12 @@ services:
     env_file: ../.env
     environment:
       OTEL_SERVICE_NAME: ai
-    ports:
-      - "5001:5001"
+    # S-P0-02/T04 (ADR-047 enforce, W-103/ADR-047-gap): GỠ `ports: 5001` →
+    # AI KHÔNG reachable từ host (chỉ Gateway nội bộ qua `ai:5001` trên network
+    # icp). Perimeter = Gateway duy nhất (ADR-047). Debug local: override
+    # docker-compose.dev.yml. KHÔNG dùng `internal: true` cho network — AI cần
+    # EGRESS internet gọi Gemini/OpenAI (internal:true chặn egress → vỡ LLM);
+    # egress-allowlist/mTLS = C8 (xem report deviation).
     # S-05 T02 fixturefix (Phiên Sx05-2c): bind-mount infra/seed for runtime
     # fixture access (cart_by_text.py stock_issue_lookup fallback path-a +
     # co_purchase_category.json S-04 inheritance). Read-only.
@@ -239,8 +243,9 @@ services:
     env_file: ../.env
     environment:
       OTEL_SERVICE_NAME: mcp
-    ports:
-      - "5050:5050"
+    # S-P0-02/T04 (ADR-047 enforce): GỠ `ports: 5050` → MCP KHÔNG reachable từ
+    # host (chỉ AI/Gateway nội bộ qua `mcp:5050`). MCP cần egress (Gemini vision/
+    # gtrends) → KHÔNG internal:true. Debug local: docker-compose.dev.yml.
     # S-05 T02 fixturefix (Phiên Sx05-2c): bind-mount infra/seed for runtime
     # fixture access (cart.py: promo_codes.json + free_gift_rules.json +
     # cart_stock_replacement.json). Read-only — no container can mutate seed.

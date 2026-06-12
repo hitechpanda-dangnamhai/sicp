@@ -30,6 +30,7 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 ### Idempotency (gateway) ✅
 `idempotency.cache_hit` · `cached_response_stored` · `lock_acquired` · `lock_conflict` · `lock_released_on_disconnect` · `lock_release_failed` · `cache_corrupted` · `cache_write_failed`.
 - **Mirror set** cho `POST /intent/{id}/action`: `intent_action_idempotency.*` (8 tên y hệt).
+- **S-P0-02/T04 (#31):** idempotency = INTERCEPTOR (SAU guard), scope key từ JWT-verified `req.user.id` + `req.tenant_id` (KHÔNG header client). Message names GIỮ NGUYÊN. NEW: `idempotency.skipped_unauthenticated` (route opt-in `@Idempotent` mà thiếu auth guard → KHÔNG cache, cảnh báo cấu hình sai).
 
 ### Intent / AI dispatch (gateway + ai) ✅ — RECONCILE
 - **Gateway:** `intent.received` · `intent.failed` · `intent.action_received` · `intent.action_failed` · `intent.policy_denied` · `intent.suggest_attrs_received` · `intent.suggest_attrs_done` · `intent.suggest_attrs_failed` · `intent.sse_opened` · `intent.sse_session_missing` · `intent.sse_idle_timeout` · `intent.sse_idle_timeout_resume_failed`; `ai_client.initialized/health_ok/unhealthy/unreachable/intent_dispatched/intent_failed/intent_timeout/intent_resume_ok/intent_resume_failed`.
@@ -127,6 +128,10 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 - **`tenant.switched`** (fields: `from_tenant_id`, `to_tenant_id`, `session_id`): POST /auth/switch-tenant cập nhật sessions.last_active_tenant_id (KHÔNG re-issue token).
 - **`tenant.landing_resolved.source` (closed set):** `last_active` | `onboarding` — GET /auth/landing redirect resolution.
 - **`public.tenant_not_found`**: GET /public/tenant-by-slug/:slug không khớp tenant active → 404.
+
+### AI backpressure (ai) ✅ — NEW (S-P0-02/T04)
+`ai.load_shed`.
+- **`ai.load_shed`** (fields: `request_id`, `max_concurrency`): W-94 — BoundedSemaphore (`AI_MAX_CONCURRENCY`, default 32) bão hoà → POST /intent trả **503** + `Retry-After: 5` (KHÔNG spawn graph-thread mới). Graph đang chạy KHÔNG bị ảnh hưởng. Full load-shed = W-97/C3-RT.
 
 ### Rate limiting / Hardening (gateway) ✅ — NEW (S-P0-02/T03)
 `throttle.limit_exceeded`.
