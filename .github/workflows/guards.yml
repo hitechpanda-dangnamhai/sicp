@@ -43,6 +43,9 @@ jobs:
             # taxonomy v3: slice id cho phép prefix chữ + nhiều đoạn (S-P0-01,
             # S-META-02, S-AUDIT) — không chỉ S-<số>. WHY: BACKLOG §2 đặt tên
             # slice theo priority (P0). Nguồn: docs/ICP_PLAYBOOK_V2.2.md R0.1-a.
-            echo "$s" | grep -qE '^(S-[A-Z0-9]+(-[A-Z0-9]+)*/(T[0-9]+|HOTFIX-[0-9]+|REFACTOR-[0-9]+)|META): .+' \
+            # taxonomy v3.1: task id cho phép hậu tố chữ + nhánh con (T02b-1) —
+            # không chỉ T<số>. WHY: slice tách task phức tạp thành T0Nx-M
+            # (S-P0-01 đặt T02b → T02b-1/2/3). Nguồn: docs/slices/S-P0-01.md.
+            echo "$s" | grep -qE '^(S-[A-Z0-9]+(-[A-Z0-9]+)*/(T[0-9]+[a-z]?(-[0-9]+)?|HOTFIX-[0-9]+|REFACTOR-[0-9]+)|META): .+' \
               || { echo "::error::Commit sai format taxonomy: '$s'"; exit 1; }
           done
