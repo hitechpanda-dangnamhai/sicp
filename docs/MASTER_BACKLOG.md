@@ -63,7 +63,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
-| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ *(cart deploy-lag regression, phát hiện T05 smoke)* |
+| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ *(cart deploy-lag regression, phát hiện T05 smoke)* |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -167,6 +167,20 @@ trong image + live-smoke so SHA container vs HEAD (bài học T06 — cart outag
 pre-T03b ẩn vì CI soft-fail + cart chưa smoke; + BACKLOG #32 docker-cache-stale tiền lệ).
 
 ## §4 Done gần đây
+
+- **2026-06-13 · S-P0-02 CLOSE** (`93befff` + close) — **Cluster C1 Stop-the-bleed ✅
+  (6 task, 13 finding + 1 regression):** T01 governance pack (5 ADR 051-055 + 3 amend +
+  NFR + map 105→cluster + re-verify 13/13) · T02 housekeeper worker (gỡ bom W-66 partition
+  + W-67 matview, V014) · T03 vỏ cứng Gateway (W-58 ValidationPipe · W-60 throttler+Redis ·
+  W-62 helmet · W-63 upload sniff, #8) · T04 danh tính+cô lập (#31 idempotency interceptor
+  SAU guard · ADR-047 gỡ ports · W-104 runbook · W-94 semaphore 503) · T05 stock atomic
+  ADR-055 (W-85 decrement_stock primitive · W-59 next 14.2.25 · W-61 npm 0 critical) ·
+  T06 cart deploy-lag fix (regression T03b stale mcp). **W-ID đóng:** W-58/59/60/62/63/66/
+  67/85/94/104 ✅ · #31/ADR-047-gap ✅ · W-61 🟡. **2 risk-acceptance (Human 2026-06-13):**
+  W-104 keys lộ→rotate C8 · CSP report-only (gate cấm enforce thiếu Plan). **Nợ đẩy:**
+  W-61 npm residual→C8 · pip langgraph (4 CVE)→C7 · seed customer password→W-75 · deploy-
+  drift gate→C2(W-76). **Risk còn:** cart=customer 0-membership isolation ở MCP; AI/MCP
+  egress chưa allowlist (C8); resume path chưa load-shed (C3-RT).
 
 - **2026-06-12 · S-P0-01/T03e** (`1406903`): Per-intent membership policy (ADR-050)
   — IntentPolicyGuard thay TenantMembershipGuard tại POST /intent + /:rid/action;
