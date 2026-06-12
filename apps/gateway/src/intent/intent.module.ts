@@ -50,6 +50,7 @@ import { IntentActionIdempotencyMiddleware } from './intent-action-idempotency.m
 import { IntentActionController } from './intent-action.controller';
 import { IntentController } from './intent.controller';
 import { IntentService } from './intent.service';
+import { IntentPolicyGuard } from './intent-policy.guard';
 import { IntentSuggestAttrsController } from './intent-suggest-attrs.controller';
 
 @Module({
@@ -59,7 +60,7 @@ import { IntentSuggestAttrsController } from './intent-suggest-attrs.controller'
     IntentActionController,
     IntentSuggestAttrsController,
   ],
-  providers: [IntentService, IntentActionIdempotencyMiddleware],
+  providers: [IntentService, IntentPolicyGuard, IntentActionIdempotencyMiddleware],
 })
 export class IntentModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

@@ -56,6 +56,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -75,7 +76,7 @@ import { RedisClient } from '../idempotency/redis.client';
 import { IntentRequestDto } from './dto/intent-request.dto';
 import { IntentService } from './intent.service';
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
-import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
+import { IntentPolicyGuard } from './intent-policy.guard';
 
 /** Lazy tracer per C-28 LOCK. */
 function getTracer(): Tracer {
@@ -131,7 +132,7 @@ export class IntentController {
    * to Redis channel `sse:pubsub:{rid}`).
    */
   @Post()
-  @UseGuards(JwtAuthGuard, TenantMembershipGuard)
+  @UseGuards(JwtAuthGuard, IntentPolicyGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Dispatch intent to AI service',
@@ -141,7 +142,10 @@ export class IntentController {
       '(basic_fallback) per D-S04-03 LAW Adaptive Single Endpoint. ' +
       'Sx05-3-CODE HOTFIX (D-S05-13 LAW): @UseGuards(JwtAuthGuard) added — ' +
       'req.user.id forwarded to AI as PostIntentBody.user_id so cart_by_text ' +
-      'graph operates on correct authenticated cart.',
+      'graph operates on correct authenticated cart. ' +
+      'S-P0-01 T03e (ADR-050): IntentPolicyGuard thay TenantMembershipGuard — ' +
+      'tenant strict mọi intent; membership-required (01 import/07 analyzing + ' +
+      'default-deny) → owner ∈ tenant_ids (403); customer-allowed (02/03/04/05) PASS.',
   })
   @ApiCookieAuth('icp_session')
   @ApiBody({ type: IntentRequestDto })
@@ -157,10 +161,12 @@ export class IntentController {
     const userId = req.user?.id ?? 'anon';
     // S-P0-01 T02 (2-phase): GIỮ body.user_id (AI hiện đọc field này tới T03) +
     // THÊM forward context → header X-User-Id/X-Tenant-Id (ADR-047/046). tenant
-    // = req.tenant_id do TenantMembershipGuard set (URL, đã validate membership).
+    // = req.tenant_id do IntentPolicyGuard set (URL, tenant strict — ADR-050 §1).
+    // T03e: membership_required do guard tính → ghi vào intent:cache (ADR-050 §4).
     return this.intentService.dispatch(
       { ...body, user_id: userId },
       { userId, tenantId: req.tenant_id ?? null },
+      req.membership_required ?? true,
     );
   }
 
@@ -210,13 +216,9 @@ export class IntentController {
         });
       }
 
-      // 2. F2 ownership-check: rid phải thuộc đúng owner (user + tenant∈membership).
+      // 2. F2 ownership-check: rid phải thuộc đúng owner (user + tenant_id non-null).
       //    Mismatch/cache-miss → 404 ĐỒNG NHẤT (không lộ tồn tại rid của tenant khác).
-      const owned = await this.intentService.assertOwnership(
-        requestId,
-        req.user.id,
-        req.user.tenant_ids,
-      );
+      const owned = await this.intentService.assertOwnership(requestId, req.user.id);
       if (!owned) {
         // (null = cache-miss / cross-owner / orphan format cũ)
         span.setAttribute('intent.ownership_denied', true);
@@ -226,6 +228,18 @@ export class IntentController {
             code: 'INVALID_INTENT',
             message: `request_id not found or expired: ${requestId}`,
           },
+        });
+      }
+
+      // 2b. T03e (ADR-050 §4): membership gate SAU ownership. Customer-allowed
+      //     (02/03/04/05) PASS; membership-required (01/07) đòi owner ∈ tenant.
+      //     Phòng-thủ-sâu — POST guard đã 403 customer cho 01/07; nhánh này bắt
+      //     ca membership đổi trong cửa sổ TTL 60s. → 403 TENANT_FORBIDDEN.
+      if (!this.intentService.isMembershipSatisfied(owned, req.user.tenant_ids)) {
+        span.setAttribute('intent.membership_denied', true);
+        span.end();
+        throw new ForbiddenException({
+          error: { code: 'TENANT_FORBIDDEN', message: 'Intent requires tenant membership' },
         });
       }
 

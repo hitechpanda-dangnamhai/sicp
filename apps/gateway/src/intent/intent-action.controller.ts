@@ -36,6 +36,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   HttpCode,
   HttpStatus,
   Logger as NestLogger,
@@ -54,7 +55,7 @@ import {
 } from '@nestjs/swagger';
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
-import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
+import { IntentPolicyGuard } from './intent-policy.guard';
 import { AiClient } from '../clients/ai.client';
 import { IntentService } from './intent.service';
 import { IntentActionDto } from './dto/intent-action.dto';
@@ -88,7 +89,7 @@ export class IntentActionController {
    * events flow to FE via existing /stream connection (no FE reconnect).
    */
   @Post(':rid/action')
-  @UseGuards(JwtAuthGuard, TenantMembershipGuard)
+  @UseGuards(JwtAuthGuard, IntentPolicyGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Resume interrupted intent graph with user choice',
@@ -116,15 +117,11 @@ export class IntentActionController {
       const userId = req.user.id;
 
       // S-P0-01 T03c F2 ownership-check: rid phải thuộc đúng owner (user +
-      // tenant∈membership) TRƯỚC resume. TenantMembershipGuard (:87) đã validate
-      // tenant của request ∈ membership, nhưng KHÔNG ràng buộc rid↔owner → user
-      // cùng tenant vẫn có thể resume rid của người khác nếu thiếu check này.
+      // tenant_id non-null) TRƯỚC resume. IntentPolicyGuard (:guard) chỉ tenant
+      // strict; KHÔNG ràng buộc rid↔owner → user cùng tenant vẫn có thể resume
+      // rid của người khác nếu thiếu check này.
       // Mismatch/cache-miss → 404 ĐỒNG NHẤT (không lộ tồn tại rid).
-      const owned = await this.intentService.assertOwnership(
-        rid,
-        userId,
-        req.user.tenant_ids,
-      );
+      const owned = await this.intentService.assertOwnership(rid, userId);
       if (!owned) {
         span.setAttribute('intent.ownership_denied', true);
         span.end();
@@ -133,6 +130,17 @@ export class IntentActionController {
             code: 'INVALID_INTENT',
             message: `request_id not found or expired: ${rid}`,
           },
+        });
+      }
+
+      // T03e (ADR-050 §4): policy enforce từ intent:cache SAU ownership, KHÔNG
+      // parse lại body. Customer-allowed (02/03/04/05) PASS; membership-required
+      // (01/07) đòi owner ∈ tenant_ids (ca membership đổi trong TTL 60s). → 403.
+      if (!this.intentService.isMembershipSatisfied(owned, req.user.tenant_ids)) {
+        span.setAttribute('intent.membership_denied', true);
+        span.end();
+        throw new ForbiddenException({
+          error: { code: 'TENANT_FORBIDDEN', message: 'Intent requires tenant membership' },
         });
       }
 

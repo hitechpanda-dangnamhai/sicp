@@ -67,6 +67,14 @@ export interface IntentCacheEntry {
   request_id: string;
   user_id: string | null;
   tenant_id: string | null;
+  /**
+   * S-P0-01 T03e (ADR-050 §4) — membership policy tính 1 lần lúc POST /intent
+   * (IntentPolicyGuard), ghi vào VALUE → /:rid/action enforce sau ownership-check
+   * KHÔNG parse lại body. `false` = customer-allowed (02/03/04/05); `true` =
+   * membership-required (01/07 + default-deny). Entry format cũ (T03c, thiếu
+   * field) → undefined → isMembershipSatisfied coi như required (fail-closed).
+   */
+  membership_required?: boolean;
 }
 
 @Injectable()
@@ -95,6 +103,7 @@ export class IntentService {
   async dispatch(
     body: PostIntentBody,
     ctx?: AiForwardContext,
+    membershipRequired = true,
   ): Promise<{ request_id: string; status: 'accepted' }> {
     const tracer = getTracer();
     const span = tracer.startSpan('gateway.intent.dispatch');
@@ -112,12 +121,15 @@ export class IntentService {
         // (S-P0-01 T03c F2). /stream + /:rid/action đọc VALUE này verify rid↔owner.
         // ctx.tenantId luôn có cho POST /intent (TenantMembershipGuard ép X-Tenant-Id);
         // ctx.userId = JWT-resolved. TTL 60s.
+        // S-P0-01 T03e (ADR-050 §4): membership_required (do IntentPolicyGuard
+        // tính từ tuple modality/hint) đi cùng owner → /:rid/action enforce sau.
         await this.redis.setWithTtl(
           `${INTENT_CACHE_PREFIX}${aiResponse.request_id}`,
           JSON.stringify({
             request_id: aiResponse.request_id,
             user_id: ctx?.userId ?? null,
             tenant_id: ctx?.tenantId ?? null,
+            membership_required: membershipRequired,
           }),
           INTENT_CACHE_TTL_SECONDS,
         );
@@ -171,10 +183,19 @@ export class IntentService {
 
   /**
    * F2 ownership gate (S-P0-01 T03c) — rid hợp lệ VÀ thuộc đúng owner.
-   * Trả ENTRY (truthy) chỉ khi: cache hit + `user_id` khớp + `tenant_id ∈
-   * membership`; ngược lại `null`. Dùng cho /stream (trước subscribe) +
-   * /:rid/action (trước resume). Caller trả 404 ĐỒNG NHẤT cache-miss khi null
-   * → KHÔNG lộ tồn tại rid của tenant khác.
+   * Trả ENTRY (truthy) chỉ khi: cache hit + `user_id` khớp + `tenant_id` non-null;
+   * ngược lại `null`. Dùng cho /stream (trước subscribe) + /:rid/action (trước
+   * resume). Caller trả 404 ĐỒNG NHẤT cache-miss khi null → KHÔNG lộ tồn tại rid
+   * của tenant/user khác.
+   *
+   * S-P0-01 T03e (ADR-050): TÁCH membership ra khỏi ownership. T03c cũ ép
+   * `tenant_id ∈ membership` ở đây — sai khi T03e mở intent cho customer
+   * (0-membership BY DESIGN, ADR-046). Ownership giờ = identity (user_id) +
+   * validity (tenant_id non-null, cần cho kênh SSE); membership-required check
+   * tách sang {@link isMembershipSatisfied} (gọi SAU, gated bởi
+   * `membership_required` từ cache — ADR-050 §4). Cô lập cross-user vẫn nguyên
+   * (user_id khớp); cross-tenant của customer là vô hại (rid bind user + chỉ
+   * owner truy cập, kết quả scope theo tenant header lúc POST).
    *
    * S-P0-01 T03b: trả entry (không phải boolean) để /stream dựng kênh SSE
    * tenant-scoped `sse:pubsub:{entry.tenant_id}:{rid}` từ tenant ĐÃ verify
@@ -188,12 +209,23 @@ export class IntentService {
   async assertOwnership(
     requestId: string,
     userId: string,
-    tenantIds: string[],
   ): Promise<IntentCacheEntry | null> {
     const entry = await this.lookup(requestId);
     if (!entry) return null;
     if (entry.user_id !== userId) return null;
-    if (entry.tenant_id == null || !tenantIds.includes(entry.tenant_id)) return null;
+    if (entry.tenant_id == null) return null;
     return entry;
+  }
+
+  /**
+   * S-P0-01 T03e (ADR-050 §4) — membership gate, gọi SAU assertOwnership.
+   * `membership_required === false` (customer-allowed 02/03/04/05) → luôn PASS
+   * (owner check đã đủ). Ngược lại (membership-required 01/07/default-deny HOẶC
+   * entry format cũ T03c thiếu field → undefined → FAIL-CLOSED) → owner PHẢI là
+   * thành viên `entry.tenant_id ∈ tenantIds`.
+   */
+  isMembershipSatisfied(entry: IntentCacheEntry, tenantIds: string[]): boolean {
+    if (entry.membership_required === false) return true;
+    return entry.tenant_id != null && tenantIds.includes(entry.tenant_id);
   }
 }
