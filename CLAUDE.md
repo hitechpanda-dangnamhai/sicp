@@ -37,6 +37,9 @@
 
 ## 6. COMMIT
 - Trong task: commit nháp tuỳ ý. ĐÓNG TASK: **squash về đúng 1 commit**.
+- ĐÓNG TASK xong (squash + META flip) → `git push origin main` NGAY.
+  Commit local-only = vô hình với PLAN/Meta (2 surface verify bằng origin);
+  push cadence = task cadence, gap local↔origin chỉ được tồn tại TRONG 1 task.
 - Format (commit-lint enforce):
   - `S-XX/T0N: <làm gì, 1 dòng>` — body: quyết định ngầm · ADR ref · `breaking: KHÔNG|CÓ + lý do`
   - `S-XX/HOTFIX-NN: <triệu chứng> — <nguyên nhân gốc>`
