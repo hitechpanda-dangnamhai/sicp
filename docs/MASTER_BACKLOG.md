@@ -52,7 +52,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
-| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ⬜ · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
+| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -109,6 +109,15 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 
 ## §4 Done gần đây
 
+- **2026-06-12 · S-P0-01/T03e** (`1406903`): Per-intent membership policy (ADR-050)
+  — IntentPolicyGuard thay TenantMembershipGuard tại POST /intent + /:rid/action;
+  classify (modality,hint) mirror dispatch main.py:326-398 → membership {01 import,
+  07 analyzing} / customer {02 buy,03 search,04 recommend,05 cart} + default-deny
+  tuple lạ; membership_required lưu intent:cache VALUE lúc POST, action enforce sau
+  ownership; assertOwnership tách membership (customer 0-membership truy cập rid của
+  chính họ). Divergence (text,'analyze')→403 fail-closed (ADR-050 amend §3). RECON:
+  FE intent/06 placeholder không qua POST /intent → payment ngoài matrix OK. Nợ e2e
+  customer storefront live → T05.
 - **2026-06-12 · S-P0-01/T04** (`8e4f066`): Vespa + analytics tenant scope —
   product.sd +tenant_id, 4 query tool ép inject_tenant_filter + index ghi tenant,
   matview filter app-level, backfill CLI PARTIAL-UPDATE (ADR-036), NN
