@@ -61,14 +61,19 @@ import psycopg
 import redis
 from psycopg.rows import dict_row
 
+from src.db import current_tenant, current_user, tenant_connection
 from src.observability import get_logger
 from src.tools import register
 
 _logger = get_logger(__name__)
 
 # Storage constants per D-S05-02 LAW.
-_CART_KEY_TEMPLATE = "cart:{user_id}"
-_CART_LOCK_KEY_TEMPLATE = "cart:{user_id}:lock"
+# S-P0-01 T03b (ADR-040 iv): re-key cart:{tenant}:{user} — cô lập cross-tenant
+# qua key namespace + RLS ở validate_stock. tenant/user lấy từ contextvar (header
+# X-Tenant-Id/X-User-Id) KHÔNG từ params (2-phase đóng — ADR-047). Cart format cũ
+# `cart:{user}` mồ côi (tiền lệ orphan), TTL 7d tự hết — KHÔNG migrate.
+_CART_KEY_TEMPLATE = "cart:{tenant_id}:{user_id}"
+_CART_LOCK_KEY_TEMPLATE = "cart:{tenant_id}:{user_id}:lock"
 _CART_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days
 _CART_LOCK_TTL_SECONDS = 5  # short — best-effort guard
 _MAX_QTY_PER_ITEM = 99  # per D-S05-02 LAW + UI cap
@@ -89,14 +94,6 @@ _FREE_GIFT_FIXTURE_PATH = os.getenv(
 # ---------------------------------------------------------------------------
 # Connection helpers (clone products.py pattern)
 # ---------------------------------------------------------------------------
-
-
-def _get_dsn() -> str:
-    """Return Postgres DSN from env. Clone of products.py:_get_dsn."""
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        raise RuntimeError("DATABASE_URL env var not set")
-    return dsn
 
 
 def _get_redis_url() -> str:
@@ -122,11 +119,11 @@ def _get_redis_client() -> redis.Redis:
 
 
 def _cart_key(user_id: str) -> str:
-    return _CART_KEY_TEMPLATE.format(user_id=user_id)
+    return _CART_KEY_TEMPLATE.format(tenant_id=current_tenant(), user_id=user_id)
 
 
 def _cart_lock_key(user_id: str) -> str:
-    return _CART_LOCK_KEY_TEMPLATE.format(user_id=user_id)
+    return _CART_LOCK_KEY_TEMPLATE.format(tenant_id=current_tenant(), user_id=user_id)
 
 
 def _now_iso() -> str:
@@ -399,7 +396,7 @@ def get(params: dict[str, Any]) -> dict[str, Any]:
     Always returns 200 + valid Cart shape per CartSchema. Empty-cart user
     returns the empty Cart shape (NEVER None or 404).
     """
-    user_id = params.get("user_id")
+    user_id = current_user()  # S-P0-01 T03b: identity từ header X-User-Id (2-phase), KHÔNG params
     if not isinstance(user_id, str) or not user_id:
         raise ValueError("'user_id' required (UUID or session id string)")
 
@@ -408,7 +405,7 @@ def get(params: dict[str, Any]) -> dict[str, Any]:
 
     if cart["items"]:
         # Re-validate stock + recompute totals on every read per A4 LAW.
-        with psycopg.connect(_get_dsn()) as conn:
+        with tenant_connection(current_tenant()) as conn:
             cart["items"] = _validate_stock_inline(conn, cart["items"])
         cart["totals"] = _compute_totals(cart["items"], cart.get("promo"))
         cart["free_gift_hint"] = _compute_free_gift_hint(
@@ -441,7 +438,7 @@ def update_qty(params: dict[str, Any]) -> dict[str, Any]:
 
     Returns the fresh Cart shape with totals recomputed.
     """
-    user_id = params.get("user_id")
+    user_id = current_user()  # S-P0-01 T03b: identity từ header X-User-Id (2-phase), KHÔNG params
     product_id = params.get("product_id")
     qty_raw = params.get("qty")
     snapshot_in = params.get("snapshot")
@@ -495,7 +492,7 @@ def update_qty(params: dict[str, Any]) -> dict[str, Any]:
         )
     else:
         # Upsert (ADD) path — need full item shape.
-        with psycopg.connect(_get_dsn()) as conn:
+        with tenant_connection(current_tenant()) as conn:
             pg_snap = _fetch_product_snapshot(conn, product_id)
         if not pg_snap:
             raise ValueError(
@@ -540,7 +537,7 @@ def update_qty(params: dict[str, Any]) -> dict[str, Any]:
         )
 
     # Recompute totals on every mutation.
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         cart["items"] = _validate_stock_inline(conn, cart["items"])
     cart["totals"] = _compute_totals(cart["items"], cart.get("promo"))
     cart["free_gift_hint"] = _compute_free_gift_hint(cart["totals"]["subtotal"])
@@ -555,7 +552,7 @@ def remove(params: dict[str, Any]) -> dict[str, Any]:
     Sugar over update_qty with qty=0. Idempotent — removing missing item
     is a no-op (returns current cart unchanged).
     """
-    user_id = params.get("user_id")
+    user_id = current_user()  # S-P0-01 T03b: identity từ header X-User-Id (2-phase), KHÔNG params
     product_id = params.get("product_id")
     if not isinstance(user_id, str) or not user_id:
         raise ValueError("'user_id' required")
@@ -571,7 +568,7 @@ def clear(params: dict[str, Any]) -> dict[str, Any]:
     cart.get returns empty cart shape from _empty_cart helper. Idempotent —
     deleting absent key returns same {cleared: true} response.
     """
-    user_id = params.get("user_id")
+    user_id = current_user()  # S-P0-01 T03b: identity từ header X-User-Id (2-phase), KHÔNG params
     if not isinstance(user_id, str) or not user_id:
         raise ValueError("'user_id' required")
 
@@ -593,7 +590,7 @@ def validate_stock(params: dict[str, Any]) -> dict[str, Any]:
     Returns updates list (NOT the cart) so caller can map updates → its
     own state machine. Empty list when cart is empty.
     """
-    user_id = params.get("user_id")
+    user_id = current_user()  # S-P0-01 T03b: identity từ header X-User-Id (2-phase), KHÔNG params
     if not isinstance(user_id, str) or not user_id:
         raise ValueError("'user_id' required")
 
@@ -602,7 +599,7 @@ def validate_stock(params: dict[str, Any]) -> dict[str, Any]:
     if not cart["items"]:
         return {"updates": []}
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         items = _validate_stock_inline(conn, cart["items"])
 
     updates = [
@@ -639,7 +636,7 @@ def apply_promo(params: dict[str, Any]) -> dict[str, Any]:
     Edge case: applying same promo twice is idempotent (overwrites with same
     state, no error).
     """
-    user_id = params.get("user_id")
+    user_id = current_user()  # S-P0-01 T03b: identity từ header X-User-Id (2-phase), KHÔNG params
     code_raw = params.get("code")
     if not isinstance(user_id, str) or not user_id:
         raise ValueError("'user_id' required")
@@ -681,7 +678,7 @@ def apply_promo(params: dict[str, Any]) -> dict[str, Any]:
     }
     # Pre-compute discount via _compute_totals dry-run.
     if cart["items"]:
-        with psycopg.connect(_get_dsn()) as conn:
+        with tenant_connection(current_tenant()) as conn:
             cart["items"] = _validate_stock_inline(conn, cart["items"])
     new_totals = _compute_totals(cart["items"], promo_state)
     promo_state["discount_amount"] = int(new_totals["discount"])
@@ -702,7 +699,7 @@ def apply_promo(params: dict[str, Any]) -> dict[str, Any]:
 
 def remove_promo(params: dict[str, Any]) -> dict[str, Any]:
     """cart.remove_promo {user_id} → Cart with promo=None + totals recomputed."""
-    user_id = params.get("user_id")
+    user_id = current_user()  # S-P0-01 T03b: identity từ header X-User-Id (2-phase), KHÔNG params
     if not isinstance(user_id, str) or not user_id:
         raise ValueError("'user_id' required")
 
@@ -715,7 +712,7 @@ def remove_promo(params: dict[str, Any]) -> dict[str, Any]:
 
     cart["promo"] = None
     if cart["items"]:
-        with psycopg.connect(_get_dsn()) as conn:
+        with tenant_connection(current_tenant()) as conn:
             cart["items"] = _validate_stock_inline(conn, cart["items"])
     cart["totals"] = _compute_totals(cart["items"], None)
     cart["free_gift_hint"] = _compute_free_gift_hint(cart["totals"]["subtotal"])

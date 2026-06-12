@@ -2,7 +2,8 @@
  * apps/gateway/src/cart/cart.service.spec.ts
  *
  * S-P0-01 T02c — CartService raw-fetch client forward identity header
- * X-User-Id/X-Tenant-Id qua 7 cart.* tool; GIỮ user_id trong params (2-phase).
+ * X-User-Id/X-Tenant-Id qua 7 cart.* tool. T03b: 2-phase ĐÓNG — user_id KHÔNG
+ * còn trong params (MCP cart đọc current_user từ X-User-Id header).
  */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -36,8 +37,8 @@ describe('CartService identity headers (T02c)', () => {
     const { headers, body } = lastFetch(fetchSpy);
     expect(headers['x-user-id']).toBe('u-1');
     expect(headers['x-tenant-id']).toBe('t-1');
-    // 2-phase: user_id GIỮ trong params song song.
-    expect(body.params.user_id).toBe('u-1');
+    // T03b: 2-phase ĐÓNG — user_id KHÔNG còn trong params (MCP đọc X-User-Id header).
+    expect(body.params.user_id).toBeUndefined();
     expect(body.method).toBe('cart.get');
   });
 

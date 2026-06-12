@@ -102,9 +102,6 @@ from .tools.redis_publisher import RedisPublisher
 #   + explicit adelete_thread(rid) at final node (fast-path cleanup).
 _SAVER_TTL_CONFIG = {"default_ttl": 30, "refresh_on_read": True}
 
-# Redis pub/sub channel template per D-S04-13 LAW Option Z + 02_DATA_MODEL.md §5.
-_SSE_PUBSUB_CHANNEL_TEMPLATE = "sse:pubsub:{request_id}"
-
 # SSE heartbeat interval — keeps connection alive during interrupt user-think pauses
 # (5-10s typical) per D-S04-13 Option Z architecture note. 15s < Gateway 60s timeout.
 _SSE_HEARTBEAT_S = 15.0
@@ -272,11 +269,11 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                     # dev mode in main.py _sse_subscribe_stream may pick up
                     # later events, and FE will at least see final/error).
                     pub_client = await publisher._ensure_client()
-                    # S-P0-01 T03a: gate poll kênh CŨ `sse:pubsub:{rid}` CÓ CHỦ Ý —
-                    # consumer production là Gateway, vẫn subscribe kênh cũ tới T03b.
-                    # Dual-publish emit cả 2 kênh nên không mất event. (Dev direct-call
-                    # subscribe kênh mới → gate 3s timeout rồi publish-anyway, best-effort.)
-                    channel = f"sse:pubsub:{request_id}"
+                    # S-P0-01 T03b: gate poll kênh tenant-scoped `sse:pubsub:{tenant}:{rid}`
+                    # — KHỚP kênh publisher publish + Gateway subscribe (CHỈ THỊ i; nợ
+                    # T03a chuyển đồng thời Gateway switch). tenant None (dev direct-call)
+                    # → _scoped_id trả `{rid}` = kênh cũ.
+                    channel = f"sse:pubsub:{_scoped_id(tenant_id, request_id)}"
                     _gate_started_at = asyncio.get_event_loop().time()
                     _gate_timeout_s = 3.0
                     while True:

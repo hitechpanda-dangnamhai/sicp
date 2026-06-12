@@ -210,12 +210,13 @@ export class CartService {
   // 7 tool wrappers (1:1 mapping to MCP cart.* tools)
   // -----------------------------------------------------------------------
 
-  // S-P0-01 T03d — mỗi wrapper nhận `tenantId` non-null (cart.controller
-  // resolve() STRICT, 400 khi thiếu header) → identity header X-User-Id/X-Tenant-Id.
-  // GIỮ `user_id` trong params song song (2-phase, xoá ở T03b).
+  // S-P0-01 T03b — đóng 2-phase: gỡ `user_id` khỏi params; MCP cart đọc identity
+  // từ header X-User-Id (current_user) — `{ userId, tenantId }` (identity arg 3)
+  // build X-User-Id/X-Tenant-Id qua buildMcpIdentityHeaders. user_id trong params
+  // = dead-param đã xoá (ADR-047 2-phase đóng).
 
   async get(userId: string, tenantId: string): Promise<unknown> {
-    return this.callMcp('cart.get', { user_id: userId }, { userId, tenantId });
+    return this.callMcp('cart.get', {}, { userId, tenantId });
   }
 
   async addItem(
@@ -226,7 +227,6 @@ export class CartService {
     snapshot?: Record<string, unknown>,
   ): Promise<unknown> {
     const params: Record<string, unknown> = {
-      user_id: userId,
       product_id: productId,
       qty,
     };
@@ -245,7 +245,6 @@ export class CartService {
     return this.callMcp(
       'cart.update_qty',
       {
-        user_id: userId,
         product_id: productId,
         qty,
       },
@@ -257,7 +256,6 @@ export class CartService {
     return this.callMcp(
       'cart.remove',
       {
-        user_id: userId,
         product_id: productId,
       },
       { userId, tenantId },
@@ -265,14 +263,14 @@ export class CartService {
   }
 
   async clear(userId: string, tenantId: string): Promise<unknown> {
-    return this.callMcp('cart.clear', { user_id: userId }, { userId, tenantId });
+    return this.callMcp('cart.clear', {}, { userId, tenantId });
   }
 
   async applyPromo(userId: string, tenantId: string, code: string): Promise<unknown> {
-    return this.callMcp('cart.apply_promo', { user_id: userId, code }, { userId, tenantId });
+    return this.callMcp('cart.apply_promo', { code }, { userId, tenantId });
   }
 
   async removePromo(userId: string, tenantId: string): Promise<unknown> {
-    return this.callMcp('cart.remove_promo', { user_id: userId }, { userId, tenantId });
+    return this.callMcp('cart.remove_promo', {}, { userId, tenantId });
   }
 }

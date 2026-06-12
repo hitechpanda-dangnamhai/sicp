@@ -24,24 +24,16 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
-import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from src.db import current_tenant, tenant_connection
 from src.observability import get_logger
 from src.tools import register
 
 _logger = get_logger(__name__)
-
-
-def _get_dsn() -> str:
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        raise RuntimeError("DATABASE_URL env var not set")
-    return dsn
 
 
 # Valid action_type values per PHASE_03 §F (5 variants — SUGGEST_PRICE,
@@ -124,7 +116,7 @@ def create(params: dict[str, Any]) -> dict[str, Any]:
     if expires_at is not None and not isinstance(expires_at, str):
         raise ValueError("'expires_at' must be string (ISO 8601) or null")
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -181,7 +173,7 @@ def list_pending(params: dict[str, Any]) -> list[dict[str, Any]]:
     if limit < 1 or limit > 200:
         raise ValueError("'limit' must be in [1, 200]")
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
@@ -232,7 +224,7 @@ def update_status(params: dict[str, Any]) -> dict[str, Any]:
     if applied_value is not None and not isinstance(applied_value, dict):
         raise ValueError("'applied_value' must be object or null")
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor() as cur:
             # Idempotent UPDATE: only update if currently pending.
             # If applied_value provided, merge into suggestion JSONB via ||

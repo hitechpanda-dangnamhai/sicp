@@ -14,6 +14,7 @@ DATABASE_URL còn superuser tới khi cutover.
 
 from __future__ import annotations
 
+import contextvars
 import os
 import re
 from collections.abc import Iterator
@@ -26,6 +27,56 @@ import psycopg
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
 )
+
+# =============================================================================
+# S-P0-01 T03b — request identity contextvars (ADR-047 enforcement)
+# =============================================================================
+# server.py `rpc()` set 2 contextvar này từ header X-Tenant-Id / X-User-Id SAU
+# traceparent extract, TRƯỚC dispatch; reset trong finally. Tool handler đọc qua
+# current_tenant()/current_user() — KHÔNG đổi chữ ký dispatch(method, params)
+# (RPC envelope giữ nguyên). Flask gọi handler ĐỒNG BỘ trong cùng thread/context
+# của rpc() → contextvar nhìn thấy được (KHÔNG spawn thread per-tool; tool Gemini
+# dùng ThreadPoolExecutor KHÔNG đọc tenant nên không vướng propagation).
+
+_tenant_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "icp_tenant_id", default=None
+)
+_user_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "icp_user_id", default=None
+)
+
+
+def current_tenant() -> str:
+    """Tenant đang active cho request (rpc() set từ X-Tenant-Id).
+
+    Fail-closed (ADR-047 (b)): chưa set → raise. rpc() đã chặn RPC thiếu header
+    TRƯỚC dispatch nên tool không bao giờ thấy None; đây là lưới phòng thủ cuối.
+    """
+    tid = _tenant_ctx.get()
+    if tid is None:
+        raise PermissionError("tenant context not set (X-Tenant-Id required)")
+    return tid
+
+
+def current_user() -> str | None:
+    """User đang active (X-User-Id) — None khi call tenant-only (vd merchant op
+    không gắn user cụ thể). Tool đòi user (vd cart) tự validate non-None."""
+    return _user_ctx.get()
+
+
+def set_request_identity(
+    tenant_id: str | None, user_id: str | None
+) -> tuple[contextvars.Token, contextvars.Token]:
+    """Set contextvar identity; trả tokens cho reset_request_identity (finally)."""
+    return (_tenant_ctx.set(tenant_id), _user_ctx.set(user_id))
+
+
+def reset_request_identity(
+    tokens: tuple[contextvars.Token, contextvars.Token],
+) -> None:
+    """Reset contextvar về giá trị trước request (chống rò qua thread tái dùng)."""
+    _tenant_ctx.reset(tokens[0])
+    _user_ctx.reset(tokens[1])
 
 
 def _get_dsn() -> str:

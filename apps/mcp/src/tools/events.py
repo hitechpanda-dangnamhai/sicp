@@ -34,26 +34,15 @@
 
 from __future__ import annotations
 
-import json
-import os
 from typing import Any
 
-import psycopg
 from psycopg.types.json import Jsonb
 
+from src.db import current_tenant, tenant_connection
 from src.observability import get_logger
 from src.tools import register
 
 _logger = get_logger(__name__)
-
-
-def _get_dsn() -> str:
-    """Resolve Postgres DSN from DATABASE_URL env (verified .env.example Phiên 25)."""
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        # Should never hit in container (env_file: ../.env wires this).
-        raise RuntimeError("DATABASE_URL env var not set")
-    return dsn
 
 
 def append(params: dict[str, Any]) -> dict[str, str]:
@@ -107,7 +96,7 @@ def append(params: dict[str, Any]) -> dict[str, str]:
     # instrumentation-psycopg (entry-point loaded by Dockerfile CMD wrapper).
     # The INSERT span becomes child of "mcp.tool.events.append" span from
     # tools/__init__.py dispatch() wrap → AC-10 verified.
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 """

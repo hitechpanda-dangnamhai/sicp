@@ -171,23 +171,29 @@ export class IntentService {
 
   /**
    * F2 ownership gate (S-P0-01 T03c) — rid hợp lệ VÀ thuộc đúng owner.
-   * True chỉ khi: cache hit + `user_id` khớp + `tenant_id ∈ membership`.
-   * Dùng cho /stream (trước subscribe) + /:rid/action (trước resume). Caller
-   * trả 404 ĐỒNG NHẤT cache-miss khi false → KHÔNG lộ tồn tại rid của tenant khác.
+   * Trả ENTRY (truthy) chỉ khi: cache hit + `user_id` khớp + `tenant_id ∈
+   * membership`; ngược lại `null`. Dùng cho /stream (trước subscribe) +
+   * /:rid/action (trước resume). Caller trả 404 ĐỒNG NHẤT cache-miss khi null
+   * → KHÔNG lộ tồn tại rid của tenant khác.
+   *
+   * S-P0-01 T03b: trả entry (không phải boolean) để /stream dựng kênh SSE
+   * tenant-scoped `sse:pubsub:{entry.tenant_id}:{rid}` từ tenant ĐÃ verify
+   * ownership — KHỚP kênh AI publish (resolve cùng lúc POST /intent). KHÔNG lấy
+   * tenant từ JWT (JWT chỉ có tenant_ids[], không active tenant — ADR-046).
    *
    * Orphan window: rid in-flight lúc deploy có VALUE format cũ `{request_id}`
-   * (thiếu owner) → user_id=null → false → 404 tới khi TTL 60s tự hết (tiền lệ
+   * (thiếu owner) → user_id=null → null → 404 tới khi TTL 60s tự hết (tiền lệ
    * cart re-key; KHÔNG migrate — ADR-040 iv).
    */
   async assertOwnership(
     requestId: string,
     userId: string,
     tenantIds: string[],
-  ): Promise<boolean> {
+  ): Promise<IntentCacheEntry | null> {
     const entry = await this.lookup(requestId);
-    if (!entry) return false;
-    if (entry.user_id !== userId) return false;
-    if (entry.tenant_id == null || !tenantIds.includes(entry.tenant_id)) return false;
-    return true;
+    if (!entry) return null;
+    if (entry.user_id !== userId) return null;
+    if (entry.tenant_id == null || !tenantIds.includes(entry.tenant_id)) return null;
+    return entry;
   }
 }

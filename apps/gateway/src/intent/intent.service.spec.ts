@@ -32,34 +32,37 @@ function makeService(getImpl: () => Promise<string | null>) {
 }
 
 describe('IntentService.assertOwnership (T03c F2)', () => {
-  it('true khi cache hit + user khớp + tenant ∈ membership', async () => {
+  it('trả entry khi cache hit + user khớp + tenant ∈ membership (T03b: /stream dùng tenant_id dựng kênh)', async () => {
     const { svc } = makeService(async () => entry());
-    expect(await svc.assertOwnership(RID, USER, [TENANT, 't-9'])).toBe(true);
+    expect(await svc.assertOwnership(RID, USER, [TENANT, 't-9'])).toMatchObject({
+      user_id: USER,
+      tenant_id: TENANT,
+    });
   });
 
   it('false khi cache-miss (rid không tồn tại / hết hạn)', async () => {
     const { svc } = makeService(async () => null);
-    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBe(false);
+    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBeNull();
   });
 
   it('false khi user khác (cùng tenant) — rid của người khác', async () => {
     const { svc } = makeService(async () => entry({ user_id: 'u-other' }));
-    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBe(false);
+    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBeNull();
   });
 
   it('false khi tenant ∉ membership (cross-tenant)', async () => {
     const { svc } = makeService(async () => entry({ tenant_id: 't-other' }));
-    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBe(false);
+    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBeNull();
   });
 
   it('false khi VALUE format cũ thiếu owner (orphan window 60s)', async () => {
     const { svc } = makeService(async () => JSON.stringify({ request_id: RID }));
-    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBe(false);
+    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBeNull();
   });
 
   it('false khi VALUE corrupt JSON', async () => {
     const { svc } = makeService(async () => '{not-json');
-    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBe(false);
+    expect(await svc.assertOwnership(RID, USER, [TENANT])).toBeNull();
   });
 });
 

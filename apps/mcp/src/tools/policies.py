@@ -60,24 +60,16 @@
 
 from __future__ import annotations
 
-import os
 import re
 from typing import Any
 
-import psycopg
 from psycopg.rows import dict_row
 
+from src.db import current_tenant, tenant_connection
 from src.observability import get_logger
 from src.tools import register
 
 _logger = get_logger(__name__)
-
-
-def _get_dsn() -> str:
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        raise RuntimeError("DATABASE_URL env var not set")
-    return dsn
 
 
 # ---------------------------------------------------------------------------
@@ -294,7 +286,7 @@ def find_matching(params: dict[str, Any]) -> list[dict[str, Any]]:
         raise ValueError("'context' param required (object)")
 
     # Load enabled policies for this trigger from DB.
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """

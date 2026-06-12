@@ -42,24 +42,16 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
-import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from src.db import current_tenant, tenant_connection
 from src.observability import get_logger
 from src.tools import register
 
 _logger = get_logger(__name__)
-
-
-def _get_dsn() -> str:
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        raise RuntimeError("DATABASE_URL env var not set")
-    return dsn
 
 
 def _row_to_product(row: dict[str, Any]) -> dict[str, Any]:
@@ -93,7 +85,7 @@ def get(params: dict[str, Any]) -> dict[str, Any] | None:
     if not isinstance(product_id, str):
         raise ValueError("'id' param required (string UUID)")
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 """
@@ -193,7 +185,7 @@ def create(params: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("'idempotency_key' must be string or null")
 
     # --- Transactional INSERT products + events outbox row ---
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             # Idempotency pre-check guard per Q-4 Path B pattern.
             cur.execute(
@@ -390,7 +382,7 @@ def update(params: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("'status' must be one of: active, inactive, archived")
 
     # --- Transactional ownership check + UPDATE + outbox event ---
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             # Defense-in-depth: re-verify ownership inside txn (Gateway already
             # checked but race conditions / future direct-MCP callers might skip).

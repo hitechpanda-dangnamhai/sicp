@@ -218,6 +218,7 @@ export class IntentController {
         req.user.tenant_ids,
       );
       if (!owned) {
+        // (null = cache-miss / cross-owner / orphan format cũ)
         span.setAttribute('intent.ownership_denied', true);
         span.end();
         throw new NotFoundException({
@@ -256,8 +257,14 @@ export class IntentController {
       //    required because a connection in subscriber mode cannot issue
       //    other commands.
       const subscriber = this.redis.raw().duplicate();
-      const channel = `${SSE_PUBSUB_CHANNEL_PREFIX}${requestId}`;
+      // S-P0-01 T03b: kênh SSE tenant-scoped `sse:pubsub:{tenant}:{rid}` —
+      // tenant = owned.tenant_id (intent:cache, ĐÃ verify ownership T03c), KHỚP
+      // kênh AI publish (gỡ dual-publish). KHÔNG lấy tenant từ JWT (ADR-046).
+      // assertOwnership trả null nếu tenant_id null → owned.tenant_id non-null tại đây.
+      const tenantId = owned.tenant_id as string;
+      const channel = `${SSE_PUBSUB_CHANNEL_PREFIX}${tenantId}:${requestId}`;
       span.setAttribute('redis.channel', channel);
+      span.setAttribute('intent.tenant_id', tenantId);
 
       let cleanupReason: 'final_event' | 'client_close' | 'timeout' = 'client_close';
       let idleTimeoutId: NodeJS.Timeout | null = null;

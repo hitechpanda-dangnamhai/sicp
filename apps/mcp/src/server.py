@@ -32,12 +32,19 @@ from opentelemetry import trace
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from src import __version__
+from src.db import reset_request_identity, set_request_identity
 from src.observability import get_logger, init_otel, setup_logger
 from src.tools import (
     JSONRPC_INVALID_REQUEST,
     JSONRPC_PARSE_ERROR,
     dispatch,
 )
+
+# S-P0-01 T03b (ADR-047 note 2026-06-12): WHITELIST tool tenant-optional = ∅.
+# MỌI RPC (kể cả system.list_tools) PHẢI mang X-Tenant-Id — giữ invariant phổ
+# quát + attribution usage metering (ADR-044). Entry tương lai PHẢI qua test đỏ
+# + câu WHY tường minh. test_t03b assert frozenset này RỖNG.
+_TENANT_OPTIONAL_WHITELIST: frozenset[str] = frozenset()
 
 
 def create_app() -> Flask:
@@ -123,8 +130,34 @@ def create_app() -> Flask:
             span.set_attribute("rpc.method", method)
             log.info("rpc.received", method=method, request_id=req_id)
 
+            # --- S-P0-01 T03b: tenant fail-closed + identity contextvar ---
+            # Header case-insensitive (werkzeug). WHITELIST = ∅ → mọi method đòi
+            # X-Tenant-Id. Thiếu → reject TRƯỚC dispatch (ADR-047 (b), KHÔNG
+            # fail-open — tenant boundary ADR-040). X-User-Id optional (tool đòi
+            # user tự validate). Set contextvar → dispatch → reset (finally).
+            tenant_id = request.headers.get("X-Tenant-Id")
+            user_id = request.headers.get("X-User-Id")
+            if not tenant_id and method not in _TENANT_OPTIONAL_WHITELIST:
+                log.warning("rpc.tenant_missing", method=method, request_id=req_id)
+                span.set_attribute("rpc.status", "tenant_missing")
+                return jsonify(
+                    {
+                        "jsonrpc": "2.0",
+                        "error": {
+                            "code": JSONRPC_INVALID_REQUEST,
+                            "message": "Tenant context required",
+                            "data": {"detail": "X-Tenant-Id header missing"},
+                        },
+                        "id": req_id,
+                    }
+                ), 400
+
             # --- Dispatch (tools/__init__.py wraps in mcp.tool.<name> span) ---
-            result, error = dispatch(method, params)
+            tokens = set_request_identity(tenant_id, user_id)
+            try:
+                result, error = dispatch(method, params)
+            finally:
+                reset_request_identity(tokens)
 
             if error is not None:
                 span.set_attribute("rpc.status", "error")

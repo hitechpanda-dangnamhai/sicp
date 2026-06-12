@@ -40,7 +40,7 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 `sse.pubsub.subscribed` · `sse.pubsub.forwarded` · `sse.pubsub.unsubscribed` · `sse.pubsub.subscribe_failed`. 🟡 `sse.pubsub.published` (AI-side) chưa thấy log.
 
 ### MCP RPC layer (mcp) ✅ — RECONCILE
-`rpc.received` · `rpc.parse_error` · `tool.method_not_found` · `tool.invalid_params` · `tool.internal_error` · `tool.duplicate_registration` · `policies.unknown_op`.
+`rpc.received` · `rpc.parse_error` · `rpc.tenant_missing` · `tool.method_not_found` · `tool.invalid_params` · `tool.internal_error` · `tool.duplicate_registration` · `policies.unknown_op`.
 - `mcp.error` = **ai** (emit trong `searching_by_text` khi MCP client lỗi).
 
 ### LLM (ai) ✅ — RECONCILE

@@ -96,7 +96,7 @@ def test_call_without_tenant_omits_header_outbound() -> None:
     assert "X-Tenant-Id" not in fake.captured_headers
 
 
-# --- RedisPublisher dual-publish ---------------------------------------------
+# --- RedisPublisher tenant-scoped publish (T03b: gỡ dual-publish) ------------
 
 class _FakeRedis:
     def __init__(self) -> None:
@@ -107,18 +107,19 @@ class _FakeRedis:
         return 1
 
 
-def test_dual_publish_emits_both_channels_when_tenant() -> None:
+def test_publish_tenant_channel_only_when_tenant() -> None:
+    # T03b: CHỈ kênh tenant-scoped (gỡ kênh cũ của T03a — Gateway switch subscribe).
     pub = RedisPublisher("redis://x", tenant_id=TENANT)
     fake = _FakeRedis()
     pub._client = fake  # bypass real aioredis
     asyncio.run(pub.publish_sse("rid-1", "understanding", {"a": 1}))
     channels = [c for c, _ in fake.published]
-    assert "sse:pubsub:rid-1" in channels  # kênh cũ — Gateway hiện subscribe
-    assert f"sse:pubsub:{TENANT}:rid-1" in channels  # kênh mới T03a
-    assert len(channels) == 2
+    assert channels == [f"sse:pubsub:{TENANT}:rid-1"]
+    assert "sse:pubsub:rid-1" not in channels  # kênh cũ ĐÃ GỠ
 
 
-def test_single_publish_old_channel_only_when_no_tenant() -> None:
+def test_publish_old_channel_fallback_when_no_tenant() -> None:
+    # tenant None (dev direct-call) → fallback kênh cũ `sse:pubsub:{rid}`.
     pub = RedisPublisher("redis://x", tenant_id=None)
     fake = _FakeRedis()
     pub._client = fake
@@ -127,8 +128,8 @@ def test_single_publish_old_channel_only_when_no_tenant() -> None:
     assert channels == ["sse:pubsub:rid-2"]
 
 
-def test_dual_publish_returns_old_channel_subscriber_count() -> None:
-    # Contract: return = subscriber_count kênh CŨ (caller hiện đọc số này).
+def test_publish_returns_tenant_channel_subscriber_count() -> None:
+    # T03b: return = subscriber_count kênh tenant-scoped (kênh duy nhất publish).
     pub = RedisPublisher("redis://x", tenant_id=TENANT)
     pub._client = _FakeRedis()
     n = asyncio.run(pub.publish_sse("rid-3", "products", {}))

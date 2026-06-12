@@ -151,7 +151,7 @@ async def _node_clear_confirm_prompt(
 
     try:
         cart = await mcp_client.call(
-            "cart.get", {"user_id": user_id}, **identity_kwargs(state)
+            "cart.get", {}, **identity_kwargs(state)
         )
     except McpError as e:
         _logger.warning(
@@ -220,7 +220,7 @@ async def _node_clear_execute(
     if choice == "confirm_clear":
         try:
             await mcp_client.call(
-                "cart.clear", {"user_id": user_id}, **identity_kwargs(state)
+                "cart.clear", {}, **identity_kwargs(state)
             )
             _logger.info("cart.cleared_via_graph", request_id=rid, user_id=user_id)
         except McpError as e:
@@ -258,7 +258,7 @@ async def _node_cart_view(
 
     try:
         cart = await mcp_client.call(
-            "cart.get", {"user_id": user_id}, **identity_kwargs(state)
+            "cart.get", {}, **identity_kwargs(state)
         )
     except McpError as e:
         _logger.error(
@@ -581,7 +581,7 @@ async def _node_stock_resolve(
         if choice == "resolve_remove":
             await mcp_client.call(
                 "cart.remove",
-                {"user_id": user_id, "product_id": product_id},
+                {"product_id": product_id},
                 **identity_kwargs(state),
             )
             _logger.info(
@@ -593,7 +593,7 @@ async def _node_stock_resolve(
             # 1) Remove out-of-stock item.
             await mcp_client.call(
                 "cart.remove",
-                {"user_id": user_id, "product_id": product_id},
+                {"product_id": product_id},
                 **identity_kwargs(state),
             )
             # 2) Add replacement product (uses qty=1 default; FE may
@@ -602,7 +602,6 @@ async def _node_stock_resolve(
                 await mcp_client.call(
                     "cart.update_qty",
                     {
-                        "user_id": user_id,
                         "product_id": replacement_id,
                         "qty": 1,
                     },

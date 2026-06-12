@@ -36,24 +36,16 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
-import psycopg
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
+from src.db import current_tenant, tenant_connection
 from src.observability import get_logger
 from src.tools import register
 
 _logger = get_logger(__name__)
-
-
-def _get_dsn() -> str:
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        raise RuntimeError("DATABASE_URL env var not set")
-    return dsn
 
 
 def _empty_result(matched_via: str = "no_match") -> dict[str, Any]:
@@ -115,7 +107,7 @@ def price_range(params: dict[str, Any]) -> dict[str, Any]:
     # — additional attrs like type/color/variant are noise that prevent match.
     attrs_match = {k: str(v) for k, v in attributes.items() if k in ("brand", "size") and v}
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             # Tier 1: specific match (category + attributes @> filter)
             if attrs_match:

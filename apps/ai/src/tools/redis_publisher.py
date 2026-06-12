@@ -99,11 +99,10 @@ class RedisPublisher:
 
     def __init__(self, redis_url: str, tenant_id: str | None = None) -> None:
         self._redis_url = redis_url
-        # S-P0-01 T03a (ADR-048 amend c + ADR-040 iv): dual-publish — kênh cũ
-        # `sse:pubsub:{rid}` (Gateway hiện subscribe) LUÔN giữ + kênh mới
-        # `sse:pubsub:{tenant}:{rid}` khi có tenant. Gateway switch sang kênh mới
-        # ở T03b → KHÔNG cần deploy atomic 2 service. tenant None (anonymous/dev)
-        # → chỉ kênh cũ.
+        # S-P0-01 T03b (ADR-048 amend c + ADR-040 iv): publish CHỈ kênh
+        # tenant-scoped `sse:pubsub:{tenant}:{rid}` (Gateway switch subscribe sang
+        # kênh này — gỡ dual-publish kênh cũ của T03a). tenant None (dev
+        # direct-call) → fallback kênh cũ `sse:pubsub:{rid}`.
         self._tenant_id = tenant_id
         self._client: aioredis.Redis | None = None
 
@@ -132,35 +131,25 @@ class RedisPublisher:
             proceeds but events are dropped).
         """
         client = await self._ensure_client()
-        channel = _CHANNEL_TEMPLATE.format(request_id=request_id)
+        # S-P0-01 T03b: publish CHỈ kênh tenant-scoped `sse:pubsub:{tenant}:{rid}`
+        # — Gateway switch subscribe sang kênh này (CHỈ THỊ i). Gỡ dual-publish
+        # kênh cũ `sse:pubsub:{rid}` của T03a. tenant None (dev direct-call, không
+        # qua Gateway) → fallback kênh cũ để smoke test vẫn chạy.
+        if self._tenant_id:
+            channel = f"sse:pubsub:{self._tenant_id}:{request_id}"
+        else:
+            channel = _CHANNEL_TEMPLATE.format(request_id=request_id)
         block = _format_sse_block(event_type, data)
 
         with _tracer.start_as_current_span("sse.published") as span:
             span.set_attribute("sse.event_type", event_type)
             span.set_attribute("sse.channel", channel)
             span.set_attribute("sse.request_id", request_id)
+            if self._tenant_id:
+                span.set_attribute("sse.tenant_id", self._tenant_id)
 
             subscriber_count = await client.publish(channel, block)
             span.set_attribute("sse.subscriber_count", subscriber_count)
-
-            # S-P0-01 T03a: dual-publish kênh tenant-scoped (chỉ khi có tenant).
-            # Return = subscriber_count kênh CŨ (giữ contract caller; Gateway hiện
-            # subscribe kênh cũ). Kênh mới log riêng để verify rollout.
-            if self._tenant_id:
-                tenant_channel = (
-                    f"sse:pubsub:{self._tenant_id}:{request_id}"
-                )
-                tenant_subs = await client.publish(tenant_channel, block)
-                span.set_attribute("sse.tenant_channel", tenant_channel)
-                span.set_attribute("sse.tenant_subscriber_count", tenant_subs)
-                _logger.info(
-                    "sse.published",
-                    request_id=request_id,
-                    event_type=event_type,
-                    channel=tenant_channel,
-                    subscriber_count=int(tenant_subs),
-                    tenant_id=self._tenant_id,
-                )
 
             _logger.info(
                 "sse.published",
@@ -168,6 +157,7 @@ class RedisPublisher:
                 event_type=event_type,
                 channel=channel,
                 subscriber_count=subscriber_count,
+                tenant_id=self._tenant_id,
             )
             return int(subscriber_count)
 

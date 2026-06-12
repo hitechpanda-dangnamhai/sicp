@@ -37,26 +37,14 @@ import math
 import os
 from typing import Any, Optional
 
-import psycopg
 import redis
 from psycopg.rows import dict_row
 
+from src.db import current_tenant, tenant_connection
 from src.observability import get_logger
 from src.tools import register
 
 _logger = get_logger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Helpers (clone from cart.py:94-122 + policies.py:74-80 — pattern-locked LAW)
-# ---------------------------------------------------------------------------
-
-def _get_dsn() -> str:
-    """Return Postgres DSN from env. Clone of policies.py:_get_dsn."""
-    dsn = os.getenv("DATABASE_URL")
-    if not dsn:
-        raise RuntimeError("DATABASE_URL env var not set")
-    return dsn
 
 
 def _get_redis_url() -> str:
@@ -144,7 +132,7 @@ def co_purchased(params: dict[str, Any]) -> dict[str, Any]:
     if limit < 1 or limit > 100:
         raise ValueError("'limit' must be in range [1, 100]")
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(
                 _CO_PURCHASED_SQL,
@@ -222,7 +210,7 @@ def product_corpus_size(params: dict[str, Any]) -> dict[str, Any]:
         return {"count": count, "cached": True}
 
     # Cache MISS → fresh Postgres hit
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 "SELECT COUNT(*) FROM products WHERE image_data IS NOT NULL"
@@ -621,7 +609,7 @@ def aggregate(params: dict[str, Any]) -> dict[str, Any]:
         "SELECT COALESCE(SUM(revenue),0)::bigint AS r FROM analytics_daily "
         "WHERE merchant_id = %(mid)s AND day > CURRENT_DATE - 30"
     )
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(series_sql, {"fmt": fmt, "mid": merchant_id})
             rows = [
@@ -688,7 +676,7 @@ def detect_anomaly(params: dict[str, Any]) -> dict[str, Any]:
     if win < 1 or win > 90:
         raise ValueError("'window_days' must be in [1, 90]")
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(_ANOMALY_SQL, {"mid": merchant_id, "win": win, "win2": win * 2})
             rows = cur.fetchall()
@@ -760,7 +748,7 @@ def stock_snapshot(params: dict[str, Any]) -> dict[str, Any]:
     category = params.get("category")
     product_id = params.get("product_id")
 
-    with psycopg.connect(_get_dsn()) as conn:
+    with tenant_connection(current_tenant()) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
             cur.execute(_STOCK_SQL, {"mid": merchant_id, "category": category,
                                      "product_id": product_id})

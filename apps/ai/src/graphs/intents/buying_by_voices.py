@@ -454,7 +454,7 @@ async def _node_load_voice_context(
         try:
             voice_history, cart_data = await asyncio.gather(
                 _load_voice_context_redis(user_id, state.get("tenant_id")),
-                mcp.call("cart.get", {"user_id": user_id}, **identity_kwargs(state)),
+                mcp.call("cart.get", {}, **identity_kwargs(state)),
             )
         except McpError as e:
             _logger.warning(
@@ -899,7 +899,7 @@ async def _node_voice_cart_remove(
         try:
             final_cart = await mcp.call(
                 "cart.update_qty",
-                {"user_id": user_id, "product_id": product_id, "qty": 0},
+                {"product_id": product_id, "qty": 0},
                 **identity_kwargs(state),
             )
             removed_count += 1
@@ -1215,7 +1215,6 @@ async def _node_bulk_cart_commit(
             final_cart = await mcp.call(
                 "cart.update_qty",
                 {
-                    "user_id": user_id,
                     "product_id": product_id,
                     "qty": qty,
                     "snapshot": snapshot,
