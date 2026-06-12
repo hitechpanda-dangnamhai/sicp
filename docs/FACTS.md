@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-11T10:55:01Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-12T00:46:04Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -144,7 +144,6 @@
   - /dev/organism-smoke/login-form
   - /dev/organism-smoke/order-summary
   - /dev/preview-frame
-  - /home
   - /intent-01
   - /intent-02
   - /intent-03
@@ -157,13 +156,14 @@
   - /me/notifications
   - /me/security
   - /onboarding
+  - /s/[slug]/home
 - components/ui (shadcn): 8 file
 - components/icp/atoms: 10 file
 - components/icp/molecules: 44 file
 - components/icp/organisms: 20 file
 - components/icp/layout: 5 file
 - e2e specs: 3
-- unit/__tests__: 9
+- unit/__tests__: 12
 
 ## Vespa rank-profiles   <!-- grep rank-profile product.sd -->
 - ai_augmented

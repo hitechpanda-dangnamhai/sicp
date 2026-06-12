@@ -1,7 +1,10 @@
 /**
- * apps/web/app/home/page.tsx — Home Dashboard hub.
+ * apps/web/app/s/[slug]/home/page.tsx — Home Dashboard hub.
  *
  * Slice:    S-03 T03b — Home Dashboard hub
+ *           S-P0-01 T02b-1 (ADR-046 amend d) — migrate /home → /s/<slug>/home;
+ *           tile nav qua tenantHref() để giữ slug khi push sang /intent-0X
+ *           (chưa migrate → forward-rewrite render). Avatar → /me GIỮ global.
  * Mockup:   golden-reference-mockup.html (full page composition)
  *
  * Page composition: pageWrap > phoneFrame > [Header + Hero + StatBar + Tiles + Input + Nav]
@@ -16,6 +19,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { tenantHref } from '@/lib/tenant-href';
+import { useTenant } from '@/lib/providers/tenant-provider';
 import { useStats } from '@/lib/dashboard/use-stats';
 import { useMe } from '@/lib/dashboard/use-me';
 import { useCart } from '@/src/features/cart/use-cart';
@@ -47,6 +52,7 @@ const TILE_MAPPING: Record<TileId, { tile_id: TileId; intent_id: IntentId; sourc
 
 export default function HomeDashboardPage() {
   const router = useRouter();
+  const tenant = useTenant();
   const statsQuery = useStats();
   const meQuery = useMe();
   const cartQuery = useCart();
@@ -68,7 +74,9 @@ export default function HomeDashboardPage() {
     } catch {
       // Analytics non-blocking.
     }
-    router.push(m.route);
+    // tenantHref giữ slug active → /s/<slug>/intent-0X (chưa migrate: middleware
+    // forward-rewrite render page cũ). Slug từ context (KHÔNG window) — ADR-046 d.
+    router.push(tenantHref(m.route, tenant?.slug));
   };
 
   const initials = meQuery.data?.avatar_initials ?? '?';

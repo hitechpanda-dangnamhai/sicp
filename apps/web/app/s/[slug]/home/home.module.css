@@ -1,5 +1,5 @@
 /* =============================================================================
- * apps/web/app/home/home.module.css — Scoped page styles for /home Dashboard.
+ * apps/web/app/s/[slug]/home/home.module.css — Scoped page styles for /home Dashboard.
  *
  * Source:    docs/mockups/golden-reference-mockup.html lines 13-49 (verbatim CSS rules)
  * Strategy:  CSS Module → unique class names → NO conflict with T01 globals.css.

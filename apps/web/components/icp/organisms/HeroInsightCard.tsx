@@ -30,6 +30,8 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { tenantHref } from '@/lib/tenant-href';
+import { useTenant } from '@/lib/providers/tenant-provider';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/icp/atoms';
 
@@ -47,6 +49,7 @@ interface InsightData {
 
 export function HeroInsightCard({ className }: HeroInsightCardProps) {
   const router = useRouter();
+  const tenant = useTenant();
   const [insight, setInsight] = React.useState<InsightData | null>(null);
 
   React.useEffect(() => {
@@ -156,7 +159,7 @@ export function HeroInsightCard({ className }: HeroInsightCardProps) {
       <div className="relative flex gap-2">
         <button
           type="button"
-          onClick={() => router.push('/intent-07?preset=revenue_7d')}
+          onClick={() => router.push(tenantHref('/intent-07?preset=revenue_7d', tenant?.slug))}
           className={cn(
             'flex-1 bg-white border-none text-pink-700 py-3 rounded-2xl',
             'text-[13px] font-bold flex items-center justify-center gap-1.5',
