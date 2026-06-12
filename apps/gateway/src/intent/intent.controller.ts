@@ -65,7 +65,6 @@ import {
   Query,
   Req,
   Res,
-  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -75,7 +74,7 @@ import { AiClient } from '../clients/ai.client';
 import { RedisClient } from '../idempotency/redis.client';
 import { IntentRequestDto } from './dto/intent-request.dto';
 import { IntentService } from './intent.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
 
 /** Lazy tracer per C-28 LOCK. */
@@ -99,36 +98,6 @@ const CART_IDLE_TIMEOUT_MS = 300_000; // 5 min — accommodates S-07 Intent 01 i
 
 /** Redis pub/sub channel template per `02_DATA_MODEL.md §5`. */
 const SSE_PUBSUB_CHANNEL_PREFIX = 'sse:pubsub:';
-
-/**
- * Parse `req.headers.cookie` header for a specific cookie name.
- * Returns value (decoded) or null. Per C-40 (inline parse, no cookie-parser dep
- * required — though S-03 T02 wired cookie-parser globally for /auth routes).
- */
-function readCookie(req: Request, name: string): string | null {
-  // Prefer req.cookies if cookie-parser middleware populated it (S-03+).
-  const fromParser = (req as Request & { cookies?: Record<string, string> }).cookies?.[name];
-  if (typeof fromParser === 'string' && fromParser.length > 0) {
-    return fromParser;
-  }
-  // Fallback: parse raw header (S-02 zero-dep pattern).
-  const header = req.headers.cookie;
-  if (!header) return null;
-  const cookies = header.split(';').map((c) => c.trim());
-  for (const c of cookies) {
-    const eq = c.indexOf('=');
-    if (eq < 0) continue;
-    if (c.slice(0, eq) === name) {
-      const raw = c.slice(eq + 1);
-      try {
-        return decodeURIComponent(raw);
-      } catch {
-        return raw;
-      }
-    }
-  }
-  return null;
-}
 
 /** Format heartbeat SSE frame string per W3C spec. */
 function formatHeartbeat(): string {
@@ -210,17 +179,20 @@ export class IntentController {
    *   - Cleanup unsubscribe on: final event detected / req.close / timeout
    */
   @Get('stream')
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({
     summary: 'SSE stream of intent events',
     description:
       'Forwards Redis pub/sub channel `sse:pubsub:{rid}` to FE EventSource. ' +
       'S-04 T03: 17 typed event types (10 S-02 + 7 S-04) per 03_API §3. ' +
-      'Requires icp_session cookie.',
+      'S-P0-01 T03c: JwtAuthGuard (cookie httpOnly, EventSource auto-send) + ' +
+      'rid ownership-check (user + tenant∈membership). KHÔNG TenantMembershipGuard ' +
+      '— EventSource không set được X-Tenant-Id (ADR-019 constraint).',
   })
   @ApiCookieAuth('icp_session')
   async stream(
     @Query('id') requestId: string,
-    @Req() req: Request,
+    @Req() req: AuthedRequest,
     @Res() res: Response,
   ): Promise<void> {
     const tracer = getTracer();
@@ -228,31 +200,25 @@ export class IntentController {
     await context.with(trace.setSpan(context.active(), span), async () => {
       span.setAttribute('intent.request_id', requestId ?? 'missing');
 
-      // 1. Cookie auth check (D-05 + ADR-019).
-      const session = readCookie(req, 'icp_session');
-      if (!session || session.length === 0) {
-        this.nestLogger.warn(
-          JSON.stringify({
-            message: 'intent.sse_session_missing',
-            extras: { request_id: requestId },
-          }),
-        );
-        span.setStatus({ code: SpanStatusCode.ERROR, message: 'missing icp_session cookie' });
-        span.end();
-        throw new UnauthorizedException({
-          error: { code: 'UNAUTHORIZED', message: 'Missing icp_session cookie' },
-        });
-      }
-
-      // 2. Validate request_id + cache existence check.
+      // 1. Auth (S-P0-01 T03c F1 — khôi phục ADR-019 verify thật): JwtAuthGuard
+      //    đã verify JWT cookie (signature/expiry/revocation) + populate req.user
+      //    TRƯỚC handler. Thay cookie-presence check yếu cũ.
       if (!requestId) {
         span.end();
         throw new NotFoundException({
           error: { code: 'INVALID_INTENT', message: 'Missing query param: id' },
         });
       }
-      const cached = await this.intentService.lookup(requestId);
-      if (!cached) {
+
+      // 2. F2 ownership-check: rid phải thuộc đúng owner (user + tenant∈membership).
+      //    Mismatch/cache-miss → 404 ĐỒNG NHẤT (không lộ tồn tại rid của tenant khác).
+      const owned = await this.intentService.assertOwnership(
+        requestId,
+        req.user.id,
+        req.user.tenant_ids,
+      );
+      if (!owned) {
+        span.setAttribute('intent.ownership_denied', true);
         span.end();
         throw new NotFoundException({
           error: {

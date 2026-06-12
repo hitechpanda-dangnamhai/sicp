@@ -39,6 +39,7 @@ import {
   HttpCode,
   HttpStatus,
   Logger as NestLogger,
+  NotFoundException,
   Param,
   Post,
   Req,
@@ -52,10 +53,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api';
-import type { Request } from 'express';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
 import { AiClient } from '../clients/ai.client';
+import { IntentService } from './intent.service';
 import { IntentActionDto } from './dto/intent-action.dto';
 
 /** Lazy tracer per C-28 LOCK. */
@@ -68,7 +69,10 @@ function getTracer(): Tracer {
 export class IntentActionController {
   private readonly nestLogger = new NestLogger(IntentActionController.name);
 
-  constructor(private readonly aiClient: AiClient) {}
+  constructor(
+    private readonly aiClient: AiClient,
+    private readonly intentService: IntentService,
+  ) {}
 
   /**
    * POST /api/v1/intent/:rid/action — resume interrupted graph.
@@ -100,7 +104,7 @@ export class IntentActionController {
   async action(
     @Param('rid') rid: string,
     @Body() body: IntentActionDto,
-    @Req() req: Request,
+    @Req() req: AuthedRequest,
   ): Promise<{ request_id: string; status: 'accepted' }> {
     const tracer = getTracer();
     const span = tracer.startSpan('gateway.intent.action');
@@ -109,7 +113,28 @@ export class IntentActionController {
       span.setAttribute('intent.action.choice', body.choice);
       const attemptN = body._meta?.attempt_n ?? 1;
       span.setAttribute('intent.action.attempt_n', attemptN);
-      const userId = req.user?.id ?? 'anon';
+      const userId = req.user.id;
+
+      // S-P0-01 T03c F2 ownership-check: rid phải thuộc đúng owner (user +
+      // tenant∈membership) TRƯỚC resume. TenantMembershipGuard (:87) đã validate
+      // tenant của request ∈ membership, nhưng KHÔNG ràng buộc rid↔owner → user
+      // cùng tenant vẫn có thể resume rid của người khác nếu thiếu check này.
+      // Mismatch/cache-miss → 404 ĐỒNG NHẤT (không lộ tồn tại rid).
+      const owned = await this.intentService.assertOwnership(
+        rid,
+        userId,
+        req.user.tenant_ids,
+      );
+      if (!owned) {
+        span.setAttribute('intent.ownership_denied', true);
+        span.end();
+        throw new NotFoundException({
+          error: {
+            code: 'INVALID_INTENT',
+            message: `request_id not found or expired: ${rid}`,
+          },
+        });
+      }
 
       this.nestLogger.log(
         JSON.stringify({

@@ -44,7 +44,6 @@ import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api'
 import {
   AiClient,
   type AiForwardContext,
-  type AiIntentResponse,
   type PostIntentBody,
 } from '../clients/ai.client';
 import { RedisClient } from '../idempotency/redis.client';
@@ -54,9 +53,21 @@ function getTracer(): Tracer {
   return trace.getTracer('gateway.intent.service');
 }
 
-/** Redis key prefix for cached `AiIntentResponse` per request_id. TTL 60s. */
+/** Redis key prefix for cached intent owner per request_id. TTL 60s. */
 export const INTENT_CACHE_PREFIX = 'intent:cache:';
 export const INTENT_CACHE_TTL_SECONDS = 60;
+
+/**
+ * S-P0-01 T03c (F2 ownership binding) — VALUE của intent:cache:{rid}. Lưu owner
+ * `{user_id, tenant_id}` lúc POST /intent tạo rid → /stream + /:rid/action verify
+ * rid↔owner TRƯỚC subscribe/resume (ADR-040 iv amend bis: cô lập cross-tenant qua
+ * VALUE, KHÔNG key-prefix — /stream mở bằng EventSource không mang X-Tenant-Id).
+ */
+export interface IntentCacheEntry {
+  request_id: string;
+  user_id: string | null;
+  tenant_id: string | null;
+}
 
 @Injectable()
 export class IntentService {
@@ -97,11 +108,17 @@ export class IntentService {
         const aiResponse = await this.aiClient.postIntent(body, ctx);
         span.setAttribute('ai.request_id', aiResponse.request_id);
 
-        // Cache request_id for SSE stream pickup gate. /stream handler checks
-        // existence of this key to confirm request_id is valid + recent (TTL 60s).
+        // Cache request_id + owner cho SSE stream pickup gate + ownership verify
+        // (S-P0-01 T03c F2). /stream + /:rid/action đọc VALUE này verify rid↔owner.
+        // ctx.tenantId luôn có cho POST /intent (TenantMembershipGuard ép X-Tenant-Id);
+        // ctx.userId = JWT-resolved. TTL 60s.
         await this.redis.setWithTtl(
           `${INTENT_CACHE_PREFIX}${aiResponse.request_id}`,
-          JSON.stringify({ request_id: aiResponse.request_id }),
+          JSON.stringify({
+            request_id: aiResponse.request_id,
+            user_id: ctx?.userId ?? null,
+            tenant_id: ctx?.tenantId ?? null,
+          }),
           INTENT_CACHE_TTL_SECONDS,
         );
 
@@ -142,13 +159,35 @@ export class IntentService {
    * /intent + still within 60s window (matches typical user "open browser
    * → tap chip → SSE" flow well under 60s).
    */
-  async lookup(requestId: string): Promise<AiIntentResponse | null> {
+  async lookup(requestId: string): Promise<IntentCacheEntry | null> {
     const raw = await this.redis.get(`${INTENT_CACHE_PREFIX}${requestId}`);
     if (!raw) return null;
     try {
-      return JSON.parse(raw) as AiIntentResponse;
+      return JSON.parse(raw) as IntentCacheEntry;
     } catch {
       return null;
     }
+  }
+
+  /**
+   * F2 ownership gate (S-P0-01 T03c) — rid hợp lệ VÀ thuộc đúng owner.
+   * True chỉ khi: cache hit + `user_id` khớp + `tenant_id ∈ membership`.
+   * Dùng cho /stream (trước subscribe) + /:rid/action (trước resume). Caller
+   * trả 404 ĐỒNG NHẤT cache-miss khi false → KHÔNG lộ tồn tại rid của tenant khác.
+   *
+   * Orphan window: rid in-flight lúc deploy có VALUE format cũ `{request_id}`
+   * (thiếu owner) → user_id=null → false → 404 tới khi TTL 60s tự hết (tiền lệ
+   * cart re-key; KHÔNG migrate — ADR-040 iv).
+   */
+  async assertOwnership(
+    requestId: string,
+    userId: string,
+    tenantIds: string[],
+  ): Promise<boolean> {
+    const entry = await this.lookup(requestId);
+    if (!entry) return false;
+    if (entry.user_id !== userId) return false;
+    if (entry.tenant_id == null || !tenantIds.includes(entry.tenant_id)) return false;
+    return true;
   }
 }

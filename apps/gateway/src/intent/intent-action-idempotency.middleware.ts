@@ -73,6 +73,10 @@ const CACHE_TTL_SECONDS = 300;
 const UUID_V4_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** UUID v1-5 guard cho X-Tenant-Id key segment (S-P0-01 T03c F3, khớp resolver). */
+const TENANT_UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Header name (case-insensitive in HTTP; Express normalizes to lower). */
 const HEADER_NAME = 'idempotency-key';
 
@@ -135,9 +139,18 @@ export class IntentActionIdempotencyMiddleware implements NestMiddleware {
         ? meta.attempt_n
         : 1;
 
-    // 4. Build composite keys per `02_DATA_MODEL.md §5`.
-    const cacheKey = `intent:action:${rid}:${attemptN}`;
-    const lockKey = `intent:action:lock:${rid}:${attemptN}`;
+    // 4. Build composite keys per `02_DATA_MODEL.md §5` + S-P0-01 T03c F3 re-key
+    //    tenant-scope (ADR-040 iv): `intent:action:{tenant}:{rid}:{attempt_n}`.
+    //    Tenant đọc TỪ HEADER X-Tenant-Id (action đi qua fetch nên có header;
+    //    MW chạy TRƯỚC guard — #31 ngoài scope — nên không có req.tenant_id).
+    //    Đây là namespace dedup defense-in-depth; CÔ LẬP tenant THẬT do
+    //    ownership-check ở controller (F2). Header thiếu/không UUID → key không
+    //    tenant-prefix (graceful — rid là UUID toàn cục, dedup vẫn đúng).
+    const tenantHeader = (req.headers['x-tenant-id'] as string | undefined)?.trim();
+    const tenantPrefix =
+      tenantHeader && TENANT_UUID_REGEX.test(tenantHeader) ? `${tenantHeader}:` : '';
+    const cacheKey = `intent:action:${tenantPrefix}${rid}:${attemptN}`;
+    const lockKey = `intent:action:lock:${tenantPrefix}${rid}:${attemptN}`;
     const keyPrefix = key.slice(0, 8);
 
     // 5. Cache hit check.
