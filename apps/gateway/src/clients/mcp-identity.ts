@@ -17,13 +17,19 @@
 
 export interface McpIdentity {
   userId: string;
-  tenantId: string | null;
+  /**
+   * S-P0-01 T03d: tenantId BẮT BUỘC non-null. Sau khi Gateway siết tenant
+   * strict (mọi controller resolve() — merchant + cart đều ném 400 khi thiếu
+   * header), MỌI call Gateway→MCP có tenant hiện diện → buildMcpIdentityHeaders
+   * luôn phát X-Tenant-Id (bỏ nhánh skip-khi-null của T02c). Type này ép compiler
+   * bắt mọi call-site truyền tenant non-null.
+   */
+  tenantId: string;
 }
 
 /** Header thuần cho outbound MCP call. Rỗng khi vắng identity (caller cũ chưa wire). */
 export function buildMcpIdentityHeaders(identity?: McpIdentity): Record<string, string> {
   if (!identity?.userId) return {};
-  const headers: Record<string, string> = { 'x-user-id': identity.userId };
-  if (identity.tenantId) headers['x-tenant-id'] = identity.tenantId;
-  return headers;
+  // T03d: luôn gửi CẢ 2 header (tenant strict ở Gateway — tenant luôn hiện diện).
+  return { 'x-user-id': identity.userId, 'x-tenant-id': identity.tenantId };
 }

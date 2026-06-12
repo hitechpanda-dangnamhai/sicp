@@ -58,6 +58,7 @@ import { trace, context, SpanStatusCode, type Tracer } from '@opentelemetry/api'
 import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { McpClient } from '../clients/mcp.client';
 import { TenantResolverService } from '../tenant/tenant-resolver.service';
+import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
 
 /** Lazy tracer per C-28 LOCK (same pattern intent-action.controller uses). */
 function getTracer(): Tracer {
@@ -104,7 +105,9 @@ export class IntentSuggestAttrsController {
    * Idempotent via base S-02 `IdempotencyMiddleware`. Synchronous (~7s p50).
    */
   @Post(':rid/suggest-attrs')
-  @UseGuards(JwtAuthGuard)
+  // S-P0-01 T03d — merchant route (product attr suggest): tenant strict
+  // (400 thiếu header / 403 ∉ tenant_ids) + vá lỗ authz customer 0-membership.
+  @UseGuards(JwtAuthGuard, TenantMembershipGuard)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Request AI-suggested attribute chips for PrefillForm',
@@ -181,7 +184,8 @@ export class IntentSuggestAttrsController {
             category: body.category,
             existing_attrs: normalizedExisting,
           },
-          { userId, tenantId: this.tenant.resolveOptional(req) },
+          // T03d: resolve() non-null (TenantMembershipGuard đã validate ∈ tenant_ids).
+          { userId, tenantId: this.tenant.resolve(req).tenantId },
         )) as SuggestAttrsResponse;
 
         // Defensive — MCP normalization should already guarantee shape, but

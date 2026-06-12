@@ -106,7 +106,10 @@ export class DashboardController {
 
   @Get('insight')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard)
+  // S-P0-01 T03d — insight = analytics.detect_anomaly (Postgres tenant-scoped) →
+  // tenant strict (400 thiếu header / 403 ∉ tenant_ids). Trước T03d chỉ JwtAuthGuard
+  // + resolveOptional (tenant nullable) → MCP có thể thiếu X-Tenant-Id.
+  @UseGuards(JwtAuthGuard, TenantMembershipGuard)
   @ApiCookieAuth('icp_session')
   @ApiOperation({
     summary: 'Get home hero AI insight — REAL analytics (S-10 detect_anomaly)',
@@ -125,11 +128,11 @@ export class DashboardController {
     return context.with(trace.setSpan(context.active(), span), async () => {
       try {
         span.setAttribute('auth.user_id_prefix', req.user.id.slice(0, 8));
-        // getInsight chỉ JwtAuthGuard (không TenantMembershipGuard) → tenant
-        // header-only qua resolveOptional (non-throw). S-P0-01 T02c.
+        // T03d: TenantMembershipGuard set req.tenant_id (đã validate ∈ tenant_ids);
+        // resolve() non-null. Bỏ resolveOptional (T02c) — tenant nay BẮT BUỘC.
         const result = await this.dashboardService.getInsight(
           req.user.id,
-          this.tenant.resolveOptional(req),
+          this.tenant.resolve(req).tenantId,
         );
         return result as DashboardInsightDto;
       } catch (err) {

@@ -48,6 +48,7 @@ import { JwtAuthGuard, type AuthedRequest } from '../auth/jwt-auth.guard';
 import { McpClient, McpError } from '../clients/mcp.client';
 import type { McpIdentity } from '../clients/mcp-identity';
 import { TenantResolverService } from '../tenant/tenant-resolver.service';
+import { TenantMembershipGuard } from '../tenant/tenant-membership.guard';
 
 /**
  * Whitelisted updatable fields per C-S07-N. Frontend should send any subset;
@@ -78,7 +79,9 @@ interface ProductUpdateResult {
 
 @ApiTags('products')
 @ApiCookieAuth('icp_session')
-@UseGuards(JwtAuthGuard)
+// S-P0-01 T03d — merchant route: tenant strict (400 thiếu header / 403 ∉ tenant_ids)
+// + vá lỗ authz customer 0-membership. X-Tenant-Id luôn hiện diện cho MCP.
+@UseGuards(JwtAuthGuard, TenantMembershipGuard)
 @Controller('api/v1/products')
 export class ProductsController {
   constructor(
@@ -86,9 +89,10 @@ export class ProductsController {
     private readonly tenant: TenantResolverService,
   ) {}
 
-  /** S-P0-01 T02c — identity header cho MCP (tenant header-only, non-throw). */
+  /** S-P0-01 T03d — identity header cho MCP (tenant strict: resolve() non-null;
+   * guard đã validate ∈ tenant_ids). */
   private identity(req: AuthedRequest): McpIdentity {
-    return { userId: req.user.id, tenantId: this.tenant.resolveOptional(req) };
+    return { userId: req.user.id, tenantId: this.tenant.resolve(req).tenantId };
   }
 
   /**

@@ -133,7 +133,7 @@ export class DashboardService {
    * Defensive: any MCP/shape failure degrades to has_data=false so the home
    * page never errors on the hero card.
    */
-  async getInsight(userId: string, tenantId: string | null): Promise<DashboardInsightType> {
+  async getInsight(userId: string, tenantId: string): Promise<DashboardInsightType> {
     let insight: DashboardInsightType = {
       delta_pct: null,
       direction: 'flat',

@@ -70,6 +70,12 @@ function getTracer(): Tracer {
 
 @ApiTags('cart')
 @Controller('api/v1/cart')
+// S-P0-01 T03d — cart = customer-facing: resolve() STRICT (400 khi thiếu
+// X-Tenant-Id) + JwtAuthGuard, NHƯNG KHÔNG TenantMembershipGuard. WHY: customer
+// mua hàng = "khách trong cửa hàng", 0-membership BY DESIGN (V011:66,79, ADR-046
+// amend 2026-06-12) — gắn MembershipGuard vào cart sẽ 403 chặn checkout của khách.
+// Tenant = header slug-driven (storefront luôn gắn, api-client.ts:25). Isolation
+// thật ở MCP (cart re-key cart:{tenant}:{user} — T03b).
 @UseGuards(JwtAuthGuard)
 @ApiCookieAuth('icp_session')
 export class CartController {
@@ -106,7 +112,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.get(userId, this.tenant.resolveOptional(req));
+        return await this.cartService.get(userId, this.tenant.resolve(req).tenantId);
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -154,7 +160,7 @@ export class CartController {
       try {
         return await this.cartService.addItem(
           userId,
-          this.tenant.resolveOptional(req),
+          this.tenant.resolve(req).tenantId,
           body.product_id,
           body.qty,
           body.snapshot,
@@ -198,7 +204,7 @@ export class CartController {
       try {
         return await this.cartService.updateQty(
           userId,
-          this.tenant.resolveOptional(req),
+          this.tenant.resolve(req).tenantId,
           productId,
           body.qty,
         );
@@ -236,7 +242,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.remove(userId, this.tenant.resolveOptional(req), productId);
+        return await this.cartService.remove(userId, this.tenant.resolve(req).tenantId, productId);
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -276,7 +282,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.clear(userId, this.tenant.resolveOptional(req));
+        return await this.cartService.clear(userId, this.tenant.resolve(req).tenantId);
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -315,7 +321,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.applyPromo(userId, this.tenant.resolveOptional(req), body.code);
+        return await this.cartService.applyPromo(userId, this.tenant.resolve(req).tenantId, body.code);
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;
@@ -345,7 +351,7 @@ export class CartController {
         }),
       );
       try {
-        return await this.cartService.removePromo(userId, this.tenant.resolveOptional(req));
+        return await this.cartService.removePromo(userId, this.tenant.resolve(req).tenantId);
       } catch (err) {
         this.recordSpanError(span, err);
         throw err;

@@ -41,15 +41,15 @@ describe('CartService identity headers (T02c)', () => {
     expect(body.method).toBe('cart.get');
   });
 
-  it('omits X-Tenant-Id when tenant null (global)', async () => {
+  it('T03d: cart luôn gửi X-Tenant-Id (controller resolve() strict → non-null)', async () => {
     const fetchSpy = vi.fn(async () => okResponse());
     vi.stubGlobal('fetch', fetchSpy);
 
-    await new CartService().clear('u-2', null);
+    await new CartService().clear('u-2', 't-2');
 
     const { headers } = lastFetch(fetchSpy);
     expect(headers['x-user-id']).toBe('u-2');
-    expect(headers['x-tenant-id']).toBeUndefined();
+    expect(headers['x-tenant-id']).toBe('t-2');
   });
 
   it('forwards identity on cart.update_qty (addItem path) with tenant', async () => {

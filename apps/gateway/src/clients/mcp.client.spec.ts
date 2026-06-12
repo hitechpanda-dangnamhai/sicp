@@ -37,15 +37,15 @@ describe('McpClient.call identity headers (T02c)', () => {
     expect(headers['x-tenant-id']).toBe('t-1');
   });
 
-  it('omits X-Tenant-Id for global customer (tenant null)', async () => {
+  it('T03d: luôn gửi X-Tenant-Id khi có identity (tenant strict, non-null)', async () => {
     const fetchSpy = vi.fn(async () => okResponse());
     vi.stubGlobal('fetch', fetchSpy);
 
-    await new McpClient().call('cards.list_pending', {}, { userId: 'u-1', tenantId: null });
+    await new McpClient().call('cards.list_pending', {}, { userId: 'u-1', tenantId: 't-7' });
 
     const headers = lastFetchHeaders(fetchSpy);
     expect(headers['x-user-id']).toBe('u-1');
-    expect(headers['x-tenant-id']).toBeUndefined();
+    expect(headers['x-tenant-id']).toBe('t-7');
   });
 
   it('sends no identity header when identity omitted (backward compatible)', async () => {
