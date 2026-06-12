@@ -77,7 +77,7 @@ from opentelemetry import trace
 
 from ...state import IcpState
 from ...tools.llm_client import LLMError, LLMTimeout, get_llm_client
-from ...tools.mcp_client import McpClient, McpError
+from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
 from ...prompts import load_prompt
 
@@ -186,6 +186,7 @@ async def _node_vision_analyze(
         result = await mcp_client.call(
             "vision.analyze",
             {"image_b64": image_b64, "timeout_s": 15.0},
+            **identity_kwargs(state),
         )
     except McpError as e:
         _logger.warning(
@@ -279,19 +280,19 @@ async def _node_enrich(
     }
     compare_task = mcp_client.call("vespa.compare_similar", {
         "product": product_payload, "limit": 10,
-    })
+    }, **identity_kwargs(state))
     search_trend_task = mcp_client.call("vespa.search_trend", {
         "category": category or "nuoc_tuong", "limit": 10,
-    })
+    }, **identity_kwargs(state))
     shopee_task = mcp_client.call("shopee.price_range", {
         "category": category or "nuoc_tuong",
         "attributes": {k: attributes.get(k) for k in ("brand", "size") if attributes.get(k)},
-    })
+    }, **identity_kwargs(state))
     gtrends_task = mcp_client.call("gtrends.interest_over_time", {
         "keyword": keyword,
         "category": category,
         "window_days": 7,
-    })
+    }, **identity_kwargs(state))
 
     results = await asyncio.gather(
         compare_task, search_trend_task, shopee_task, gtrends_task,
@@ -591,7 +592,7 @@ async def _node_emit_draft_event(
             "user_id": user_id if user_id != "anon" else None,
             "payload": payload,
             "metadata": {"request_id": rid},
-        })
+        }, **identity_kwargs(state))
         event_id = result.get("event_id") if isinstance(result, dict) else None
     except McpError as e:
         _logger.warning(
@@ -664,7 +665,7 @@ async def _node_find_policies(
         matches = await mcp_client.call("policies.find_matching", {
             "trigger": "ProductDraftSubmitted",
             "context": context,
-        })
+        }, **identity_kwargs(state))
     except McpError as e:
         _logger.warning(
             "find_policies.mcp_error",
@@ -754,7 +755,7 @@ async def _node_create_cards(
                 "user_id": user_id,
                 "action_type": action_type,
                 "suggestion": suggestion,
-            })
+            }, **identity_kwargs(state))
             card_id = card_result.get("card_id") if isinstance(card_result, dict) else None
         except McpError as e:
             _logger.warning(
@@ -804,7 +805,7 @@ async def _fetch_price_solver(
             "shopee_sample_count": int(context.get("shopee_sample_count") or 0),
             "trend_trajectory": context.get("trend_trajectory") or "stable",
             "seller_type": None,
-        })
+        }, **identity_kwargs(state))
     except McpError:
         return {}
     return res if isinstance(res, dict) else {}
@@ -979,7 +980,9 @@ async def _node_commit_product(
     }
 
     try:
-        create_res = await mcp_client.call("products.create", create_params)
+        create_res = await mcp_client.call(
+            "products.create", create_params, **identity_kwargs(state)
+        )
     except McpError as e:
         _logger.error(
             "commit_product.create_failed",
@@ -1023,7 +1026,7 @@ async def _node_commit_product(
                 "trend_score": create_params["trend_score"],
                 "status": "active",
             },
-        })
+        }, **identity_kwargs(state))
         indexed = True
     except McpError as e:
         _logger.warning(

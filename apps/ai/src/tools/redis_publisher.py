@@ -97,8 +97,14 @@ class RedisPublisher:
     that forwards to FE EventSource. AI service is fire-and-forget.
     """
 
-    def __init__(self, redis_url: str) -> None:
+    def __init__(self, redis_url: str, tenant_id: str | None = None) -> None:
         self._redis_url = redis_url
+        # S-P0-01 T03a (ADR-048 amend c + ADR-040 iv): dual-publish — kênh cũ
+        # `sse:pubsub:{rid}` (Gateway hiện subscribe) LUÔN giữ + kênh mới
+        # `sse:pubsub:{tenant}:{rid}` khi có tenant. Gateway switch sang kênh mới
+        # ở T03b → KHÔNG cần deploy atomic 2 service. tenant None (anonymous/dev)
+        # → chỉ kênh cũ.
+        self._tenant_id = tenant_id
         self._client: aioredis.Redis | None = None
 
     async def _ensure_client(self) -> aioredis.Redis:
@@ -136,6 +142,25 @@ class RedisPublisher:
 
             subscriber_count = await client.publish(channel, block)
             span.set_attribute("sse.subscriber_count", subscriber_count)
+
+            # S-P0-01 T03a: dual-publish kênh tenant-scoped (chỉ khi có tenant).
+            # Return = subscriber_count kênh CŨ (giữ contract caller; Gateway hiện
+            # subscribe kênh cũ). Kênh mới log riêng để verify rollout.
+            if self._tenant_id:
+                tenant_channel = (
+                    f"sse:pubsub:{self._tenant_id}:{request_id}"
+                )
+                tenant_subs = await client.publish(tenant_channel, block)
+                span.set_attribute("sse.tenant_channel", tenant_channel)
+                span.set_attribute("sse.tenant_subscriber_count", tenant_subs)
+                _logger.info(
+                    "sse.published",
+                    request_id=request_id,
+                    event_type=event_type,
+                    channel=tenant_channel,
+                    subscriber_count=int(tenant_subs),
+                    tenant_id=self._tenant_id,
+                )
 
             _logger.info(
                 "sse.published",

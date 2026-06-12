@@ -84,7 +84,7 @@ from opentelemetry import trace
 
 from ...state import IcpState
 from ...tools.llm_client import LITE_MODEL, LLMTimeout, get_llm_client
-from ...tools.mcp_client import McpClient, McpError
+from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
 from ...prompts import load_prompt
 
@@ -458,7 +458,7 @@ async def _node_hybrid_search(state: IcpState, publisher: RedisPublisher) -> dic
     mcp = McpClient(_mcp_url(), timeout_s=30.0)
     t0 = time.monotonic()
     try:
-        result = await mcp.call("vespa.hybrid_search", params)
+        result = await mcp.call("vespa.hybrid_search", params, **identity_kwargs(state))
     except McpError as e:
         _logger.error("mcp.error", request_id=rid, tool="vespa.hybrid_search", error=str(e))
         await publisher.publish_sse(

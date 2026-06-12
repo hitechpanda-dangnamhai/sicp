@@ -141,7 +141,7 @@ from opentelemetry import trace
 
 from ...state import IcpState
 from ...tools.llm_client import LLMTimeout, get_llm_client
-from ...tools.mcp_client import McpClient, McpError
+from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
 from ...prompts import load_prompt
 
@@ -247,7 +247,12 @@ def _redis_url() -> str:
     return os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 
-def _voice_context_key(user_id: str) -> str:
+def _voice_context_key(user_id: str, tenant_id: str | None = None) -> str:
+    # S-P0-01 T03a (ADR-040 iv): tenant-scoped key. tenant None (dev/anon) → key
+    # cũ. Key cũ voice:context:{user} orphan sau deploy — TTL 30min refresh-on-read
+    # tự hết, KHÔNG migrate (tiền lệ cart cart:{user}→cart:{tenant}:{user}).
+    if tenant_id:
+        return f"voice:context:{tenant_id}:{user_id}"
     return f"voice:context:{user_id}"
 
 
@@ -260,7 +265,9 @@ def _now_iso() -> str:
 # ============================================================================
 
 
-async def _load_voice_context_redis(user_id: str) -> list[dict[str, Any]]:
+async def _load_voice_context_redis(
+    user_id: str, tenant_id: str | None = None
+) -> list[dict[str, Any]]:
     """Load voice:context:{user_id} from Redis. Returns [] if missing.
 
     Per D-S08-NN-A LAW: separate Redis key from RedisSaver checkpoint
@@ -270,11 +277,11 @@ async def _load_voice_context_redis(user_id: str) -> list[dict[str, Any]]:
     """
     client = aioredis.from_url(_redis_url(), decode_responses=True)
     try:
-        raw = await client.get(_voice_context_key(user_id))
+        raw = await client.get(_voice_context_key(user_id, tenant_id))
         if not raw:
             return []
         # Refresh TTL on read per D-S08-NN-A LAW.
-        await client.expire(_voice_context_key(user_id), VOICE_CONTEXT_TTL_S)
+        await client.expire(_voice_context_key(user_id, tenant_id), VOICE_CONTEXT_TTL_S)
         try:
             doc = json.loads(raw)
         except json.JSONDecodeError as e:
@@ -291,7 +298,7 @@ async def _load_voice_context_redis(user_id: str) -> list[dict[str, Any]]:
 
 
 async def _save_voice_context_redis(
-    user_id: str, turns: list[dict[str, Any]]
+    user_id: str, turns: list[dict[str, Any]], tenant_id: str | None = None
 ) -> None:
     """Save voice:context:{user_id} to Redis with FIFO truncate + TTL.
 
@@ -304,7 +311,7 @@ async def _save_voice_context_redis(
     client = aioredis.from_url(_redis_url(), decode_responses=True)
     try:
         await client.set(
-            _voice_context_key(user_id),
+            _voice_context_key(user_id, tenant_id),
             json.dumps(doc, ensure_ascii=False),
             ex=VOICE_CONTEXT_TTL_S,
         )
@@ -446,8 +453,8 @@ async def _node_load_voice_context(
         mcp = McpClient(_mcp_url(), timeout_s=10.0)
         try:
             voice_history, cart_data = await asyncio.gather(
-                _load_voice_context_redis(user_id),
-                mcp.call("cart.get", {"user_id": user_id}),
+                _load_voice_context_redis(user_id, state.get("tenant_id")),
+                mcp.call("cart.get", {"user_id": user_id}, **identity_kwargs(state)),
             )
         except McpError as e:
             _logger.warning(
@@ -456,7 +463,9 @@ async def _node_load_voice_context(
                 user_id=user_id,
                 error=str(e),
             )
-            voice_history = await _load_voice_context_redis(user_id)
+            voice_history = await _load_voice_context_redis(
+                user_id, state.get("tenant_id")
+            )
             cart_data = {"items": [], "totals": {"subtotal": 0}}
 
         span.set_attribute("voice.history_turns", len(voice_history))
@@ -515,6 +524,7 @@ async def _node_speech_transcribe(
                     "mime_type": "audio/webm",
                     "lang": "vi",
                 },
+                **identity_kwargs(state),
             )
             span.set_attribute("voice.text_chars",
                                len((result or {}).get("text", "")))
@@ -773,6 +783,7 @@ async def _node_resolve_items(
             result = await mcp.call(
                 "vespa.hybrid_search",
                 {"query": query, "limit": VESPA_RESOLVE_LIMIT},
+                **identity_kwargs(state),
             )
         except McpError as e:
             _logger.warning(
@@ -889,6 +900,7 @@ async def _node_voice_cart_remove(
             final_cart = await mcp.call(
                 "cart.update_qty",
                 {"user_id": user_id, "product_id": product_id, "qty": 0},
+                **identity_kwargs(state),
             )
             removed_count += 1
         except McpError as e:
@@ -1208,6 +1220,7 @@ async def _node_bulk_cart_commit(
                     "qty": qty,
                     "snapshot": snapshot,
                 },
+                **identity_kwargs(state),
             )
             committed_count += 1
         except McpError as e:
@@ -1273,6 +1286,7 @@ async def _node_co_purchase_lookup(
         result = await mcp.call(
             "analytics.co_purchased",
             {"anchor_category": anchor_category, "limit": 1},
+            **identity_kwargs(state),
         )
     except McpError as e:
         _logger.info(
@@ -1353,7 +1367,9 @@ async def _node_save_voice_context(
     new_history = list(existing) + [this_turn]
 
     try:
-        await _save_voice_context_redis(user_id, new_history)
+        await _save_voice_context_redis(
+            user_id, new_history, state.get("tenant_id")
+        )
         _logger.info(
             "voice.context_saved",
             request_id=rid,
@@ -1494,6 +1510,7 @@ async def _node_reason_need(
             "vespa.hybrid_search",
             {"query": search_term, "limit": VESPA_RESOLVE_LIMIT,
              "category_filter": category},
+            **identity_kwargs(state),
         )
     except McpError as e:
         _logger.warning("voice.reason_need.vespa_error",

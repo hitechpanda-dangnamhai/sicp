@@ -119,6 +119,17 @@ def _redis_url() -> str:
     return os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 
+def _scoped_id(tenant_id: str | None, request_id: str) -> str:
+    """RedisSaver thread_id + SSE tenant-channel suffix scoped theo tenant.
+
+    S-P0-01 T03a (ADR-040 amend iv): thread_id = `{tenant}:{rid}` khi có tenant,
+    plain `{rid}` khi anonymous/dev. Checkpoint cũ (thread_id=rid) TTL 30min tự
+    hết — KHÔNG migrate. Dùng chung cho RedisSaver thread_id + kênh dev-subscribe
+    để initial + resume khớp namespace.
+    """
+    return f"{tenant_id}:{request_id}" if tenant_id else request_id
+
+
 def _format_sse_message(event_type: str, data: dict[str, Any]) -> str:
     """Format a single SSE message per W3C EventSource spec.
 
@@ -130,9 +141,15 @@ def _format_sse_message(event_type: str, data: dict[str, Any]) -> str:
     return f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-async def _sse_subscribe_stream(request_id: str) -> AsyncIterator[str]:
-    """Subscribe to Redis pub/sub channel sse:pubsub:{request_id} and yield SSE
-    messages forwarded by the graph (via redis_publisher).
+async def _sse_subscribe_stream(
+    request_id: str, tenant_id: str | None = None
+) -> AsyncIterator[str]:
+    """Subscribe to Redis pub/sub channel and yield SSE messages forwarded by
+    the graph (via redis_publisher).
+
+    S-P0-01 T03a: dev-subscribe đọc kênh tenant-scoped `sse:pubsub:{tenant}:{rid}`
+    (graph dual-publish cả 2 kênh). tenant None → kênh cũ `sse:pubsub:{rid}`.
+    Đây là đường DEV direct-call; production Gateway subscribe kênh cũ tới T03b.
 
     Per D-S04-13 LAW Option Z: AI service publishes; this endpoint just
     forwards published messages to the EventSource. In production the Gateway
@@ -143,7 +160,7 @@ async def _sse_subscribe_stream(request_id: str) -> AsyncIterator[str]:
         - On `final` event: break loop + close subscription
         - On timeout / client disconnect: caller handles via `stream_with_context`
     """
-    channel = _SSE_PUBSUB_CHANNEL_TEMPLATE.format(request_id=request_id)
+    channel = f"sse:pubsub:{_scoped_id(tenant_id, request_id)}"
     client = aioredis.from_url(_redis_url(), decode_responses=True)
     pubsub = client.pubsub()
     try:
@@ -226,6 +243,8 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
 
     redis_url = _redis_url()
     request_id = initial_state["request_id"]
+    # S-P0-01 T03a: tenant cho dual-publish + thread_id scope (ADR-040 iv / 048 c).
+    tenant_id = initial_state.get("tenant_id")
 
     def _runner() -> None:
         loop = asyncio.new_event_loop()
@@ -239,7 +258,7 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                 redis_url, ttl=_SAVER_TTL_CONFIG
             ) as saver:
                 await saver.asetup()
-                publisher = RedisPublisher(redis_url=redis_url)
+                publisher = RedisPublisher(redis_url=redis_url, tenant_id=tenant_id)
                 try:
                     # ─── Phiên Sx04-12 EMERGENCY FIX: wait-for-subscriber gate ───
                     # D-S04-13 LAW Option Z race condition: graph publishes
@@ -253,6 +272,10 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                     # dev mode in main.py _sse_subscribe_stream may pick up
                     # later events, and FE will at least see final/error).
                     pub_client = await publisher._ensure_client()
+                    # S-P0-01 T03a: gate poll kênh CŨ `sse:pubsub:{rid}` CÓ CHỦ Ý —
+                    # consumer production là Gateway, vẫn subscribe kênh cũ tới T03b.
+                    # Dual-publish emit cả 2 kênh nên không mất event. (Dev direct-call
+                    # subscribe kênh mới → gate 3s timeout rồi publish-anyway, best-effort.)
                     channel = f"sse:pubsub:{request_id}"
                     _gate_started_at = asyncio.get_event_loop().time()
                     _gate_timeout_s = 3.0
@@ -376,7 +399,12 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
                         graph = compile_cart_by_text_graph(saver, publisher)
                     else:
                         graph = compile_searching_by_text_graph(saver, publisher)
-                    config = {"configurable": {"thread_id": request_id}}
+                    # S-P0-01 T03a: thread_id tenant-scoped (ADR-040 iv).
+                    config = {
+                        "configurable": {
+                            "thread_id": _scoped_id(tenant_id, request_id)
+                        }
+                    }
                     async for _chunk in graph.astream(initial_state, config=config):
                         # Events are published by nodes via redis_publisher;
                         # astream chunks are state-snapshot deltas we don't need
@@ -404,7 +432,7 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
             # async-with publisher above may have already torn down.
             try:
                 async def _emit_error() -> None:
-                    err_pub = RedisPublisher(redis_url=redis_url)
+                    err_pub = RedisPublisher(redis_url=redis_url, tenant_id=tenant_id)
                     try:
                         await err_pub.publish_sse(
                             request_id,
@@ -441,7 +469,9 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> None:
     t.start()
 
 
-def _drive_graph_resume_async(request_id: str, resume_value: Any) -> None:
+def _drive_graph_resume_async(
+    request_id: str, resume_value: Any, tenant_id: str | None = None
+) -> None:
     """Spawn an asyncio task that resumes the search graph with a Command(resume=...).
 
     Per D-S04-13 LAW Pattern A: when Gateway forwards POST /action to this AI
@@ -465,14 +495,20 @@ def _drive_graph_resume_async(request_id: str, resume_value: Any) -> None:
                 redis_url, ttl=_SAVER_TTL_CONFIG
             ) as saver:
                 await saver.asetup()
-                publisher = RedisPublisher(redis_url=redis_url)
+                publisher = RedisPublisher(redis_url=redis_url, tenant_id=tenant_id)
                 try:
                     # S-05 T02 NEW per C-S05-F Path α LAW + D-S05-01 LAW:
                     # Peek checkpointed state to recover entry_intent for
                     # correct graph compile target on resume. RedisSaver
                     # persisted state.entry_intent at first node's interrupt;
                     # we read it back before compile.
-                    config = {"configurable": {"thread_id": request_id}}
+                    # S-P0-01 T03a: thread_id tenant-scoped — phải khớp namespace
+                    # đã dùng ở /intent để aget_tuple tìm đúng checkpoint.
+                    config = {
+                        "configurable": {
+                            "thread_id": _scoped_id(tenant_id, request_id)
+                        }
+                    }
                     entry_intent_dispatch = None
                     try:
                         checkpoint_tuple = await saver.aget_tuple(config)
@@ -644,9 +680,17 @@ def create_app() -> Flask:
             # backward-compat with smoke tests that bypass JwtAuthGuard.
             # Without this, cart_by_text graph nodes operate on anon cart →
             # wrong cart cleared/checked per Bug #1+#2 manual test.
-            user_id = payload.get("user_id") if isinstance(
+            # S-P0-01 T03a (ADR-047): identity transport = header (Gateway forward).
+            # user_id: ưu tiên header X-User-Id, fallback body.user_id (2-phase —
+            # Gateway còn gửi body.user_id tới T03b), cuối cùng 'anon' (dev/smoke).
+            # tenant_id: chỉ header (None khi anonymous/dev — chưa enforce tới T03b).
+            hdr_user = request.headers.get("X-User-Id")
+            hdr_tenant = request.headers.get("X-Tenant-Id")
+            body_user = payload.get("user_id") if isinstance(
                 payload.get("user_id"), str
-            ) else "anon"
+            ) else None
+            user_id = hdr_user or body_user or "anon"
+            tenant_id = hdr_tenant or None
             # Sx07-F-debug Phiên 2026-05-26 — Explicit filter override (A1).
             # FE-injected chip filters (brand/category) propagated verbatim to
             # IcpState._filters. searching_by_text.parse_filters node detects
@@ -664,6 +708,8 @@ def create_app() -> Flask:
             span.set_attribute("ai.modality", modality)
             span.set_attribute("ai.mode", mode)
             span.set_attribute("ai.user_id", user_id)
+            if tenant_id:
+                span.set_attribute("ai.tenant_id", tenant_id)
             if entry_intent:
                 span.set_attribute("ai.entry_intent", entry_intent)
 
@@ -695,6 +741,9 @@ def create_app() -> Flask:
                 # persisted in checkpointed state — survives interrupt/resume
                 # boundary so resume nodes still operate on correct user cart.
                 "user_id": user_id,
+                # S-P0-01 T03a: tenant checkpointed → nodes đọc per-call qua
+                # identity_kwargs(state) → MCP header; survives interrupt/resume.
+                "tenant_id": tenant_id,
                 # Sx07-F-debug Phiên 2026-05-26 — Filter override (A1).
                 # When dict non-empty, parse_filters node uses these instead
                 # of calling LLM. Shape: {category?: str, extra: {brand?: str}}.
@@ -713,7 +762,7 @@ def create_app() -> Flask:
             def _sse_generator() -> Any:
                 loop = asyncio.new_event_loop()
                 try:
-                    agen = _sse_subscribe_stream(request_id)
+                    agen = _sse_subscribe_stream(request_id, tenant_id)
                     while True:
                         try:
                             msg = loop.run_until_complete(agen.__anext__())
@@ -785,7 +834,11 @@ def create_app() -> Flask:
             if attempt_n is not None:
                 resume_value["attempt_n"] = attempt_n
 
-            _drive_graph_resume_async(rid, resume_value)
+            # S-P0-01 T03a: tenant từ header (Gateway forward trên /resume nữa) —
+            # cần để dựng thread_id `{tenant}:{rid}` khớp checkpoint của /intent +
+            # dual-publish. Gateway intent-action.controller forward X-Tenant-Id.
+            resume_tenant_id = request.headers.get("X-Tenant-Id") or None
+            _drive_graph_resume_async(rid, resume_value, resume_tenant_id)
 
             return jsonify({"status": "accepted", "request_id": rid}), 202
 

@@ -85,7 +85,7 @@ from opentelemetry import trace
 
 from ...state import IcpState
 from ...tools.llm_client import LLMTimeout, get_llm_client
-from ...tools.mcp_client import McpClient, McpError
+from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
 from ...prompts import load_prompt
 
@@ -150,7 +150,9 @@ async def _node_clear_confirm_prompt(
     user_id = state.get("user_id") or "anon"
 
     try:
-        cart = await mcp_client.call("cart.get", {"user_id": user_id})
+        cart = await mcp_client.call(
+            "cart.get", {"user_id": user_id}, **identity_kwargs(state)
+        )
     except McpError as e:
         _logger.warning(
             "cart_clear.cart_get_failed", request_id=rid, error=str(e)
@@ -217,7 +219,9 @@ async def _node_clear_execute(
 
     if choice == "confirm_clear":
         try:
-            await mcp_client.call("cart.clear", {"user_id": user_id})
+            await mcp_client.call(
+                "cart.clear", {"user_id": user_id}, **identity_kwargs(state)
+            )
             _logger.info("cart.cleared_via_graph", request_id=rid, user_id=user_id)
         except McpError as e:
             _logger.error(
@@ -253,7 +257,9 @@ async def _node_cart_view(
     user_id = state.get("user_id") or "anon"
 
     try:
-        cart = await mcp_client.call("cart.get", {"user_id": user_id})
+        cart = await mcp_client.call(
+            "cart.get", {"user_id": user_id}, **identity_kwargs(state)
+        )
     except McpError as e:
         _logger.error(
             "cart_view.cart_get_failed", request_id=rid, error=str(e)
@@ -412,6 +418,7 @@ async def _node_stock_issue_lookup(
                         "limit": 5,
                         "rank_profile": "ai_augmented",
                     },
+                    **identity_kwargs(state),
                 ),
                 timeout=_STOCK_LLM_SOFT_TIMEOUT_S,
             )
@@ -575,6 +582,7 @@ async def _node_stock_resolve(
             await mcp_client.call(
                 "cart.remove",
                 {"user_id": user_id, "product_id": product_id},
+                **identity_kwargs(state),
             )
             _logger.info(
                 "stock_resolve.removed",
@@ -586,6 +594,7 @@ async def _node_stock_resolve(
             await mcp_client.call(
                 "cart.remove",
                 {"user_id": user_id, "product_id": product_id},
+                **identity_kwargs(state),
             )
             # 2) Add replacement product (uses qty=1 default; FE may
             #    surface a qty stepper post-resolve if needed).
@@ -597,6 +606,7 @@ async def _node_stock_resolve(
                         "product_id": replacement_id,
                         "qty": 1,
                     },
+                    **identity_kwargs(state),
                 )
             _logger.info(
                 "stock_resolve.replaced",

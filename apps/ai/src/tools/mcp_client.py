@@ -38,6 +38,18 @@ _logger = structlog.get_logger()
 _propagator = TraceContextTextMapPropagator()
 
 
+def identity_kwargs(state: Any) -> dict[str, Any]:
+    """Extract MCP identity kwargs (tenant_id/user_id) from graph state.
+
+    S-P0-01 T03a (ADR-047 amend 2026-06-12): identity propagates Gateway→AI→MCP
+    via HTTP header, NOT params. Contextvar KHÔNG dùng được phía AI vì graph chạy
+    trong threading.Thread (contextvar không propagate) → truyền tường minh qua
+    state. Mỗi node có `state` ở runtime (kể cả node của 3 graph dựng client lúc
+    compile) → đọc per-call. user_id trong params GIỮ song song tới T03b (2-phase).
+    """
+    return {"tenant_id": state.get("tenant_id"), "user_id": state.get("user_id")}
+
+
 class McpError(Exception):
     """Raised when MCP server returns a JSON-RPC error object."""
 
@@ -71,24 +83,45 @@ class McpClient:
             self._client = httpx.AsyncClient(timeout=self._timeout)
         return self._client
 
-    def _build_headers(self) -> dict[str, str]:
-        """Build HTTP headers with W3C trace context injected.
+    def _build_headers(
+        self, tenant_id: str | None = None, user_id: str | None = None
+    ) -> dict[str, str]:
+        """Build HTTP headers with W3C trace context + tenant identity injected.
 
         Returns dict containing at minimum `content-type`; `traceparent` is
         added when an active OTel span exists (else propagator no-ops).
+
+        S-P0-01 T03a (ADR-047 amend 2026-06-12): inject `X-Tenant-Id` + `X-User-Id`
+        khi có (cùng pattern Gateway buildMcpIdentityHeaders — tenant null=global
+        → bỏ X-Tenant-Id). MCP CHƯA enforce ở T03a (header thừa vô hại); T03b bật
+        fail-closed.
         """
         headers: dict[str, str] = {"content-type": "application/json"}
         # Propagator.inject() reads from current OTel context and writes
         # traceparent + tracestate into the carrier dict.
         _propagator.inject(carrier=headers, setter=default_setter)
+        if tenant_id:
+            headers["X-Tenant-Id"] = tenant_id
+        if user_id:
+            headers["X-User-Id"] = user_id
         return headers
 
-    async def call(self, method: str, params: dict[str, Any]) -> Any:
+    async def call(
+        self,
+        method: str,
+        params: dict[str, Any],
+        *,
+        tenant_id: str | None = None,
+        user_id: str | None = None,
+    ) -> Any:
         """Invoke an MCP tool via JSON-RPC 2.0.
 
         Args:
             method: MCP tool name (e.g. "auth.verify_jwt", "events.append").
             params: Tool params dict per docs/03_API_CONTRACTS §5.
+            tenant_id: active tenant → header `X-Tenant-Id` (S-P0-01 T03a).
+            user_id: authenticated user → header `X-User-Id` (S-P0-01 T03a).
+                     Caller thường truyền qua `**identity_kwargs(state)`.
 
         Returns:
             The `result` field of the JSON-RPC response.
@@ -110,7 +143,7 @@ class McpClient:
             span.set_attribute("mcp.method", method)
             span.set_attribute("mcp.request_id", request_id)
 
-            headers = self._build_headers()
+            headers = self._build_headers(tenant_id=tenant_id, user_id=user_id)
             client = await self._ensure_client()
 
             _logger.debug(

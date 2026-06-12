@@ -175,6 +175,15 @@ class IcpState(TypedDict, total=False):
     # that pre-date JWT propagation (e.g. smoke tests bypassing auth).
     user_id: str
 
+    # --- S-P0-01 T03a (ADR-047 amend 2026-06-12): active tenant ---
+    # Resolved at Gateway (JWT/URL membership) → forwarded header X-Tenant-Id →
+    # AI main.py initial_state['tenant_id'] → checkpointed via RedisSaver →
+    # restored on resume. Nodes đọc field này để truyền per-call qua
+    # identity_kwargs(state) → MCP header X-Tenant-Id (mcp_client). None =
+    # anonymous/dev (chưa enforce tới T03b). Tách khỏi RedisSaver thread_id
+    # ({tenant}:{rid}) + voice:context key ({tenant}:{user}) per ADR-040 (iv).
+    tenant_id: str | None
+
     # --- S-04 T02 D-S04-13 LAW fields (Phiên Sx04-5) ---
     mode: Mode
     cart_trigger_product_id: str

@@ -114,7 +114,7 @@ from opentelemetry import trace
 
 from ...state import IcpState
 from ...tools.llm_client import LLMTimeout, get_llm_client, LITE_MODEL
-from ...tools.mcp_client import McpClient, McpError
+from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
 from ...prompts import load_prompt
 
@@ -150,7 +150,11 @@ def _redis_url() -> str:
     return os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 
-def _voice_context_key(user_id: str) -> str:
+def _voice_context_key(user_id: str, tenant_id: str | None = None) -> str:
+    # S-P0-01 T03a (ADR-040 iv): tenant-scoped (shared shape với buying_by_voices).
+    # tenant None=dev → key cũ. Key cũ orphan sau deploy — TTL 30min tự hết.
+    if tenant_id:
+        return f"voice:context:{tenant_id}:{user_id}"
     return f"voice:context:{user_id}"
 
 
@@ -163,7 +167,9 @@ def _now_iso() -> str:
 # ============================================================================
 
 
-async def _load_voice_context_redis(user_id: str) -> list[dict[str, Any]]:
+async def _load_voice_context_redis(
+    user_id: str, tenant_id: str | None = None
+) -> list[dict[str, Any]]:
     """Load voice:context:{user_id} from Redis. Returns [] if missing.
 
     Separate Redis key from RedisSaver checkpoint per D-S08-NN-A LAW. TTL
@@ -172,10 +178,10 @@ async def _load_voice_context_redis(user_id: str) -> list[dict[str, Any]]:
     """
     client = aioredis.from_url(_redis_url(), decode_responses=True)
     try:
-        raw = await client.get(_voice_context_key(user_id))
+        raw = await client.get(_voice_context_key(user_id, tenant_id))
         if not raw:
             return []
-        await client.expire(_voice_context_key(user_id), VOICE_CONTEXT_TTL_S)
+        await client.expire(_voice_context_key(user_id, tenant_id), VOICE_CONTEXT_TTL_S)
         try:
             doc = json.loads(raw)
         except json.JSONDecodeError as e:
@@ -189,7 +195,7 @@ async def _load_voice_context_redis(user_id: str) -> list[dict[str, Any]]:
 
 
 async def _save_voice_context_redis(
-    user_id: str, turns: list[dict[str, Any]]
+    user_id: str, turns: list[dict[str, Any]], tenant_id: str | None = None
 ) -> None:
     """Save voice:context:{user_id} with FIFO truncate + TTL (D-S08-NN-A)."""
     truncated = turns[-VOICE_CONTEXT_MAX_TURNS:]
@@ -197,7 +203,7 @@ async def _save_voice_context_redis(
     client = aioredis.from_url(_redis_url(), decode_responses=True)
     try:
         await client.set(
-            _voice_context_key(user_id),
+            _voice_context_key(user_id, tenant_id),
             json.dumps(doc, ensure_ascii=False),
             ex=VOICE_CONTEXT_TTL_S,
         )
@@ -254,7 +260,9 @@ async def _node_load_context(
         await publisher.publish_sse(
             rid, "status", {"phase": "load_context", "request_id": rid},
         )
-        voice_history = await _load_voice_context_redis(user_id)
+        voice_history = await _load_voice_context_redis(
+            user_id, state.get("tenant_id")
+        )
         span.set_attribute("analyze.history_turns", len(voice_history))
 
     _logger.info("analyze.context_loaded", request_id=rid, user_id=user_id,
@@ -315,6 +323,7 @@ async def _node_speech_transcribe(
             result = await mcp.call(
                 "speech.transcribe",
                 {"audio_b64": audio_b64, "mime_type": "audio/webm", "lang": "vi"},
+                **identity_kwargs(state),
             )
             span.set_attribute("analyze.text_chars",
                                len((result or {}).get("text", "")))
@@ -507,12 +516,15 @@ async def _node_execute_queries(
         with _tracer.start_as_current_span("analyze.execute_queries"):
             agg, anomaly, stock = await asyncio.gather(
                 mcp.call("analytics.aggregate",
-                         {"merchant_id": merchant_id, "period": "month"}),
+                         {"merchant_id": merchant_id, "period": "month"},
+                         **identity_kwargs(state)),
                 mcp.call("analytics.detect_anomaly",
                          {"merchant_id": merchant_id,
-                          "window_days": ANOMALY_WINDOW_DAYS}),
+                          "window_days": ANOMALY_WINDOW_DAYS},
+                         **identity_kwargs(state)),
                 mcp.call("analytics.stock_snapshot",
-                         {"merchant_id": merchant_id}),
+                         {"merchant_id": merchant_id},
+                         **identity_kwargs(state)),
             )
     except McpError as e:
         return await _emit_error_and_route_to_final(
@@ -620,9 +632,10 @@ async def _node_build_insights(
                         "delta_rev_merchant": delta_rev_merchant,
                         "period": period,
                         "product_id": None, "merchant_id": merchant_id,
-                    }),
+                    }, **identity_kwargs(state)),
                     mcp.call("analytics.suggest_promo",
-                             {"delta_pct": worst.get("delta_pct", 0)}),
+                             {"delta_pct": worst.get("delta_pct", 0)},
+                             **identity_kwargs(state)),
                 )
                 reasoning["trend"] = trend
                 bd = trend.get("breakdown") or [{}, {}]
@@ -665,7 +678,7 @@ async def _node_build_insights(
             restock = await mcp.call("analytics.suggest_restock", {
                 "qty_7d": int(restock_product.get("qty_7d") or 0),
                 "current_stock": int(restock_product.get("current_stock") or 0),
-            })
+            }, **identity_kwargs(state))
             if restock.get("emitted"):
                 reasoning["restock"] = restock
                 cards.append({
@@ -694,7 +707,7 @@ async def _node_build_insights(
                 "trend_trajectory": traj,
                 "reorder_qty": int(restock.get("reorder_qty") or 0),
                 "unit_price": int(restock_product.get("unit_price") or 0),
-            })
+            }, **identity_kwargs(state))
             if loan.get("emitted"):
                 reasoning["loan"] = loan
                 cards.append({
@@ -841,7 +854,9 @@ async def _node_save_voice_context(
     existing = state.get("voice_history") or []  # type: ignore[typeddict-item]
     new_history = list(existing) + [this_turn]
     try:
-        await _save_voice_context_redis(user_id, new_history)
+        await _save_voice_context_redis(
+            user_id, new_history, state.get("tenant_id")
+        )
         _logger.info("analyze.context_saved", request_id=rid, user_id=user_id,
                      total_turns=len(new_history[-VOICE_CONTEXT_MAX_TURNS:]))
     except Exception as e:  # noqa: BLE001

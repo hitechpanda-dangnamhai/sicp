@@ -83,7 +83,7 @@ from opentelemetry import trace
 
 from ...state import IcpState
 from ...tools.llm_client import LLMError, LLMTimeout, get_llm_client
-from ...tools.mcp_client import McpClient, McpError
+from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
 from ...prompts import load_prompt
 
@@ -235,6 +235,7 @@ async def _node_vision_analyze(
         result = await mcp_client.call(
             "vision.analyze",
             {"image_b64": image_b64, "timeout_s": _VISION_TIMEOUT_S},
+            **identity_kwargs(state),
         )
     except McpError as e:
         _logger.warning("recommend.vision.mcp_error", request_id=rid, error=str(e))
@@ -361,16 +362,20 @@ async def _node_parallel_fetch(
 
     # ─── Step 1: query corpus size FIRST (needed for phase_progress.meta) ───
     # This is intentionally outside gather so meta can be emitted accurately.
-    corpus_size_task = mcp_client.call("analytics.product_corpus_size", {})
+    corpus_size_task = mcp_client.call(
+        "analytics.product_corpus_size", {}, **identity_kwargs(state)
+    )
 
     # Visual + collab queries fired in parallel with corpus_size.
     visual_task = mcp_client.call(
         "vespa.image_nearest_neighbor",
         {"query_desc": query_desc, "limit": _BLEND_MAX_HITS, "category_filter": (state.get("_detected") or {}).get("category") or None},
+        **identity_kwargs(state),
     )
     collab_task = mcp_client.call(
         "analytics.co_purchased",
         {"category": category or "mi_an_lien", "limit": 20},
+        **identity_kwargs(state),
     )
 
     results = await asyncio.gather(
