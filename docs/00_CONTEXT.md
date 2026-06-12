@@ -148,6 +148,7 @@ icp/
 | Registry log message + behavior event | `docs/LOG_CATALOG.md` | Append TRƯỚC khi emit (CLAUDE.md DoD §5) |
 | Contract (OpenAPI + types) | `packages/shared-types/openapi.json` + `src/api/` | Máy sinh `pnpm openapi:sync` |
 | Tri thức triển khai (code hoạt động ra sao) | CODE | PULL khi cần (CLAUDE.md §3) |
+| Kiến trúc AI chi tiết (graph kernel v6) | `docs/AI_ARCHITECTURE_v6.md` (pointer ADR-051) | Tay, update CÙNG PR khi đổi graph kernel |
 | Fossil docs v1 | `docs/archive-v1/` (`README.md` map) | Read-only, T08 normalize references |
 
 ## §5 Glossary (chỉ thuật ngữ cần)

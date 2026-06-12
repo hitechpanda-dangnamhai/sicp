@@ -33,6 +33,16 @@
 ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớm — payment + GDPR
 + analytics đều scope theo tenant; retrofit sau tốn gấp 3.
 
+**Re-architecture program (ADR-052, supersede một phần ADR-045§b):** 8 cluster C1–C8
+thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → safety-net → outbox/DLQ
+→ media/cache → tenant depth → AI v6 → scale infra. Sổ phủ 105 finding = §3 map dưới.
+
+**NFR phê chuẩn bởi Human 2026-06-13 (ADR-052):**
+- **1.000 tenant** năm 1 · **500 RPS** sustained / **2.000** peak.
+- p95 **REST <300ms** · p95 **intent-stream-start <2s** · availability **99,9%**.
+- **RPO 15min / RTO 1h**.
+- **LLM cost** = proxy **đ/intent-call** (chốt số sau 2 tuần data W-93).
+
 ## §2 Slices (registry vĩnh viễn — danh tính, không brief)
 
 | ID | Tên | Phase | Status | Episodes |
@@ -53,6 +63,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
+| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ⬜ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -106,6 +117,38 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 30 | Inline comment pattern voice:context Redis FIFO 5 turns TTL 30min (Intent 02 + 07) | — | 🔵 | thêm note tại `_node_load_voice_context` 2 graph khi chạm code; "KHÔNG đổi schema mà không bump version" |
 | 34 | FE ẩn/khoá page intent 01+07 dưới `/s/[slug]` cho non-member (hiện 403 lúc submit — UX, không security) | ADR-050 | 🟡 | sau T03e enforce per-intent policy |
 | 32 | `nest build` emit không hoạt động, dùng `tsc` trực tiếp | — | ✅ | FIXED 06-12: Dockerfile `rm -rf dist *.tsbuildinfo` + `build`=`tsc -p tsconfig.build.json` (incremental:false) thay nest build → clean full emit. Acceptance: delta source + docker build CÓ-cache → string mới có trong dist của image + gateway tsc-built boot OK. (Lịch sử: docker build có-cache ship dist stale, lộ ở smoke T02c) |
+
+### Map 105 finding → cluster (ADR-052 · nguồn `docs/INVENTORY_2026-06-13.md`)
+
+> Sổ phủ luật **W-ID mồ côi** (CLAUDE.md §5): mọi ID inventory phải có nhà.
+> **Đếm: 14+17+13+8+0+5+9+14+10 (C1·C2·C3·C3-RT·C4·C5·C6·C7·C8) + 12 GIỮ + 3 S-AUDIT = 105.** ✅
+> ID = A1–A22 (S-SCALE-AUDIT) + W-23…W-105. ID chỉ sống ở cột **IDs** (tên cluster machine-clean).
+> Đóng cluster → tick W-IDs nhận (✅/🟡/🔵). Bất biến cứng (ADR-052): **outbox/DLQ + error
+> envelope (C3) XONG TRƯỚC payment (C4)**.
+> ⚠️ **Ranh giới C2–C8 PROVISIONAL** (neo theo thứ tự ADR-052 + domain inventory),
+> firm khi từng slice spawn. **C1 chốt** (= slice S-P0-02). Phân theo verdict/domain,
+> KHÔNG theo severity (1 P1 latent có thể nằm C1).
+
+| Cluster | Tên | IDs (∑) | Slice |
+|---|---|---|---|
+| **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58,59,60,61,62,63,66,67,85,94,104 · A16,A17,A18 (**14**) | **S-P0-02** (active) |
+| **C2** | Safety-net (test/CI/eval/golden + obs cost-trace) — TRƯỚC AI-refactor | A13 · W-32,37,40,46,54,55,56,74,75,76,77,78,79,80,81,93 (**17**) | — |
+| **C3** | Async backbone & event integrity (Kafka/outbox/relay/DLQ/envelope/retry-CB/events-partition) — XONG TRƯỚC payment | A7,A10,A11,A12,A15,A20,A21 · W-44,68,70,71,72,73 (**13**) | — |
+| **C3-RT** | Runtime-prod hardening & backpressure (flask→gunicorn/MCP-pool/Redis-HA/SSE-cap/deadlock-retry/load-shed) — *split của C3 per Plan KI#3* | A1,A3,A4,A5 · W-86,95,96,97 (**8**) | — |
+| **C4** | Payment & order integrity | (**0** inventory — payment = build mới BACKLOG #2/#3, không phải weakness có sẵn; phụ thuộc cứng C3 outbox/DLQ) | — |
+| **C5** | Media & cache (object store/CDN/cache-tiers/ETag) | W-47,88,89,90,91 (**5**) | — |
+| **C6** | Tenant depth (quota/lifecycle/GDPR-delete/RLS-deep/PII/index-composite) | A6 · W-45,50,51,57,87,98,99,100 (**9**) | — |
+| **C7** | AI v6 (ADR-051: evidence-loop/tool-RAG/reflection/validate/route-lite/guardrails) | W-23,24,25,26,28,31,33,34,35,36,38,39,42,92 (**14**) | — |
+| **C8** | Scale infra (k8s/Vespa-HA/mTLS/secret-mgr/WAF/CDN-assets/ISR-SSG/JWT-kid) | A8,A19,A22 · W-64,65,69,101,102,103,105 (**10**) | — |
+| **GIỮ** | Verdict GIỮ — KHÔNG cần action (defer/chủ ý) | A2,A9,A14 · W-27,29,30,41,43,48,49,52,53 (**12**) | — |
+| **S-AUDIT** | Docs/workflow drift → audit định kỳ | W-82,83,84 (**3**) | S-AUDIT |
+
+**Phán quyết Plan KI#3:** bất biến = "outbox/DLQ + error envelope XONG TRƯỚC payment".
+relay (W-68) + envelope (W-44) + events-partition (A7) → **C3** (KHÔNG C5: async backbone
+≤C3, trước media/cache C5 + payment C4). **Runtime-prod tách hàng riêng C3-RT** (gunicorn
+A1/MCP-pool A3/Redis-HA A4/SSE-cap A5 + backpressure W-86/95/96/97) — theo điều kiện KI#3.
+**W-61** primary C1 (critical+high vá ngay), residual moderate/pip → C8. **W-104** rotate
+C1, secret-manager thật → C8.
 
 ## §4 Done gần đây
 

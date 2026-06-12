@@ -51,5 +51,10 @@
 | [ADR-048](ADR-048.md) | LangGraph interrupt+resume + RedisSaver checkpoint + Redis pub/sub SSE forward (Pattern A) | Accepted | interrupt()/Command(resume) + checkpoint TTL 30min refresh_on_read + Option Z pub/sub forward + attempt_n composite key 5min |
 | [ADR-049](ADR-049.md) | Idempotency middleware apply per-route (not global) — login password attempts MUST NOT cache | Accepted | per-module `.forRoutes()`; intent-action MW riêng 5min; CẤM cache `/auth/login*` (replay attack); default OFF |
 | [ADR-050](ADR-050.md) | Per-intent membership policy tại Gateway (default-deny) | Accepted | IntentPolicyGuard thay TenantMembershipGuard ở /intent + /:rid/action; matrix {01,07}=member-required, {02,03,04,05}=customer-allowed; tuple lạ→default-deny; membership_required ghi vào intent:cache VALUE |
+| [ADR-051](ADR-051.md) | AI Architecture v6 (umbrella, họ ADR) | Accepted | v5 core + 6 nâng cấp (planner/eval-driven/cost/guardrails/tách-workload/context-budget); ADR con khi C7 chạm; chi tiết sống `docs/AI_ARCHITECTURE_v6.md`, supersede fossil v5 |
+| [ADR-052](ADR-052.md) | Re-architecture program (umbrella) | Accepted | Production hoá TẠI sicp (bác greenfield); 8 cluster C1–C8 thứ tự ép bởi ràng buộc cứng; supersede một phần ADR-045§b; map 105→cluster ở BACKLOG §3 |
+| [ADR-053](ADR-053.md) | Media: ảnh ra object store + CDN | Accepted | Ảnh → S3-compatible + CDN, DB giữ key+metadata; backfill 2-pha dual-read→cutover; gỡ one-way door base64 (W-90/W-47); thi hành C4 |
+| [ADR-054](ADR-054.md) | LLM cost architecture | Accepted | Giữ provider-abstraction 1 swap; durable trace từ C2 (W-93); route task lite (W-92); distill SAU eval harness; cost per-tenant/intent; quyết bằng số |
+| [ADR-055](ADR-055.md) | Stock concurrency: optimistic atomic decrement | Accepted | Trừ kho = single-statement atomic UPDATE...WHERE stock>=n tenant-scoped; KHÔNG FOR UPDATE; validate=advisory; invariant stock≥0 tại DB; cột thật `stock` |
 
 ⚠️ **Gap:** ADR-026 … ADR-030 không tồn tại trong file gốc — không sinh số bù.

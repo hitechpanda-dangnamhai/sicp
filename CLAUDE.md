@@ -34,6 +34,9 @@
 - [ ] Migration: forward-only, số kế tiếp theo FACTS, kèm rollback note trong commit body
 - [ ] Sau V011: mọi query data path có tenant scope (RLS/tenant_id) + isolation test
 - [ ] Task đổi bề mặt FACTS (migration/route/graph/MCP tool/page/test) → `bash scripts/gen-facts.sh` + commit `docs/FACTS.md` trong CÙNG squash commit (guard facts-drift chạy mỗi push, không chỉ lúc đóng slice)
+- [ ] **Tenant gate (ADR-052):** mọi thay đổi data-path phải có ≥1 assert cross-tenant (request tenant A KHÔNG đọc/ghi được data tenant B) — không assert = chưa xong
+- [ ] **Re-verify scoped (ADR-052):** finding nhận từ inventory/audit là GIẢ THUYẾT — verify lại tại `path:line` TRƯỚC khi code, ghi CONFIRMED/STALE/CHANGED vào report (lý do: inventory từng có P0 giả do đọc nhầm đơn vị)
+- [ ] **W-ID mồ côi (ADR-052):** đóng slice phải tick các W-IDs nó nhận trong `BACKLOG §3` map; chương trình re-architecture CHƯA kết thúc khi còn W-ID chưa GIỮ / chưa ✅ / chưa thuộc slice nào
 
 ## 6. COMMIT
 - Trong task: commit nháp tuỳ ý. ĐÓNG TASK: **squash về đúng 1 commit**.
