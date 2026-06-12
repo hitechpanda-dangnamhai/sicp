@@ -50,5 +50,6 @@
 | [ADR-047](ADR-047.md) | AI service trusts Gateway-forwarded identity (no JWT verify in AI/MCP) | Accepted | Gateway = perimeter; AI/MCP tin `X-User-Id` + `X-Tenant-Id`; enforce network isolation infra-level |
 | [ADR-048](ADR-048.md) | LangGraph interrupt+resume + RedisSaver checkpoint + Redis pub/sub SSE forward (Pattern A) | Accepted | interrupt()/Command(resume) + checkpoint TTL 30min refresh_on_read + Option Z pub/sub forward + attempt_n composite key 5min |
 | [ADR-049](ADR-049.md) | Idempotency middleware apply per-route (not global) — login password attempts MUST NOT cache | Accepted | per-module `.forRoutes()`; intent-action MW riêng 5min; CẤM cache `/auth/login*` (replay attack); default OFF |
+| [ADR-050](ADR-050.md) | Per-intent membership policy tại Gateway (default-deny) | Accepted | IntentPolicyGuard thay TenantMembershipGuard ở /intent + /:rid/action; matrix {01,07}=member-required, {02,03,04,05}=customer-allowed; tuple lạ→default-deny; membership_required ghi vào intent:cache VALUE |
 
 ⚠️ **Gap:** ADR-026 … ADR-030 không tồn tại trong file gốc — không sinh số bù.

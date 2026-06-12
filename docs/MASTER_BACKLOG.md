@@ -104,6 +104,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 28 | gtrends real API / Image CDN / dark mode / i18n / token contract test | — | 🔵 | — |
 | 29 | Đồng bộ log level enum structlog→Pino (warning→warn, critical→fatal) | — | 🔵 | query Loki hiện phải OR 2 enum |
 | 30 | Inline comment pattern voice:context Redis FIFO 5 turns TTL 30min (Intent 02 + 07) | — | 🔵 | thêm note tại `_node_load_voice_context` 2 graph khi chạm code; "KHÔNG đổi schema mà không bump version" |
+| 34 | FE ẩn/khoá page intent 01+07 dưới `/s/[slug]` cho non-member (hiện 403 lúc submit — UX, không security) | ADR-050 | 🟡 | sau T03e enforce per-intent policy |
 | 32 | `nest build` emit không hoạt động, dùng `tsc` trực tiếp | — | ✅ | FIXED 06-12: Dockerfile `rm -rf dist *.tsbuildinfo` + `build`=`tsc -p tsconfig.build.json` (incremental:false) thay nest build → clean full emit. Acceptance: delta source + docker build CÓ-cache → string mới có trong dist của image + gateway tsc-built boot OK. (Lịch sử: docker build có-cache ship dist stale, lộ ở smoke T02c) |
 
 ## §4 Done gần đây
