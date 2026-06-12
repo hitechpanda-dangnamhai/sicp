@@ -55,6 +55,10 @@ DoD: <từng mục ✓ hoặc N/A+lý do>
 Known issues: <tự khai, kể cả nghi ngờ>
 Đề xuất commit message: <theo format §6>
 ```
+> Sau khi human duyệt report đóng task: flip cell episode của task trong
+> BACKLOG §2 (⬜→✅, 1-cell edit; commit META riêng hoặc gộp commit docs cùng
+> nhịp). Pha C vẫn là nhịp bắt buộc cho status SLICE + §4 khi đóng cả slice —
+> luật này chỉ chuẩn hoá flip sớm cấp episode.
 
 ## 8. ĐÓNG SLICE (khi human xác nhận task cuối xong)
 1. `bash scripts/gen-facts.sh` → FACTS.md mới
