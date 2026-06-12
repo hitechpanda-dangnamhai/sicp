@@ -52,7 +52,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
-| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ⬜ · T03b ⬜ · T04–T05 ⬜ |
+| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ⬜ · T03b ⬜ · T04–T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -85,7 +85,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | 15 | Circuit breaker + retry (call ngoài) | — | 🟡 | VNPay/Momo/ZaloPay + Vespa + Gemini/OpenAI + Shopee |
 | 16 | Matview refresh job (3 matview) | — | 🟡 | cron `REFRESH MATERIALIZED VIEW CONCURRENTLY` |
 | 17 | `products` CRUD (GET/POST/DELETE) | — | 🟡 | hiện chỉ `PATCH :id` |
-| 18 | CI gate nâng cao | — | 🟡 | lint --max-warnings 0 + tsc + openapi:sync drift + coverage + next build apps/web — bằng chứng: latent break CSS import T02b-1 lọt CI green (report T02b-2 issue #1), tsc không resolve CSS import |
+| 18 | CI gate nâng cao | — | 🟡 | lint --max-warnings 0 + tsc + openapi:sync drift + coverage + next build apps/web — bằng chứng: latent break CSS import T02b-1 lọt CI green (report T02b-2 issue #1), tsc không resolve CSS import. spec files bị tsconfig exclude khỏi typed-lint — vướng 2 task liên tiếp (T03c known-issue-2, T03d known-issue-1) |
 | 19 | Load test (k6) + runbook/on-call | — | 🟡 | verify SLO |
 | 20 | Secrets vault + graceful shutdown | — | 🟡 | rotate JWT/API; SIGTERM drain |
 | 21 | Regex-PII redactor (bổ sung Pino path-redact) | — | 🟡 | — |
