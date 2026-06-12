@@ -25,7 +25,7 @@
  *   Format: local TZ HH:mm with VN heuristic "hôm nay" (today) vs date.
  * - **DM-10(d)** — 3 settings rows via `<MeSettingsMenu>` organism (Batch 4).
  * - **DM-10(e)** — Logout confirm card always-visible via `<LogoutConfirmCard>`
- *   per D-27. "Ở lại" → router.push('/home'); "Đăng xuất" → useLogout.mutate().
+ *   per D-27. "Ở lại" → hub qua /auth/landing; "Đăng xuất" → useLogout.mutate().
  * - **DM-10(f)** — Version footer reads `process.env.NEXT_PUBLIC_APP_VERSION` +
  *   `NEXT_PUBLIC_BUILD_SHA` env (defaults "0.1.0" + "dev" if unset). Format:
  *   "Aida v{version} • build {sha}" matching mockup line 207.
@@ -53,6 +53,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useMe } from '@/lib/dashboard/use-me';
 import { useLogout } from '@/lib/auth/use-logout';
+import { pushLanding } from '@/lib/landing';
 import { MeSettingsMenu, LogoutConfirmCard } from '@/components/icp/organisms';
 import { Icon } from '@/components/icp/atoms';
 
@@ -103,16 +104,15 @@ export default function MePage() {
   const lastLoginText = formatLastLogin(me?.last_login_at ?? null);
 
   const handleBack = React.useCallback(() => {
-    // T05 D-28 + C-NN-T05-NEW-4 RESOLVED-INLINE: deterministic Hub return.
-    // `router.back()` brittle when /me opened via direct URL (no history entry)
-    // → fall back to /home Hub explicitly. Matches D-27 "Ở lại" destination
-    // (single source of truth: avatar header → /me → back → /home).
-    router.push('/home');
+    // T05 D-28 deterministic Hub return. /me là GLOBAL (không slug ở URL) →
+    // resolve hub qua /auth/landing (ADR-046 amend c, S-P0-01 T02b-3), KHÔNG
+    // hardcode /home. router.back() brittle khi /me mở qua direct URL.
+    void pushLanding((href) => router.push(href));
   }, [router]);
 
   const handleStay = React.useCallback(() => {
-    // D-27 "Ở lại" → return to Hub (Home Dashboard).
-    router.push('/home');
+    // D-27 "Ở lại" → return to Hub qua /auth/landing (global, không slug).
+    void pushLanding((href) => router.push(href));
   }, [router]);
 
   const handleLogout = React.useCallback(() => {

@@ -753,7 +753,9 @@ export default function Intent04Page() {
             sourceCategory={stream.state.coPurchaseHint.source_category}
             targetCategories={stream.state.coPurchaseHint.target_categories}
             confidence={stream.state.coPurchaseHint.confidence}
-            onCategoryTap={(cat) => router.push(`/intent-03?q=${encodeURIComponent(cat)}`)}
+            onCategoryTap={(cat) =>
+              router.push(tenantHref(`/intent/03?q=${encodeURIComponent(cat)}`, tenant?.slug))
+            }
           />
         ) : null}
       </div>

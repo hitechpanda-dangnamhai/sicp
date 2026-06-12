@@ -602,6 +602,7 @@ export default function Intent01Page() {
                   ? Math.round(state.formPrefill.confidence * 100)
                   : 95
               }
+              autoRedirectTo={tenantHref('/home', tenant?.slug)}
               onClose={handleSuccessClose}
               onImportNext={handleImportNext}
             />

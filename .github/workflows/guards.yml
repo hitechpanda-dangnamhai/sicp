@@ -5,6 +5,16 @@ on:
   pull_request:
 
 jobs:
+  tenant-route-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # S-P0-01 T02b-3 (ADR-046 amend d): 0 hardcoded tenant route /home|/intent-<n>
+      # ngoài tenantHref() + middleware LEGACY_REDIRECTS. Nav tenant-scoped phải
+      # carry slug /s/<slug>. Nguồn: docs/slices/S-P0-01.md T02b-3.
+      - name: Gate hardcoded tenant routes
+        run: bash scripts/gate-tenant-routes.sh
+
   facts-drift:
     runs-on: ubuntu-latest
     steps:

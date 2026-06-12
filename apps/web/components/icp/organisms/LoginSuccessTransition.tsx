@@ -14,9 +14,11 @@
  *
  * Decisions applied:
  * - **D-25** — State machine page locus pattern: page owns state machine + this
- *   organism owns the 2s setTimeout cleanup-aware → router.push('/home'). Hook
+ *   organism owns the 2s setTimeout cleanup-aware redirect. Hook
  *   `useLogin.onSuccess` MUST NOT push (locus moved per C-34 RESOLVED-INLINE).
- * - **D-17** — Destination `/home` UNCHANGED (only implementation locus changed).
+ * - **D-17 / ADR-046 amend c (S-P0-01 T02b-3)** — post-login GLOBAL chưa có
+ *   slug → redirect qua `/auth/landing` (resolve last_active → /s/<slug> hoặc
+ *   /onboarding), KHÔNG hardcode /home. Bare /home 308 chỉ là compat bookmark.
  * - **STOP-T05-5 mitigation** — Props `displayName: string` from
  *   `loginMutation.data.user.display_name` directly (LoginResponseDto), avoiding
  *   useMe race (useMe might still be loading post-invalidateQueries when this
@@ -36,7 +38,7 @@
  * **Cleanup-aware redirect**:
  *   `useEffect(() => { const t = setTimeout(...); return () => clearTimeout(t); }, [router])`
  *   ensures if user navigates away mid-transition (e.g. browser back button),
- *   the redirect to /home is cancelled. Prevents stale navigation.
+ *   the redirect is cancelled (timer + `alive` guard for async landing fetch).
  *
  * Reach:    S-03 V-SLICE Auth (login state machine) — single use site.
  *
@@ -45,6 +47,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { pushLanding } from '@/lib/landing';
 
 export interface LoginSuccessTransitionProps {
   /** User's display name from `loginMutation.data.user.display_name`. Rendered
@@ -53,26 +56,37 @@ export interface LoginSuccessTransitionProps {
   /** Optional redirect delay override (default 2000ms per D-25 mockup). Useful
    *  for tests to short-circuit timing. */
   redirectDelayMs?: number;
-  /** Optional override target (default `/home` per D-17). Tests may inject. */
+  /** Optional override target. Khi vắng → resolve qua /auth/landing (ADR-046
+   *  amend c). Tests may inject để bỏ qua fetch. */
   redirectTo?: string;
 }
 
 const DEFAULT_REDIRECT_MS = 2000;
-const DEFAULT_REDIRECT_TO = '/home';
 
 export function LoginSuccessTransition({
   displayName,
   redirectDelayMs = DEFAULT_REDIRECT_MS,
-  redirectTo = DEFAULT_REDIRECT_TO,
+  redirectTo,
 }: LoginSuccessTransitionProps) {
   const router = useRouter();
 
-  // Cleanup-aware redirect: setTimeout cancellable if component unmounts.
+  // Cleanup-aware redirect: setTimeout cancellable + `alive` guard cho landing fetch.
   React.useEffect(() => {
+    let alive = true;
     const t = setTimeout(() => {
-      router.push(redirectTo);
+      if (redirectTo) {
+        router.push(redirectTo);
+        return;
+      }
+      // Post-login GLOBAL (chưa có slug ở URL) → /auth/landing resolve last_active.
+      void pushLanding((href) => {
+        if (alive) router.push(href);
+      });
     }, redirectDelayMs);
-    return () => clearTimeout(t);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
   }, [router, redirectDelayMs, redirectTo]);
 
   return (

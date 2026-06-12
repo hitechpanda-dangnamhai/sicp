@@ -72,14 +72,14 @@ export interface SuccessTransitionProps {
   onImportNext: () => void;
   /** Auto-redirect delay ms (default 2000). */
   autoRedirectMs?: number;
-  /** Auto-redirect target path (default '/home'). */
-  autoRedirectTo?: string;
+  /** Auto-redirect target (REQUIRED) — caller (in-slug) truyền qua tenantHref
+   *  để carry slug (S-P0-01 T02b-3, KHÔNG hardcode /home trong molecule). */
+  autoRedirectTo: string;
   /** Optional className passthrough. */
   className?: string;
 }
 
 const DEFAULT_REDIRECT_MS = 2000;
-const DEFAULT_REDIRECT_TO = '/home';
 
 /** Format current time as "9:41 hôm nay" style label. */
 function formatNowLabel(): string {
@@ -105,7 +105,7 @@ export function SuccessTransition({
   onClose,
   onImportNext,
   autoRedirectMs = DEFAULT_REDIRECT_MS,
-  autoRedirectTo = DEFAULT_REDIRECT_TO,
+  autoRedirectTo,
   className,
 }: SuccessTransitionProps) {
   const router = useRouter();
