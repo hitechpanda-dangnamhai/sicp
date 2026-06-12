@@ -597,27 +597,31 @@ def aggregate(params: dict[str, Any]) -> dict[str, Any]:
     if fmt is None:
         raise ValueError("'period' must be one of: month, week, day")
 
+    # S-P0-01 T04 — RLS KHÔNG áp lên materialized view (V011 §6 note: REFRESH chạy
+    # BYPASSRLS, aggregate mọi tenant; consumer PHẢI filter app-level). tenant_connection
+    # set GUC nhưng matview không đọc → filter tenant_id TƯỜNG MINH bằng bind param.
     series_sql = (
         "SELECT to_char(day, %(fmt)s) AS label,"
         "       SUM(revenue)::bigint AS revenue,"
         "       SUM(orders_count)    AS orders,"
         "       SUM(items_sold)      AS qty "
-        "FROM analytics_daily WHERE merchant_id = %(mid)s "
+        "FROM analytics_daily WHERE merchant_id = %(mid)s AND tenant_id = %(tid)s::uuid "
         "GROUP BY 1 ORDER BY 1"
     )
     last30_sql = (
         "SELECT COALESCE(SUM(revenue),0)::bigint AS r FROM analytics_daily "
-        "WHERE merchant_id = %(mid)s AND day > CURRENT_DATE - 30"
+        "WHERE merchant_id = %(mid)s AND tenant_id = %(tid)s::uuid AND day > CURRENT_DATE - 30"
     )
-    with tenant_connection(current_tenant()) as conn:
+    tid = current_tenant()
+    with tenant_connection(tid) as conn:
         with conn.cursor(row_factory=dict_row) as cur:
-            cur.execute(series_sql, {"fmt": fmt, "mid": merchant_id})
+            cur.execute(series_sql, {"fmt": fmt, "mid": merchant_id, "tid": tid})
             rows = [
                 {"label": r["label"], "revenue": int(r["revenue"] or 0),
                  "orders": int(r["orders"] or 0), "qty": int(r["qty"] or 0)}
                 for r in cur.fetchall()
             ]
-            cur.execute(last30_sql, {"mid": merchant_id})
+            cur.execute(last30_sql, {"mid": merchant_id, "tid": tid})
             last30 = int((cur.fetchone() or {}).get("r") or 0)
             # C-S10-NN-T (additive): tenure_months for suggest_loan via
             # graph (apps/ai has no DB). 2592000 = 30d month (matches

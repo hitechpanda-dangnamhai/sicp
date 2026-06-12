@@ -18,8 +18,12 @@ _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
 )
 
-# match đuôi "... limit N" để chèn clause trước limit.
+# Tail markers — tenant clause phải nằm TRONG mệnh đề where, TRƯỚC mọi
+# `order by` / `limit` (YQL grammar: where ... [order by ...] [limit N]).
+# search_trend dùng `order by trend_score desc limit N` → nếu chỉ split tại
+# limit, clause `and tenant_id...` sẽ rơi SAU `order by` = YQL sai cú pháp.
 _LIMIT_RE = re.compile(r"\s+limit\s+\d+\s*$", re.IGNORECASE)
+_ORDERBY_RE = re.compile(r"\s+order\s+by\b", re.IGNORECASE)
 _WHERE_RE = re.compile(r"\bwhere\b", re.IGNORECASE)
 
 
@@ -47,11 +51,14 @@ def inject_tenant_filter(yql: str, tenant_id: str) -> str:
     """
     clause = tenant_filter_clause(tenant_id)
 
-    m = _LIMIT_RE.search(yql)
-    if m:
-        head, tail = yql[: m.start()], yql[m.start():]
-    else:
-        head, tail = yql, ""
+    # Split tại marker XUẤT HIỆN SỚM NHẤT (order by HOẶC limit) — clause chèn
+    # vào head (mệnh đề where), tail (order by / limit) giữ nguyên ở cuối.
+    split_at = len(yql)
+    for rx in (_ORDERBY_RE, _LIMIT_RE):
+        m = rx.search(yql)
+        if m and m.start() < split_at:
+            split_at = m.start()
+    head, tail = yql[:split_at], yql[split_at:]
 
     if _WHERE_RE.search(head):
         head = f"{head} and {clause}"

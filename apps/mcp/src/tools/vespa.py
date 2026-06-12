@@ -50,8 +50,10 @@ from opentelemetry import trace
 from opentelemetry.propagators.textmap import default_setter
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
+from src.db import current_tenant
 from src.observability import get_logger
 from src.tools import register
+from src.tools.vespa_helpers import inject_tenant_filter, tenant_filter_clause
 
 _logger = get_logger(__name__)
 _tracer = trace.get_tracer(__name__)
@@ -78,6 +80,7 @@ def _build_yql(
     price_min: int | None = None, price_max: int | None = None,
     brand_filter: str | None = None,
     attribute_filter: dict[str, str] | None = None,
+    tenant_id: str | None = None,
 ) -> str:
     """Build YQL string with embed(@query, clip_multilingual) per D-S04-10 LAW.
 
@@ -144,7 +147,12 @@ def _build_yql(
             )
 
     where_clause = " and ".join(where_parts)
-    return f"select * from product where {where_clause} limit {int(limit)}"
+    yql = f"select * from product where {where_clause} limit {int(limit)}"
+    # S-P0-01 T04 — tenant isolation chokepoint (ADR-040 amend iii). MỌI YQL của
+    # hybrid_search đi qua đây → inject `and tenant_id contains "<uuid>"`. tenant_id
+    # luôn được search() truyền từ current_tenant() (fail-closed); param mặc định
+    # None chỉ phục vụ test pure builder không bật được nếu thiếu tenant.
+    return inject_tenant_filter(yql, tenant_id) if tenant_id else yql
 
 
 def _build_request_body(
@@ -152,6 +160,7 @@ def _build_request_body(
     price_min: int | None = None, price_max: int | None = None,
     brand_filter: str | None = None,
     attribute_filter: dict[str, str] | None = None,
+    tenant_id: str | None = None,
 ) -> dict[str, Any]:
     """Build Vespa search request body per Vespa search REST API spec.
 
@@ -175,7 +184,7 @@ def _build_request_body(
     rank-profile (verified empirically Phiên Sx04-7 smoke test).
     """
     body: dict[str, Any] = {
-        "yql": _build_yql(query, rank_profile, limit, category_filter, price_min, price_max, brand_filter, attribute_filter),
+        "yql": _build_yql(query, rank_profile, limit, category_filter, price_min, price_max, brand_filter, attribute_filter, tenant_id),
         "query": query,
         "ranking.profile": rank_profile,
         # Phiên Sx04-7 fix: use default summary class to include all document
@@ -300,6 +309,7 @@ def _call_vespa_once(
     price_min: int | None,
     price_max: int | None,
     attribute_filter: dict[str, str] | None,
+    tenant_id: str,
     level: str,
 ) -> tuple[list[dict[str, Any]], int, bool]:
     """Execute a single Vespa search call and parse the response.
@@ -324,7 +334,7 @@ def _call_vespa_once(
     body = _build_request_body(
         query, rank_profile, limit,
         category_filter, price_min, price_max, brand_filter,
-        attribute_filter,
+        attribute_filter, tenant_id,
     )
 
     span_name = "vespa.hybrid_search" if level == "primary" else f"vespa.hybrid_search.{level}"
@@ -460,6 +470,11 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
     url = _vespa_url()
     headers = _build_headers()
 
+    # S-P0-01 T04 — resolve active tenant ONCE (fail-closed: raises if rpc() did
+    # not set X-Tenant-Id) and thread through every cascade level so each Vespa
+    # body carries `and tenant_id contains "<uuid>"`. Cross-tenant rows = 0.
+    tenant_id = current_tenant()
+
     # Phiên Sx04-X fix: log all filters (was missing brand/price/limit).
     _logger.info(
         "vespa.search.request",
@@ -513,6 +528,7 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
         price_min=price_min,
         price_max=price_max,
         attribute_filter=attribute_filter,
+        tenant_id=tenant_id,
         level="primary",
     )
     if not ok:
@@ -547,6 +563,7 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
             price_min=None,                   # DROP value filter
             price_max=None,                   # DROP value filter
             attribute_filter=None,            # DROP value filter (Sx07-F)
+            tenant_id=tenant_id,              # tenant NEVER dropped (isolation)
             level="retry_drop_value",
         )
         if l2_ok and l2_total > 0:
@@ -587,6 +604,7 @@ def search(params: dict[str, Any]) -> dict[str, Any]:
             price_min=None,
             price_max=None,
             attribute_filter=None,
+            tenant_id=tenant_id,              # tenant NEVER dropped (isolation)
             level="retry_drop_all",
         )
         if l3_ok and l3_total > 0:
@@ -734,10 +752,15 @@ def compare_similar(params: dict[str, Any]) -> dict[str, Any]:
     if category and isinstance(category, str):
         safe_cat = category.replace('"', '\\"')
         where_parts.append(f'category contains "{safe_cat}"')
+    # S-P0-01 T04 — approximate:false: tenant_id filter (inject below) is ALWAYS
+    # a structural pre-filter now; HNSW approximate prunes candidates BEFORE the
+    # filter → 0-hit combo bug (same root cause as image_nearest_neighbor Sx09-F).
+    # Exact search keeps in-tenant recall correct. Corpus small → cost negligible.
     where_parts.append(
-        f'({{targetHits:{limit}}}nearestNeighbor(text_embedding, query_embedding))'
+        f'({{targetHits:{limit},approximate:false}}nearestNeighbor(text_embedding, query_embedding))'
     )
     yql = f"select * from product where {' and '.join(where_parts)} limit {limit}"
+    yql = inject_tenant_filter(yql, current_tenant())  # T04 tenant isolation
 
     body = {
         "yql": yql,
@@ -874,6 +897,8 @@ def search_trend(params: dict[str, Any]) -> dict[str, Any]:
         f'select * from product where category contains "{safe_cat}" '
         f'order by trend_score desc limit {limit}'
     )
+    # T04 tenant isolation — helper chèn clause TRƯỚC `order by` (giữ YQL hợp lệ).
+    yql = inject_tenant_filter(yql, current_tenant())
     body = {
         "yql": yql,
         "ranking.profile": "unranked",  # no relevance scoring; pure order_by
@@ -985,6 +1010,10 @@ def index(params: dict[str, Any]) -> dict[str, Any]:
 
     fields: dict[str, Any] = {
         "id": doc_id,
+        # S-P0-01 T04 — stamp active tenant from request context (fail-closed:
+        # raises if X-Tenant-Id absent). New docs are born tenant-scoped; the
+        # query helper's `tenant_id contains` filter then isolates them.
+        "tenant_id": current_tenant(),
         "merchant_id": str(product.get("merchant_id") or ""),
         "title": str(product.get("title") or ""),
         "description": str(product.get("description") or ""),
@@ -1036,6 +1065,38 @@ def index(params: dict[str, Any]) -> dict[str, Any]:
             title=fields["title"],
         )
         return {"indexed": True, "doc_id": doc_id}
+
+
+# ---------------------------------------------------------------------------
+# Tenant backfill — Document-API PARTIAL-UPDATE (S-P0-01 T04)
+# ---------------------------------------------------------------------------
+# Stamp tenant_id lên doc HIỆN HỮU bằng HTTP PUT partial-update — CẤM re-feed
+# (POST full doc). Re-feed regenerate text_embedding TỪ title/description và XÓA
+# image_embedding (index() bỏ image_description) → mất vector S-09. ADR-036:
+# embeddings sống Vespa-only, không reproduce từ PG. `assign` idempotent → re-run
+# an toàn. KHÔNG đi qua rpc() (single-tenant fail-closed) — đây là thao tác di trú
+# cross-tenant, mỗi doc nhận tenant_id RIÊNG đọc từ products.tenant_id (không blanket).
+# Driver: apps/mcp/scripts/backfill_vespa_tenant.py.
+
+def _tenant_partial_update_payload(tenant_id: str) -> dict[str, Any]:
+    """Vespa partial-update body — assign tenant_id ONLY (no title/desc/embedding
+    → không trigger re-embed, ADR-036). Validate UUID qua tenant_filter_clause."""
+    tenant_filter_clause(tenant_id)  # tái dùng UUID guard — raise ValueError nếu rác
+    return {"fields": {"tenant_id": {"assign": tenant_id}}}
+
+
+def partial_update_tenant(doc_id: str, tenant_id: str) -> bool:
+    """PUT partial-update stamping tenant_id on an existing Vespa product doc.
+
+    Returns True on success; raises httpx.HTTPError on transport/HTTP failure
+    (caller — backfill script — logs + tallies, does not abort batch)."""
+    payload = _tenant_partial_update_payload(tenant_id)
+    url = _vespa_document_url(doc_id)
+    headers = _build_headers()
+    with httpx.Client(timeout=_DEFAULT_TIMEOUT_S) as client:
+        resp = client.put(url, json=payload, headers=headers)
+        resp.raise_for_status()
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -1119,15 +1180,20 @@ def image_nearest_neighbor(params: dict[str, Any]) -> dict[str, Any]:
     # BEFORE structural filter, causing 0-hits combo bug (verified Vespa direct
     # query). Exact search ensures all candidates visible to filter.
     # Trade-off: ~50-100ms slower for 68-product corpus (acceptable).
-    nn_params = "targetHits:%d" % limit
+    # S-P0-01 T04 — approximate:false UNCONDITIONAL now: the injected tenant_id
+    # filter is ALWAYS a structural pre-filter, so the Sx09-F combo bug (HNSW
+    # prunes before structural filter → 0 hits) applies to EVERY call, not just
+    # category-filtered ones. Was conditional on category_filter; widened to keep
+    # in-tenant recall correct.
+    nn_params = f"targetHits:{limit},approximate:false"
     if category_filter and isinstance(category_filter, str):
         safe_cat = category_filter.replace('"', '\\"')
         where_parts.append(f'category contains "{safe_cat}"')
-        nn_params += ",approximate:false"
     where_parts.append(
         f'({{{nn_params}}}nearestNeighbor(image_embedding, query_embedding))'
     )
     yql = f"select * from product where {' and '.join(where_parts)} limit {limit}"
+    yql = inject_tenant_filter(yql, current_tenant())  # T04 tenant isolation
 
     body = {
         "yql": yql,

@@ -83,6 +83,7 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 ### Vespa (mcp) ✅ — RECONCILE
 `vespa.search.http_error` · `vespa.search_trend.http_error`.
 - 🟡 **CHƯA CODE:** `vespa.partial_update_completed` (worker-aggregator skeleton). Success path search không log; chỉ `*.http_error`.
+- **Backfill script** (S-P0-01 T04, one-time CLI `apps/mcp/scripts/backfill_vespa_tenant.py` — KHÔNG ship Loki): `backfill_vespa_tenant.start` · `backfill_vespa_tenant.doc_failed` · `backfill_vespa_tenant.done`.
 
 ### gtrends (mcp) ✅ — RECONCILE
 `gtrends.fixture.loaded` (= **fixture/mock**; crawler thật ADR-039 CHƯA CODE).

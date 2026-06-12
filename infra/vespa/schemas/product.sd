@@ -48,6 +48,15 @@ schema product {
     field merchant_id type string {
       indexing: attribute
     }
+    # S-P0-01 T04 — tenant isolation. EVERY query AND-s `tenant_id contains
+    # "<uuid>"` (vespa_helpers.inject_tenant_filter), so fast-search builds the
+    # dictionary for the always-present filter (parity with `category`). Backfill
+    # of existing docs via Document-API PARTIAL-UPDATE only — re-feed would wipe
+    # Vespa-generated text/image embeddings (ADR-036). See ADR-040 amendment iii.
+    field tenant_id type string {
+      indexing: attribute
+      attribute: fast-search
+    }
 
     # === Searchable text (BM25 + embedding) ================================
     field title type string {
