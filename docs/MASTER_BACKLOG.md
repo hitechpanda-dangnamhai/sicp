@@ -52,7 +52,7 @@ ALERTING**. Lý do đảo so với roadmap cũ: tenant phải nhúng schema sớ
 | S-11 | Hardening | 06 | 🟡 | — |
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
-| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T03–T05 ⬜ |
+| S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ⬜ · T03–T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
