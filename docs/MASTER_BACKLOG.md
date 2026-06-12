@@ -63,7 +63,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
-| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ⬜ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
+| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ✅ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -117,6 +117,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | 30 | Inline comment pattern voice:context Redis FIFO 5 turns TTL 30min (Intent 02 + 07) | — | 🔵 | thêm note tại `_node_load_voice_context` 2 graph khi chạm code; "KHÔNG đổi schema mà không bump version" |
 | 34 | FE ẩn/khoá page intent 01+07 dưới `/s/[slug]` cho non-member (hiện 403 lúc submit — UX, không security) | ADR-050 | 🟡 | sau T03e enforce per-intent policy |
 | 32 | `nest build` emit không hoạt động, dùng `tsc` trực tiếp | — | ✅ | FIXED 06-12: Dockerfile `rm -rf dist *.tsbuildinfo` + `build`=`tsc -p tsconfig.build.json` (incremental:false) thay nest build → clean full emit. Acceptance: delta source + docker build CÓ-cache → string mới có trong dist của image + gateway tsc-built boot OK. (Lịch sử: docker build có-cache ship dist stale, lộ ở smoke T02c) |
+| 35 | Workers runtime: tsx → dist compiled (đồng bộ cách fix #32 của gateway) | — | 🟡 | gán C3-RT. Nợ từ S-P0-02/T02: housekeeper chạy qua `tsx src/*.ts` (ESM `.js` ext + parity seed-shopee); chuyển sang `node dist/*.js` khi C3-RT chuẩn hoá runtime worker |
 
 ### Map 105 finding → cluster (ADR-052 · nguồn `docs/INVENTORY_2026-06-13.md`)
 
@@ -131,7 +132,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 
 | Cluster | Tên | IDs (∑) | Slice |
 |---|---|---|---|
-| **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58,59,60,61,62,63,66,67,85,94,104 · A16,A17,A18 (**14**) | **S-P0-02** (active) |
+| **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58,59,60,61,62,63,66✅,67✅,85,94,104 · A16,A17,A18 (**14**) | **S-P0-02** (active) |
 | **C2** | Safety-net (test/CI/eval/golden + obs cost-trace) — TRƯỚC AI-refactor | A13 · W-32,37,40,46,54,55,56,74,75,76,77,78,79,80,81,93 (**17**) | — |
 | **C3** | Async backbone & event integrity (Kafka/outbox/relay/DLQ/envelope/retry-CB/events-partition) — XONG TRƯỚC payment | A7,A10,A11,A12,A15,A20,A21 · W-44,68,70,71,72,73 (**13**) | — |
 | **C3-RT** | Runtime-prod hardening & backpressure (flask→gunicorn/MCP-pool/Redis-HA/SSE-cap/deadlock-retry/load-shed) — *split của C3 per Plan KI#3* | A1,A3,A4,A5 · W-86,95,96,97 (**8**) | — |

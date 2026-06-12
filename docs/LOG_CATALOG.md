@@ -19,7 +19,7 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 
 ## A. Operational Log Messages
 
-> **Verified TRỰC TIẾP code 2026-06-09** — grep structlog `apps/ai`+`apps/mcp` = **90 event-name**; pino `apps/gateway` = **83 event-name**. **Tên event dưới = tên THẬT trong code.** Service: `gateway` (TS/pino) · `ai` (py/structlog) · `mcp` (py/structlog). Cột `fields` = mức spec (tên đã verify; payload chi tiết cần đọc từng call). **Worker logs + Kafka = 🟡 CHƯA CODE** (workers skeleton, Kafka chưa wire). **Graph→log mapping verified per-file:** analyze.*=analyzing_by_voices · voice.*=buying_by_voices · parse_filters/typo/per_product_reason/copurchase/mcp.error=searching_by_text · generate_description/import/vision_analyze.no_image=importing_by_images · recommend.*=recommend_by_images · cart.cleared_via_graph/cart_graph=cart_by_text · llm.*=tools/llm_client. *(Lưu ý: grep tên là line-based → có thể sót log multi-line; LLM đã đủ 9 tên gồm fallback_to_openai/json_parse_failed verified qua orchestration.)*
+> **Verified TRỰC TIẾP code 2026-06-09** — grep structlog `apps/ai`+`apps/mcp` = **90 event-name**; pino `apps/gateway` = **83 event-name**. **Tên event dưới = tên THẬT trong code.** Service: `gateway` (TS/pino) · `ai` (py/structlog) · `mcp` (py/structlog). Cột `fields` = mức spec (tên đã verify; payload chi tiết cần đọc từng call). **Housekeeper worker = ✅ CODE (S-P0-02/T02 — xem section riêng dưới); Kafka + worker khác = 🟡 CHƯA CODE** (Kafka chưa wire). **Graph→log mapping verified per-file:** analyze.*=analyzing_by_voices · voice.*=buying_by_voices · parse_filters/typo/per_product_reason/copurchase/mcp.error=searching_by_text · generate_description/import/vision_analyze.no_image=importing_by_images · recommend.*=recommend_by_images · cart.cleared_via_graph/cart_graph=cart_by_text · llm.*=tools/llm_client. *(Lưu ý: grep tên là line-based → có thể sót log multi-line; LLM đã đủ 9 tên gồm fallback_to_openai/json_parse_failed verified qua orchestration.)*
 
 ### Auth (gateway) ✅
 `auth.login_succeeded` · `auth.login_failed` · `auth.logout_succeeded` · `auth.token_invalid` · `auth.token_refreshed` · `auth.refresh_rejected` · `auth.me_served` · `auth.password_reset_requested` · `auth.tenant_switch_rejected`.
@@ -127,6 +127,12 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 - **`tenant.switched`** (fields: `from_tenant_id`, `to_tenant_id`, `session_id`): POST /auth/switch-tenant cập nhật sessions.last_active_tenant_id (KHÔNG re-issue token).
 - **`tenant.landing_resolved.source` (closed set):** `last_active` | `onboarding` — GET /auth/landing redirect resolution.
 - **`public.tenant_not_found`**: GET /public/tenant-by-slug/:slug không khớp tenant active → 404.
+
+### Housekeeper worker (workers) ✅ — NEW (S-P0-02/T02)
+`housekeeper.started` · `housekeeper.leader_acquired` · `housekeeper.tick_skipped_not_leader` · `housekeeper.partition_ensured` · `housekeeper.partition_ensure_failed` · `housekeeper.matview_refreshed` · `housekeeper.matview_refresh_failed` · `housekeeper.shutting_down` · `housekeeper.bootstrap_failed`.
+- **`housekeeper.partition_ensured`** (fields: `ok`, `duration_ms`, `extras.{count,names}`): cron tạo partition `behavior_events` rolling +N tháng (idempotent CREATE IF NOT EXISTS) — gỡ bom W-66. Pair với `db.behavior_partition_missing` (gateway-side: nếu worker chết, gateway vẫn phát hiện INSERT thiếu partition).
+- **`housekeeper.matview_refreshed`** (fields: `ok`, `duration_ms`, `extras.matview`): REFRESH MATERIALIZED VIEW CONCURRENTLY 1 matview (discover qua pg_matviews) — gỡ W-67. `*_failed` = error-isolation per-matview (1 lỗi không chặn cái khác).
+- **`housekeeper.tick_skipped_not_leader`**: leader-lock Redis SETNX không giành được → instance khác đang chạy tick (multi-instance safety; hiện 1 instance, SPOF tới C3-RT Redis HA).
 
 ## B. Behavior Event Types
 

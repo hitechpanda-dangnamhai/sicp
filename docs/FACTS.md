@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-12T01:53:01Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-12T18:26:51Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -12,7 +12,8 @@
 - V011__multi_tenant.sql
 - V012__session_last_active_tenant.sql
 - V013__rls_nullif_hardening.sql
-- highest: V013
+- V014__housekeeper_safety.sql
+- highest: V014
 
 ## Gateway routes   <!-- grep @Get/@Post/@Patch/@Delete/@Put trong *.controller.ts -->
 - auth: 6 route — @Post('login') @Post('logout') @Get('me') @Post('switch-tenant') @Post('refresh') @Post('forgot-password') 
@@ -80,12 +81,17 @@
 
 ## DB   <!-- docker exec icp-postgres psql; fallback parse migrations -->
 - nguồn: ★ DB LIVE (container icp-postgres, db icp)
-- tables: 19
+- tables: 24
   - action_cards
   - behavior_events
   - behavior_events_y2026m05
   - behavior_events_y2026m06
   - behavior_events_y2026m07
+  - behavior_events_y2026m08
+  - behavior_events_y2026m09
+  - behavior_events_y2026m10
+  - behavior_events_y2026m11
+  - behavior_events_y2026m12
   - events
   - insights
   - order_items
@@ -105,7 +111,7 @@
   - analytics_daily_category
   - analytics_product_performance
 - migrations applied: 11
-- cột tenant_id: 14
+- cột tenant_id: 19
 
 ## Frontend (apps/web)   <!-- find app -name page.tsx; ls components -->
 - pages (App Router): 49
@@ -175,7 +181,11 @@
 - image_similarity
 
 ## Workers   <!-- ls apps/workers/src -->
+- housekeeper-core.ts
+- housekeeper.spec.ts
+- housekeeper.ts
 - index.ts
+- observability
 - shopee-mock-seed-worker.ts
 
 ## Kafka   <!-- grep kafkajs package.json + docker ps redpanda -->

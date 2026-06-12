@@ -287,6 +287,27 @@ services:
       retries: 3
       start_period: 30s
 
+  # S-P0-02/T02 — housekeeper worker (gỡ bom W-66 partition + refresh matview
+  # W-67). Worker THẬT đầu tiên (BACKLOG #12). KHÔNG ports (no HTTP server).
+  # restart: always — cron daemon phải sống lại sau crash; mọi op idempotent
+  # nên restart an toàn. Leader-lock Redis SETNX → an toàn khi scale >1 (hiện 1).
+  workers:
+    build:
+      context: ..
+      dockerfile: apps/workers/Dockerfile
+    image: icp/workers:dev
+    container_name: icp-workers
+    env_file: ../.env
+    environment:
+      OTEL_SERVICE_NAME: workers
+    networks: [icp]
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
 # --- Network ----------------------------------------------------------------
 # External network `icp` is shared with `docker-compose.observability.yml` (T07)
 # so cross-stack DNS works (e.g., gateway → otel-collector:4317). Network is
