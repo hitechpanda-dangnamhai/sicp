@@ -63,7 +63,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | S-META-01 | Workflow v2 bootstrap (FACTS+CLAUDE.md+guards) | META | ✅ | — |
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
-| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ⬜ *(cart contract regression, phát hiện T05 smoke)* |
+| S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | 🟡 | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ *(cart deploy-lag regression, phát hiện T05 smoke)* |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -161,6 +161,10 @@ chỉ bound /intent request-spawn (`main.py:465`), resume (`:606`) = continuatio
 bound; total in-flight cap gồm resume → C3-RT. **W-75** (e2e cluster CI) +nợ: fix parse
 seed customer password (cross-user idempotency e2e bị skip ở T04 acceptance #1, isolation
 đã đảm bảo structural bởi user-id verified trong key).
+
+**Note T06 (C2 scope):** **W-76** (CI safety-net) +**deploy-drift gate**: build SHA stamp
+trong image + live-smoke so SHA container vs HEAD (bài học T06 — cart outage do mcp stale
+pre-T03b ẩn vì CI soft-fail + cart chưa smoke; + BACKLOG #32 docker-cache-stale tiền lệ).
 
 ## §4 Done gần đây
 
