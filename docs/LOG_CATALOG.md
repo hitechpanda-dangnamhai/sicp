@@ -46,7 +46,10 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 - `mcp.error` = **ai** (emit trong `searching_by_text` khi MCP client lỗi).
 
 ### LLM (ai) ✅ — RECONCILE
-`llm.gemini.client_init` · `llm.gemini.fallback_to_openai` · `llm.gemini.init_failed` · `llm.gemini.json_parse_failed` · `llm.gemini.no_api_key` · `llm.openai.init_failed` · `llm.openai.json_parse_failed` · `llm.openai.no_api_key` · `llm.mock_timeout`.
+`llm.gemini.client_init` · `llm.gemini.fallback_to_openai` · `llm.gemini.init_failed` · `llm.gemini.json_parse_failed` · `llm.gemini.no_api_key` · `llm.openai.init_failed` · `llm.openai.json_parse_failed` · `llm.openai.no_api_key` · `llm.mock_timeout` · `llm.trace.write_failed` *(S-P0-03/T03b — durable trace-write swallowed, counter↑; fire-and-forget)* · `llm.pricing.env_parse_failed` *(T03b — LLM_PRICES_JSON parse error, fallback defaults)*.
+
+### Traces / cost spine (mcp) ✅ — NEW (S-P0-03/T03b, W-40)
+`trace.appended` *(traces.append INSERT llm_traces ok — fields: trace_id, provider, model, status, intent)*.
 
 ### Vision (mcp) ✅ — RECONCILE
 `vision.analyze.failed` · `vision.analyze.parse_failed` · `vision.analyze.timeout` · `vision.suggest_attributes.failed` · `vision.suggest_attributes.timeout` · `vision.gemini.initialized`.

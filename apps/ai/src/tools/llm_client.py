@@ -46,15 +46,101 @@ Reference:
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import os
+import time
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
 from opentelemetry import trace
 
+from .llm_pricing import cost_usd
+from .mcp_client import McpClient
+
 _tracer = trace.get_tracer(__name__)
 _logger = structlog.get_logger()
+
+
+@dataclass(frozen=True)
+class TraceContext:
+    """Per-request context threaded from a graph node so the LLM client can write
+    a durable trace (S-P0-03/T03b, ADR-054 §2). Built from graph `state` at the
+    call site (analog to mcp_client.identity_kwargs). tenant_id None → emit skipped
+    (trace is tenant-scoped; MCP requires X-Tenant-Id)."""
+
+    tenant_id: str | None
+    user_id: str | None = None
+    intent_type: str | None = None
+    rid: str | None = None
+    node: str | None = None
+
+    @classmethod
+    def from_state(cls, state: Any, node: str | None = None) -> TraceContext:
+        """Build from a graph state dict (+ optional calling node name)."""
+        return cls(
+            tenant_id=state.get("tenant_id"),
+            user_id=state.get("user_id"),
+            intent_type=state.get("intent"),
+            rid=state.get("request_id"),
+            node=node,
+        )
+
+
+# Request-scoped ambient TraceContext. main._drive_graph_async sets this ONCE at
+# the top of the graph thread's event loop (before astream); every LLM call in
+# that request inherits it via contextvar copy-on-task-create → generate_json
+# emits a trace for EVERY call WITHOUT threading a param through ~10 graph call
+# sites (W-40 "MỌI call"). Explicit trace_ctx arg still overrides when a caller
+# wants per-node granularity. `node` is None for ambient (per-request, not per-call).
+_ambient_trace_ctx: contextvars.ContextVar[TraceContext | None] = contextvars.ContextVar(
+    "icp_llm_trace_ctx", default=None
+)
+
+
+def set_request_trace_context(ctx: TraceContext | None) -> contextvars.Token:
+    """Set ambient TraceContext for the current request; returns reset token."""
+    return _ambient_trace_ctx.set(ctx)
+
+
+def reset_request_trace_context(token: contextvars.Token) -> None:
+    """Reset ambient TraceContext (finally, to avoid leaking across requests)."""
+    _ambient_trace_ctx.reset(token)
+
+
+# Fire-and-forget trace-write failure counter (W-40). A trace-write failure must
+# NEVER fail the request — we swallow + count. T03c (W-55) wires this to an OTel
+# metric; for T03b a process-local counter + ops log `llm.trace.write_failed`
+# proves the resilience invariant (kill-MCP → request completes, counter↑).
+_trace_write_failures = 0
+
+
+def get_trace_write_failures() -> int:
+    """Process-local count of swallowed trace-write failures (test/diagnostic)."""
+    return _trace_write_failures
+
+
+def _gemini_usage(resp: Any) -> dict[str, int | None]:
+    """Extract {tokens_in, tokens_out} from a Gemini response (usage_metadata)."""
+    um = getattr(resp, "usage_metadata", None)
+    if um is None:
+        return {"tokens_in": None, "tokens_out": None}
+    return {
+        "tokens_in": getattr(um, "prompt_token_count", None),
+        "tokens_out": getattr(um, "candidates_token_count", None),
+    }
+
+
+def _openai_usage(resp: Any) -> dict[str, int | None]:
+    """Extract {tokens_in, tokens_out} from an OpenAI response (usage)."""
+    u = getattr(resp, "usage", None)
+    if u is None:
+        return {"tokens_in": None, "tokens_out": None}
+    return {
+        "tokens_in": getattr(u, "prompt_tokens", None),
+        "tokens_out": getattr(u, "completion_tokens", None),
+    }
 
 # Default model — full Flash for user-facing Vietnamese tasks.
 DEFAULT_MODEL = "gemini-2.5-flash"
@@ -120,6 +206,11 @@ class LLMClient:
         self._gemini_disabled = False
         self._openai_client: Any | None = None
         self._openai_disabled = False
+        # Lazy MCP client for durable trace writes (traces.append). Short timeout
+        # so a hung/dead MCP can't stall the request beyond the fire-and-forget
+        # window. Test-injectable.
+        self._trace_mcp_client: McpClient | None = None
+        self._pending_traces: set[asyncio.Task[None]] = set()
 
     def _ensure_gemini(self, model_name: str) -> Any:
         """Return GenerativeModel for model_name, lazy-init and cache."""
@@ -181,7 +272,7 @@ class LLMClient:
 
     async def _call_gemini(
         self, prompt: str, timeout_s: float, model: str
-    ) -> dict[str, Any]:
+    ) -> tuple[dict[str, Any], dict[str, int | None]]:
         client = self._ensure_gemini(model)
         if client is None:
             raise LLMError(f"Gemini not configured (model={model})", provider="gemini")
@@ -203,9 +294,10 @@ class LLMClient:
                     provider="gemini",
                 ) from e
 
+            usage = _gemini_usage(resp)
             text = getattr(resp, "text", None) or ""
             try:
-                return json.loads(text)
+                return json.loads(text), usage
             except (json.JSONDecodeError, TypeError) as e:
                 _logger.warning(
                     "llm.gemini.json_parse_failed",
@@ -217,7 +309,9 @@ class LLMClient:
                     provider="gemini",
                 ) from e
 
-    async def _call_openai(self, prompt: str, timeout_s: float) -> dict[str, Any]:
+    async def _call_openai(
+        self, prompt: str, timeout_s: float
+    ) -> tuple[dict[str, Any], dict[str, int | None]]:
         client = self._ensure_openai()
         if client is None:
             raise LLMError("OpenAI not configured", provider="openai")
@@ -243,20 +337,116 @@ class LLMClient:
                     provider="openai",
                 ) from e
 
+            usage = _openai_usage(resp)
             text = resp.choices[0].message.content or ""
             try:
-                return json.loads(text)
+                return json.loads(text), usage
             except (json.JSONDecodeError, TypeError) as e:
                 _logger.warning("llm.openai.json_parse_failed", text_preview=text[:200])
                 raise LLMError(
                     f"Invalid JSON from OpenAI: {e}", provider="openai"
                 ) from e
 
+    def _trace_mcp(self) -> McpClient:
+        """Lazy MCP client for traces.append (short timeout, fire-and-forget)."""
+        if self._trace_mcp_client is None:
+            url = os.getenv("MCP_URL", "http://mcp:5050/rpc")
+            timeout_s = float(os.getenv("LLM_TRACE_MCP_TIMEOUT_S", "2.0"))
+            self._trace_mcp_client = McpClient(url, timeout_s=timeout_s)
+        return self._trace_mcp_client
+
+    async def _emit_trace_safe(
+        self,
+        trace_ctx: TraceContext,
+        *,
+        provider: str,
+        model: str,
+        status: str,
+        latency_ms: int,
+        usage: dict[str, int | None] | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        """Write ONE durable trace via MCP traces.append. Swallows ALL errors —
+        a trace-write failure must never fail the request (W-40 invariant). On
+        failure: increment counter + ops log, return normally.
+
+        ADR-003: the AI process NEVER touches Postgres directly — only via this
+        MCP tool. tenant_id/user_id ride as X-Tenant-Id/X-User-Id headers."""
+        global _trace_write_failures
+        usage = usage or {"tokens_in": None, "tokens_out": None}
+        tokens_in = usage.get("tokens_in")
+        tokens_out = usage.get("tokens_out")
+        try:
+            await self._trace_mcp().call(
+                "traces.append",
+                {
+                    "provider": provider,
+                    "model": model,
+                    "status": status,
+                    "intent_type": trace_ctx.intent_type,
+                    "rid": trace_ctx.rid,
+                    "node": trace_ctx.node,
+                    "tokens_in": tokens_in,
+                    "tokens_out": tokens_out,
+                    "cost_usd": cost_usd(model, tokens_in, tokens_out),
+                    "latency_ms": latency_ms,
+                    "error_code": error_code,
+                },
+                tenant_id=trace_ctx.tenant_id,
+                user_id=trace_ctx.user_id,
+            )
+        except Exception as e:  # noqa: BLE001
+            _trace_write_failures += 1
+            _logger.warning(
+                "llm.trace.write_failed",
+                provider=provider,
+                model=model,
+                error=str(e),
+                count=_trace_write_failures,
+            )
+
+    def _record_trace(
+        self,
+        trace_ctx: TraceContext | None,
+        *,
+        provider: str,
+        model: str,
+        status: str,
+        latency_ms: int,
+        usage: dict[str, int | None] | None = None,
+        error_code: str | None = None,
+    ) -> None:
+        """Schedule a fire-and-forget trace write. NEVER raises (isolates the
+        request from all trace logic). No trace_ctx / no tenant / no running loop
+        → skip silently (tenant-scoped trace needs a tenant)."""
+        if trace_ctx is None or not trace_ctx.tenant_id:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+            task = loop.create_task(
+                self._emit_trace_safe(
+                    trace_ctx,
+                    provider=provider,
+                    model=model,
+                    status=status,
+                    latency_ms=latency_ms,
+                    usage=usage,
+                    error_code=error_code,
+                )
+            )
+            # Keep a ref so the task isn't GC'd mid-flight; discard when done.
+            self._pending_traces.add(task)
+            task.add_done_callback(self._pending_traces.discard)
+        except Exception:  # noqa: BLE001 — scheduling must never fail the request.
+            pass
+
     async def generate_json(
         self,
         prompt: str,
         timeout_s: float = DEFAULT_TIMEOUT_S,
         model: str = DEFAULT_MODEL,
+        *,
+        trace_ctx: TraceContext | None = None,
     ) -> dict[str, Any]:
         """Generate JSON structured output via Gemini PRIMARY, OpenAI FALLBACK.
 
@@ -283,29 +473,61 @@ class LLMClient:
             LLMTimeout: when call exceeds timeout_s (triggers degrade interrupt)
             LLMError:   when both Gemini and OpenAI fail (non-timeout)
         """
-        # Smoke-test mock — ALL calls timeout immediately.
+        # Smoke-test mock — ALL calls timeout immediately (no real call → no trace).
         if _mock_llm_timeout_enabled():
             _logger.info("llm.mock_timeout", reason="MOCK_LLM_TIMEOUT env override")
             raise LLMTimeout(provider="mock")
 
-        # Primary: Gemini with specified model.
+        # Resolve trace context: explicit arg wins, else request-scoped ambient.
+        if trace_ctx is None:
+            trace_ctx = _ambient_trace_ctx.get()
+
+        # Primary: Gemini with specified model. Trace EVERY provider attempt
+        # (W-40 "ghi trace MỌI call cả fallback") — one row per attempt.
+        t0 = time.monotonic()
         try:
-            return await self._call_gemini(prompt, timeout_s, model)
-        except LLMTimeout:
+            parsed, usage = await self._call_gemini(prompt, timeout_s, model)
+            self._record_trace(
+                trace_ctx, provider="gemini", model=model, status="ok",
+                latency_ms=int((time.monotonic() - t0) * 1000), usage=usage,
+            )
+            return parsed
+        except LLMTimeout as gemini_timeout:
+            self._record_trace(
+                trace_ctx, provider="gemini", model=model, status="error",
+                latency_ms=int((time.monotonic() - t0) * 1000),
+                error_code=gemini_timeout.code,
+            )
             # Timeout = degrade trigger; do NOT fall back to OpenAI per
             # D-S04-14 LAW (OpenAI fallback is for non-timeout transient
             # errors only — timeout is the WHOLE POINT of degrade signal).
             raise
         except LLMError as gemini_err:
+            self._record_trace(
+                trace_ctx, provider="gemini", model=model, status="error",
+                latency_ms=int((time.monotonic() - t0) * 1000),
+                error_code=gemini_err.code,
+            )
             _logger.warning(
                 "llm.gemini.fallback_to_openai",
                 model=model,
                 error=str(gemini_err),
             )
             # Try OpenAI fallback for non-timeout errors.
+            t1 = time.monotonic()
             try:
-                return await self._call_openai(prompt, timeout_s)
+                parsed, usage = await self._call_openai(prompt, timeout_s)
+                self._record_trace(
+                    trace_ctx, provider="openai", model="gpt-4o-mini", status="ok",
+                    latency_ms=int((time.monotonic() - t1) * 1000), usage=usage,
+                )
+                return parsed
             except LLMError as openai_err:
+                self._record_trace(
+                    trace_ctx, provider="openai", model="gpt-4o-mini", status="error",
+                    latency_ms=int((time.monotonic() - t1) * 1000),
+                    error_code=openai_err.code,
+                )
                 _logger.error(
                     "llm.both_failed",
                     model=model,

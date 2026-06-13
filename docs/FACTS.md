@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-13T14:47:20Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-13T15:20:41Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -14,7 +14,8 @@
 - V013__rls_nullif_hardening.sql
 - V014__housekeeper_safety.sql
 - V015__llm_traces.sql
-- highest: V015
+- V016__llm_traces_status_check.sql
+- highest: V016
 
 ## Gateway routes   <!-- grep @Get/@Post/@Patch/@Delete/@Put trong *.controller.ts -->
 - auth: 6 route — @Post('login') @Post('logout') @Get('me') @Post('switch-tenant') @Post('refresh') @Post('forgot-password') 
@@ -41,7 +42,7 @@
 - TOTAL: 6 graph
 
 ## MCP tools   <!-- grep 'register("' apps/mcp/src -->
-- TOTAL: 39 tool (unique)
+- TOTAL: 40 tool (unique)
 - analytics.aggregate
 - analytics.co_purchased
 - analytics.detect_anomaly
@@ -74,6 +75,7 @@
 - shopee.price_range
 - speech.synthesize
 - speech.transcribe
+- traces.append
 - vespa.compare_similar
 - vespa.hybrid_search
 - vespa.image_nearest_neighbor
@@ -121,7 +123,7 @@
   - analytics_daily
   - analytics_daily_category
   - analytics_product_performance
-- migrations applied: 13
+- migrations applied: 14
 - cột tenant_id: 27
 
 ## Frontend (apps/web)   <!-- find app -name page.tsx; ls components -->

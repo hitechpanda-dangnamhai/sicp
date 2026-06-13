@@ -152,6 +152,7 @@ from src.tools import (  # noqa: E402, F401
     products,
     shopee,
     speech,  # ⭐ NEW S-08 T01.A per D-S08-NN-03 LAW
+    traces,  # ⭐ NEW S-P0-03/T03b (W-40) — traces.append durable LLM trace
     vespa,
     vision,
 )
