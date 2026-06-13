@@ -64,7 +64,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
 | S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ *(cart deploy-lag regression, phát hiện T05 smoke)* |
-| S-P0-03 | Safety-net (Cluster C2, ADR-052/054) | P0 | 🟡 | T01 ✅ *(CI soft→hard + coverage ratchet + openapi gate W-46 + deploy-drift wired; pulled 2 web fix + Python ruff/pytest)* · T01b ✅ *(CI integration-db: postgres+redis un-skip 19 spec + mcp stock-atomic; gateway floor 29→43 with-DB; test-vs-RLS fix AC-12)* · T01c-hotfix ⬜ · T02 ⬜ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
+| S-P0-03 | Safety-net (Cluster C2, ADR-052/054) | P0 | 🟡 | T01 ✅ *(CI soft→hard + coverage ratchet + openapi gate W-46 + deploy-drift wired; pulled 2 web fix + Python ruff/pytest)* · T01b ✅ *(CI integration-db: postgres+redis un-skip 19 spec + mcp stock-atomic; gateway floor 29→43 with-DB; test-vs-RLS fix AC-12)* · T01c-hotfix ✅ *(thread state→identity_kwargs vào _fetch_price_solver; gỡ noqa F821; +2 regression test)* · T02 ⬜ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -177,8 +177,10 @@ untestable thiếu langgraph local). Giữ noqa-baseline T01 tới khi hotfix đ
 gateway=29% (DB-integration specs opt-out `RUN_DB_TESTS` khi không có PG; nâng khi T01b thêm
 CI-Postgres job). 5×F841 vestigial: dọn khi chạm file ở C7.
 
-- **T01c-hotfix** *(mới, không W-ID — phát hiện T01, chạy SAU T01b)*: `_fetch_price_solver`
-  identity NameError, `ai/graphs/intents/importing_by_images.py`.
+- **T01c-hotfix ✅** *(không W-ID — phát hiện T01)*: `_fetch_price_solver` identity NameError,
+  `ai/graphs/intents/importing_by_images.py` — fix: thread `state` vào signature + 2 caller →
+  `identity_kwargs(state)` hợp lệ; gỡ noqa F821; +2 regression test (avg>0 không throw + identity
+  forward). MCP `analytics.suggest_price` là pure-math, identity qua header (T03b enforce).
 
 **T01b ✅ (đã đóng):** job `integration-db` (ci.yml) — postgres:16-alpine + redis:7-alpine +
 `apply.sh` + seed tối thiểu (`infra/seed/ci-min.sql`, CHỈ merchant1) → `RUN_DB_TESTS=1` un-skip

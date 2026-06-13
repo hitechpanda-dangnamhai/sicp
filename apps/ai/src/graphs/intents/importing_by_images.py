@@ -385,7 +385,7 @@ async def _node_generate_description(
         "trend_trajectory": trend.get("trajectory", "stable"),
     }
     _price_solver = (
-        await _fetch_price_solver(mcp_client, _price_ctx) if mcp_client else {}
+        await _fetch_price_solver(mcp_client, _price_ctx, state) if mcp_client else {}
     )
     _algo_price = (
         int(_price_solver["suggested_price"])
@@ -744,7 +744,7 @@ async def _node_create_cards(
         if action_type == "SUGGEST_PRICE":
             rationale_ctx = {
                 **rationale_ctx,
-                "_price_solver": await _fetch_price_solver(mcp_client, rationale_ctx),
+                "_price_solver": await _fetch_price_solver(mcp_client, rationale_ctx, state),
             }
         suggestion = _build_suggestion(action_type, rationale_ctx, submitted)
 
@@ -789,12 +789,18 @@ async def _node_create_cards(
 async def _fetch_price_solver(
     mcp_client: McpClient,
     context: dict[str, Any],
+    state: IcpState,
 ) -> dict[str, Any]:
     """D-S10-NN-G-I01: math-first price via analytics.suggest_price.
 
     Intent 01 only wires PRICE (promo/restock/loan are Intent 07 — they need
     sales history a brand-new product lacks). Returns {} on missing shopee
     data / MCP error → caller falls back to the original heuristic.
+
+    `state` threaded for identity_kwargs (S-P0-03/T01c-hotfix): every MCP RPC must
+    carry X-Tenant-Id/X-User-Id (T03b whitelist=∅) — header injected by mcp_client
+    from state.tenant_id/user_id. Pre-fix the closure referenced an undefined
+    `state` → NameError on the avg>0 path (not caught by `except McpError`).
     """
     avg = int(context.get("shopee_avg_price") or 0)
     if avg <= 0:
@@ -805,7 +811,7 @@ async def _fetch_price_solver(
             "shopee_sample_count": int(context.get("shopee_sample_count") or 0),
             "trend_trajectory": context.get("trend_trajectory") or "stable",
             "seller_type": None,
-        }, **identity_kwargs(state))  # noqa: F821  ruff-baseline S-P0-03/T01 (W-76): SUSPECTED REAL BUG — `state` undefined in _fetch_price_solver(mcp_client, context); identity not threaded → NameError on avg>0. NOT fixed here (behavior change in shared graph, untestable w/o langgraph). See S-P0-03 report + residual.
+        }, **identity_kwargs(state))
     except McpError:
         return {}
     return res if isinstance(res, dict) else {}
