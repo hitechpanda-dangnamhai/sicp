@@ -16,3 +16,5 @@ RA LỆNH (khi human chốt) = GHI ĐÈ NGUYÊN ống:
    ---
    <COMMAND 5-lớp, TRỎ slice+task ID, KHÔNG nhúng nội dung task (CLAUDE.md:169)>
 Hết việc → GHI ĐÈ ống THÀNH TRỐNG (reset §01). Giải thích/tranh luận trong terminal, KHÔNG nhét ống.
+
+CHUÔNG: sau MỌI lần ghi ống xong → chạy: pw-play /usr/share/sounds/freedesktop/stereo/message.oga 2>/dev/null &

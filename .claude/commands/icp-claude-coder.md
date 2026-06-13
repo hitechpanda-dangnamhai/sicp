@@ -17,3 +17,5 @@ ON-INVOCATION: đọc ngay `./connecting-coder-and-planner.md`, xử theo protoc
    <Task build → REPORT §7  |  RECON/PULL → kết quả đọc-only §12>
    KHÔNG append. Đúng 1 message.
 5. Stop Condition / fail 2 lần không giải thích được → DỪNG, REPORT nguyên trạng, KHÔNG che known-issues.
+
+CHUÔNG: sau MỌI lần ghi ống xong → chạy: pw-play /usr/share/sounds/freedesktop/stereo/complete.oga 2>/dev/null &
