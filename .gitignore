@@ -95,3 +95,6 @@ infra/vespa/models/cross_encoder_rerank/model.onnx
 *.zip
 storybook-static/
 apps/web/storybook-static/
+
+# ICP dual-terminal relay pipe (ephemeral single-slot, never committed)
+/connecting-coder-and-planner.md
