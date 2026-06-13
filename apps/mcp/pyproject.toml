@@ -74,3 +74,9 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
 ignore = ["E501"]
+
+# S-P0-03/T01 (W-76): make pytest resolve `from src.* import` when run from
+# apps/mcp (no tests/__init__, no prior pytest config → CWD not on sys.path).
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

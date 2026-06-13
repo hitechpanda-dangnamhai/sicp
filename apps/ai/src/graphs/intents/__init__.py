@@ -43,13 +43,13 @@ Reference:
     - docs/phases/PHASE_05_RECO_ANALYTICS.md §B/C
 """
 
+from .cart_by_text import compile_cart_by_text_graph
+from .importing_by_images import compile_importing_by_images_graph
+from .recommend_by_images import compile_recommend_by_images_graph
 from .searching_by_text import (
     build_searching_by_text_graph,
     compile_searching_by_text_graph,
 )
-from .cart_by_text import compile_cart_by_text_graph
-from .importing_by_images import compile_importing_by_images_graph
-from .recommend_by_images import compile_recommend_by_images_graph
 
 __all__ = [
     "build_searching_by_text_graph",  # deprecated; raises on call

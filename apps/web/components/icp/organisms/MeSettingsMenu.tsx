@@ -72,10 +72,12 @@ const SETTINGS_ROWS: SettingsRow[] = [
   },
 ];
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface MeSettingsMenuProps {
-  /** Reserved for future props (currently zero — mockup-literal hardcoded VN). */
-}
+/**
+ * Props: zero today (mockup-literal hardcoded VN). Modelled as an empty record
+ * so future props slot in without an empty-interface lint violation (ts-eslint
+ * v8 removed `no-empty-interface` → its old disable directive was a hard error).
+ */
+export type MeSettingsMenuProps = Record<string, never>;
 
 export function MeSettingsMenu(_props: MeSettingsMenuProps = {}) {
   return (

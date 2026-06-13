@@ -10,7 +10,7 @@ import { request as __request } from '../core/request';
 export class IntentService {
   /**
    * Dispatch intent to AI service
-   * Returns request_id for SSE stream pickup via GET /intent/stream?id=<rid>. S-04 T03: mode field selects Variant B (ai_augmented) or Variant A (basic_fallback) per D-S04-03 LAW Adaptive Single Endpoint. Sx05-3-CODE HOTFIX (D-S05-13 LAW): @UseGuards(JwtAuthGuard) added — req.user.id forwarded to AI as PostIntentBody.user_id so cart_by_text graph operates on correct authenticated cart.
+   * Returns request_id for SSE stream pickup via GET /intent/stream?id=<rid>. S-04 T03: mode field selects Variant B (ai_augmented) or Variant A (basic_fallback) per D-S04-03 LAW Adaptive Single Endpoint. Sx05-3-CODE HOTFIX (D-S05-13 LAW): @UseGuards(JwtAuthGuard) added — req.user.id forwarded to AI as PostIntentBody.user_id so cart_by_text graph operates on correct authenticated cart. S-P0-01 T03e (ADR-050): IntentPolicyGuard thay TenantMembershipGuard — tenant strict mọi intent; membership-required (01 import/07 analyzing + default-deny) → owner ∈ tenant_ids (403); customer-allowed (02/03/04/05) PASS.
    * @param requestBody
    * @returns any
    * @throws ApiError
@@ -27,7 +27,7 @@ export class IntentService {
   }
   /**
    * SSE stream of intent events
-   * Forwards Redis pub/sub channel `sse:pubsub:{rid}` to FE EventSource. S-04 T03: 17 typed event types (10 S-02 + 7 S-04) per 03_API §3. Requires icp_session cookie.
+   * Forwards Redis pub/sub channel `sse:pubsub:{rid}` to FE EventSource. S-04 T03: 17 typed event types (10 S-02 + 7 S-04) per 03_API §3. S-P0-01 T03c: JwtAuthGuard (cookie httpOnly, EventSource auto-send) + rid ownership-check (user + tenant∈membership). KHÔNG TenantMembershipGuard — EventSource không set được X-Tenant-Id (ADR-019 constraint).
    * @param id
    * @returns any
    * @throws ApiError

@@ -103,7 +103,7 @@ import asyncio
 import json
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 import redis.asyncio as aioredis
 import structlog
@@ -112,11 +112,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 from opentelemetry import trace
 
+from ...prompts import load_prompt
 from ...state import IcpState
-from ...tools.llm_client import LLMTimeout, get_llm_client, LITE_MODEL
+from ...tools.llm_client import LITE_MODEL, LLMTimeout, get_llm_client
 from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
-from ...prompts import load_prompt
 
 _tracer = trace.get_tracer(__name__)
 _logger = structlog.get_logger()
@@ -216,7 +216,7 @@ async def _emit_error_and_route_to_final(
     rid: str,
     code: str,
     message_vi: str,
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Emit error SSE + set sentinel voice_action='__error__' so conditional
     edges short-circuit to final (mirrors buying_by_voices error helper)."""

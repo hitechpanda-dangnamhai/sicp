@@ -1,0 +1,9 @@
+{
+  "$comment": "S-P0-03/T01 (W-76) coverage RATCHET. floor = current measured lines% rounded DOWN to 1%. CI (scripts/check-coverage.mjs) fails if an app's lines% drops below its floor. Raise floors each cluster — never lower without an ADR. Measured 2026-06-13 with vitest v8 all:true (gateway/workers include src/**; web include components+lib), in the plain-CI env (no DB → gateway DB-integration specs opt-out via RUN_DB_TESTS). T01b CI-Postgres job runs RUN_DB_TESTS=1 → raise gateway floor then. metric = lines.",
+  "metric": "lines",
+  "floors": {
+    "gateway": 29,
+    "web": 53,
+    "workers": 10
+  }
+}

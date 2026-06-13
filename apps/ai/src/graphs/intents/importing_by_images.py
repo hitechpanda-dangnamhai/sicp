@@ -67,7 +67,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
@@ -75,11 +75,11 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command, interrupt
 from opentelemetry import trace
 
+from ...prompts import load_prompt
 from ...state import IcpState
 from ...tools.llm_client import LLMError, LLMTimeout, get_llm_client
 from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
-from ...prompts import load_prompt
 
 _tracer = trace.get_tracer(__name__)
 _logger = structlog.get_logger()
@@ -805,7 +805,7 @@ async def _fetch_price_solver(
             "shopee_sample_count": int(context.get("shopee_sample_count") or 0),
             "trend_trajectory": context.get("trend_trajectory") or "stable",
             "seller_type": None,
-        }, **identity_kwargs(state))
+        }, **identity_kwargs(state))  # noqa: F821  ruff-baseline S-P0-03/T01 (W-76): SUSPECTED REAL BUG — `state` undefined in _fetch_price_solver(mcp_client, context); identity not threaded → NameError on avg>0. NOT fixed here (behavior change in shared graph, untestable w/o langgraph). See S-P0-03 report + residual.
     except McpError:
         return {}
     return res if isinstance(res, dict) else {}

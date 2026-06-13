@@ -46,6 +46,11 @@ RUN opentelemetry-bootstrap -a install
 # ---- Stage 2: runtime ----
 FROM python:3.11-slim AS runtime
 
+# S-P0-03/T01 deploy-drift gate (W-76): bake build commit → GET /health git_sha.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+LABEL org.opencontainers.image.revision=$GIT_SHA
+
 WORKDIR /app
 
 # curl for HEALTHCHECK. libpq for psycopg runtime.

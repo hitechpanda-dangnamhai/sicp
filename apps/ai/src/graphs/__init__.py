@@ -24,8 +24,8 @@ Reference:
 
 from .intents import (
     build_searching_by_text_graph,  # deprecated; raises on call
-    compile_searching_by_text_graph,  # Phiên Sx04-7 canonical builder
     compile_recommend_by_images_graph,  # S-09 NEW Phiên Sx09-C per D-S09-NN-A/B/C LAW
+    compile_searching_by_text_graph,  # Phiên Sx04-7 canonical builder
 )
 from .router_graph import router_graph
 

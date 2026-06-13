@@ -1,0 +1,9 @@
+{
+  // Lint-only TS project: the build tsconfig.json EXCLUDES **/*.spec.ts (they must
+  // not ship in dist), but typed ESLint needs every linted file inside a project
+  // or it errors "tsconfig does not include this file". S-P0-03/T01 (W-76): make
+  // lint real → lint spec files too. Extends build config, re-includes specs.
+  "extends": "./tsconfig.json",
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

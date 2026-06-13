@@ -35,7 +35,7 @@ from __future__ import annotations
 
 import math
 import os
-from typing import Any, Optional
+from typing import Any
 
 import redis
 from psycopg.rows import dict_row
@@ -52,7 +52,7 @@ def _get_redis_url() -> str:
     return os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 
-_REDIS_CLIENT: Optional[redis.Redis] = None
+_REDIS_CLIENT: redis.Redis | None = None
 
 
 def _get_redis_client() -> redis.Redis:

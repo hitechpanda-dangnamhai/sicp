@@ -74,20 +74,19 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import time
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command, interrupt
+from langgraph.types import interrupt
 from opentelemetry import trace
 
+from ...prompts import load_prompt
 from ...state import IcpState
 from ...tools.llm_client import LLMTimeout, get_llm_client
 from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
-from ...prompts import load_prompt
 
 _tracer = trace.get_tracer(__name__)
 _logger = structlog.get_logger()
@@ -147,7 +146,7 @@ async def _node_clear_confirm_prompt(
     # initial_state per fix #2). Pre-hotfix this was `state.get("content") or
     # "smoke-user-anon"` which ALWAYS fell back to anon (content holds user
     # query text, NOT user_id) → wrong cart cleared per Bug #1+#2 manual test.
-    user_id = state.get("user_id") or "anon"
+    user_id = state.get("user_id") or "anon"  # noqa: F841  ruff-baseline S-P0-03/T01 (W-76): unused identity extraction — vestigial from cart-identity fix, see residual
 
     try:
         cart = await mcp_client.call(
@@ -214,7 +213,7 @@ async def _node_clear_execute(
     """
     rid = state["request_id"]
     # Sx05-3-CODE HOTFIX (D-S05-13 LAW) — see _node_cart_clear_prompt docstring.
-    user_id = state.get("user_id") or "anon"
+    user_id = state.get("user_id") or "anon"  # noqa: F841  ruff-baseline S-P0-03/T01 (W-76): unused identity extraction — vestigial from cart-identity fix, see residual
     choice = state.get("cart_clear_action")
 
     if choice == "confirm_clear":
@@ -254,7 +253,7 @@ async def _node_cart_view(
     """
     rid = state["request_id"]
     # Sx05-3-CODE HOTFIX (D-S05-13 LAW) — see _node_cart_clear_prompt docstring.
-    user_id = state.get("user_id") or "anon"
+    user_id = state.get("user_id") or "anon"  # noqa: F841  ruff-baseline S-P0-03/T01 (W-76): unused identity extraction — vestigial from cart-identity fix, see residual
 
     try:
         cart = await mcp_client.call(
@@ -308,7 +307,7 @@ def _route_after_cart_view(state: IcpState) -> str:
 
 def _fixture_lookup_replacement(
     out_of_stock_item: dict[str, Any],
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """C-S05-E path-a fallback: load cart_stock_replacement.json fixture and
     match by anchor_category + anchor_brand_filter.
 
@@ -391,7 +390,7 @@ async def _node_stock_issue_lookup(
     # Map product_id → item for quick snapshot lookup.
     item_by_id = {it["product_id"]: it for it in cart_items if it.get("product_id")}
 
-    replacements: dict[str, Optional[dict[str, Any]]] = {}
+    replacements: dict[str, dict[str, Any] | None] = {}
     llm = get_llm_client()
 
     for pid in out_of_stock_ids:
@@ -401,11 +400,11 @@ async def _node_stock_issue_lookup(
         brand = snapshot.get("brand", "")
         title = snapshot.get("title", "")
 
-        replacement: Optional[dict[str, Any]] = None
-        reason: Optional[str] = None
+        replacement: dict[str, Any] | None = None
+        reason: str | None = None
 
         # Step 1: Vespa primary search (same category, excluding out-of-stock).
-        vespa_hit: Optional[dict[str, Any]] = None
+        vespa_hit: dict[str, Any] | None = None
         try:
             search_q = title or category or "thay thế"
             vespa_result = await asyncio.wait_for(
@@ -429,7 +428,7 @@ async def _node_stock_issue_lookup(
                 if hpid and hpid != pid and int(h.get("stock", 0)) > 0:
                     vespa_hit = h
                     break
-        except (asyncio.TimeoutError, McpError) as e:
+        except (TimeoutError, McpError) as e:
             _logger.warning(
                 "stock_issue.vespa_lookup_failed",
                 request_id=rid,
@@ -563,7 +562,7 @@ async def _node_stock_resolve(
     """
     rid = state["request_id"]
     # Sx05-3-CODE HOTFIX (D-S05-13 LAW) — see _node_cart_clear_prompt docstring.
-    user_id = state.get("user_id") or "anon"
+    user_id = state.get("user_id") or "anon"  # noqa: F841  ruff-baseline S-P0-03/T01 (W-76): unused identity extraction — vestigial from cart-identity fix, see residual
     choice = state.get("cart_stock_action")
     product_id = state.get("cart_stock_resolve_product_id", "")
     replacement_id = state.get("cart_stock_resolve_replacement_id")

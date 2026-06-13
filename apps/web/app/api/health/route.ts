@@ -26,5 +26,6 @@
  */
 
 export async function GET() {
-  return Response.json({ status: 'ok' });
+  // git_sha: S-P0-03/T01 deploy-drift gate (baked via GIT_SHA build-arg).
+  return Response.json({ status: 'ok', git_sha: process.env.GIT_SHA ?? 'dev' });
 }

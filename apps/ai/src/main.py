@@ -83,7 +83,8 @@ import json
 import os
 import threading
 import uuid
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import redis.asyncio as aioredis
 import structlog
@@ -433,6 +434,10 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> bool:
         try:
             loop.run_until_complete(_astream_with_saver())
         except Exception as e:  # noqa: BLE001
+            # Bind to a normal local: `e` is implicitly deleted at the end of the
+            # except suite, but the nested _emit_error() closure below references
+            # it — capture it so the closure stays valid (clears ruff F821).
+            graph_exc = e
             structlog.get_logger().error(
                 "intent.graph_failed",
                 request_id=request_id,
@@ -451,7 +456,7 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> bool:
                             "error",
                             {
                                 "code": "E_INTERNAL",
-                                "message": f"graph_failed: {type(e).__name__}",
+                                "message": f"graph_failed: {type(graph_exc).__name__}",
                             },
                         )
                         # final event so subscriber loop breaks cleanly.
@@ -647,7 +652,18 @@ def create_app() -> Flask:
     @app.get("/health")
     def health() -> tuple[Any, int]:
         """Liveness probe — always 200 if process is up."""
-        return jsonify({"status": "ok", "service": "ai", "version": __version__}), 200
+        # git_sha: S-P0-03/T01 deploy-drift gate (baked via GIT_SHA build-arg).
+        return (
+            jsonify(
+                {
+                    "status": "ok",
+                    "service": "ai",
+                    "version": __version__,
+                    "git_sha": os.getenv("GIT_SHA", "dev"),
+                }
+            ),
+            200,
+        )
 
     @app.get("/ready")
     def ready() -> tuple[Any, int]:

@@ -53,9 +53,9 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import psycopg
 import redis
@@ -101,7 +101,7 @@ def _get_redis_url() -> str:
     return os.getenv("REDIS_URL", "redis://redis:6379/0")
 
 
-_REDIS_CLIENT: Optional[redis.Redis] = None
+_REDIS_CLIENT: redis.Redis | None = None
 
 
 def _get_redis_client() -> redis.Redis:
@@ -128,7 +128,7 @@ def _cart_lock_key(user_id: str) -> str:
 
 def _now_iso() -> str:
     """ISO 8601 timestamp UTC for Cart.updated_at + CartItem.added_at."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ def _save_cart(rc: redis.Redis, user_id: str, cart: dict[str, Any]) -> None:
 
 
 def _compute_totals(
-    items: list[dict[str, Any]], promo: Optional[dict[str, Any]]
+    items: list[dict[str, Any]], promo: dict[str, Any] | None
 ) -> dict[str, Any]:
     """Recompute Cart.totals per D-S05-02 LAW.
 
@@ -272,7 +272,7 @@ def _compute_totals(
     }
 
 
-def _compute_free_gift_hint(subtotal: int) -> Optional[dict[str, Any]]:
+def _compute_free_gift_hint(subtotal: int) -> dict[str, Any] | None:
     """Compute free_gift_hint per fixture lookup.
 
     Returns None when:
@@ -359,7 +359,7 @@ def _validate_stock_inline(
 
 def _fetch_product_snapshot(
     conn: psycopg.Connection, product_id: str
-) -> Optional[dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Fetch product fields needed for cart snapshot (used by upsert path).
 
     Returns dict matching CartItemSnapshotSchema (cart.ts T01 ship) or None

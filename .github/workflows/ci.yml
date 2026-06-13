@@ -1,30 +1,23 @@
 # =============================================================================
-# .github/workflows/ci.yml — ICP CI (lint + test + typecheck)
+# .github/workflows/ci.yml — ICP CI (HARD gate)
 # =============================================================================
-# Slice:    S-00b Foundation Scaffold (T08).
+# Slice:    S-P0-03/T01 (W-76) — soft→HARD. Every soft-fail (`|| echo`) removed:
+#           lint / test / typecheck / coverage / Python ruff+pytest now FAIL the
+#           pipeline. No more green-on-broken (the bug this slice exists to kill).
 #
-# Source:   slices/S-00b_EXECUTION_GUIDE.md Section 4.8 lines 2581-2631.
+# Jobs (plain ubuntu runner, NO service containers):
+#   lint        — pnpm lint across gateway/web/workers (workers lint added T01).
+#   typecheck   — pnpm typecheck across TS apps.
+#   test        — pnpm test:cov (gateway/web/workers) + coverage RATCHET gate.
+#   python-lint — ruff check on apps/ai + apps/mcp.
+#   python-test — pytest on apps/ai + apps/mcp (full dev deps installed).
 #
-# Strategy: Three independent jobs (lint / test / typecheck) on ubuntu-latest
-#           with pnpm@9 + Node 20 LTS (matches D-03 version pins). Each job
-#           soft-fails with `|| echo "..."` because S-00b foundation scaffold
-#           does NOT include real lint configs, test suites, or per-package
-#           typecheck scripts yet — those land in S-01 H-UI + S-02 P-CAP.
-#
-# DoD-4    — "CI green với empty test, per DoD-4 literal" (Brief Bước 5).
-#           Soft-fail keeps green status badge while signaling "no real
-#           coverage yet" via the echo line in job logs. S-01 + S-02 replace
-#           soft-fail with strict assertion as actual lint/test/typecheck
-#           configs land.
-#
-# Branch strategy:
-#   push:  main + feat/** + fix/** (matches GitHub Flow with prefix branches)
-#   PR:    main (gate merges)
-#
-# Cache strategy:
-#   actions/setup-node@v4 cache: pnpm — caches pnpm store across runs based
-#   on pnpm-lock.yaml hash. First run: cold (~2 min install); subsequent
-#   runs: warm (~20s install).
+# DB-dependent paths are intentionally OUT of this core gate:
+#   - gateway DB-integration specs opt out unless RUN_DB_TESTS=1 (no PG here).
+#   - mcp stock-atomic tests self-skip when no DB is reachable.
+#   A CI-Postgres job that runs these with RUN_DB_TESTS=1, the openapi:sync drift
+#   gate (needs a running gateway), and the deploy-drift smoke gate all require a
+#   compose/service environment and land in T01b. See docs/slices/S-P0-03.md §1.
 # =============================================================================
 
 name: CI
@@ -51,7 +44,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint || echo "No lint script yet (S-00b foundation — populated in S-02)"
+      - run: pnpm lint
 
   test:
     runs-on: ubuntu-latest
@@ -65,7 +58,10 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test || echo "No tests yet (S-00b foundation — test rỗng cũng OK per DoD-4)"
+      # test:cov writes apps/<app>/coverage/coverage-summary.json for the ratchet.
+      - run: pnpm -r run test:cov
+      - name: Coverage ratchet (floors in coverage.floors.json)
+        run: node scripts/check-coverage.mjs
 
   typecheck:
     runs-on: ubuntu-latest
@@ -79,4 +75,67 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck || echo "Typecheck not configured yet"
+      - run: pnpm typecheck
+
+  python-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install "ruff>=0.4,<1.0"
+      - name: ruff check apps/ai
+        working-directory: apps/ai
+        run: ruff check src
+      - name: ruff check apps/mcp
+        working-directory: apps/mcp
+        run: ruff check src
+
+  python-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: install + pytest apps/ai
+        working-directory: apps/ai
+        run: |
+          pip install -e ".[dev]"
+          pytest -q
+      - name: install + pytest apps/mcp
+        working-directory: apps/mcp
+        run: |
+          pip install -e ".[dev]"
+          pytest -q
+
+  # S-P0-03/T01 (W-76) deploy-drift gate. CONDITIONAL: brings up the full compose
+  # stack, so it only runs where a Docker/compose runner exists. Enable by setting
+  # repo variable RUN_DEPLOY_SMOKE=true (default off → never reds a plain runner).
+  # Builds images with GIT_SHA=${{ github.sha }}, then scripts/smoke-live.sh
+  # asserts every container reports that SHA + the core flows serve. See §1.4.
+  deploy-smoke:
+    if: ${{ vars.RUN_DEPLOY_SMOKE == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build + start stack (GIT_SHA stamped)
+        working-directory: infra
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: docker compose up -d --build
+      - name: Deploy-drift + smoke
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: bash scripts/smoke-live.sh
+      - name: Stack logs on failure
+        if: failure()
+        working-directory: infra
+        run: docker compose logs --tail=200
+      - name: Tear down
+        if: always()
+        working-directory: infra
+        run: docker compose down -v

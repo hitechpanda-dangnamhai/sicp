@@ -23,6 +23,11 @@ RUN pnpm typecheck
 
 # ──────── Stage 2: Runtime ────────
 FROM node:20-alpine AS runtime
+# S-P0-03/T01 deploy-drift gate (W-76): bake build commit → housekeeper.started
+# log carries git_sha (workers have no HTTP surface).
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+LABEL org.opencontainers.image.revision=$GIT_SHA
 WORKDIR /workspace
 # Copy WHOLE workspace từ builder (preserve pnpm .pnpm symlink store — parity
 # gateway Dockerfile C-04). tsx + deps có sẵn.

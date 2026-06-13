@@ -9,8 +9,10 @@
     "start:housekeeper": "tsx src/housekeeper.ts",
     "dev": "tsx watch src/housekeeper.ts",
     "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint src --ext ts --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:cov": "vitest run --coverage",
     "test:watch": "vitest",
     "seed-shopee": "tsx src/shopee-mock-seed-worker.ts"
   },
@@ -34,8 +36,14 @@
     "@types/node": "^20.0.0",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.11.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
     "pino-pretty": "^11.2.2",
+    "prettier": "^3.3.3",
     "typescript": "^5.4.0",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "@vitest/coverage-v8": "^3.2.6"
   }
 }

@@ -38,6 +38,16 @@ export default defineConfig({
     globals: true,
     include: ['**/__tests__/**/*.test.{ts,tsx}'],
     setupFiles: ['./vitest.setup.ts'],
+    // S-P0-03/T01 coverage ratchet (W-76). Scope to the unit-tested surface
+    // (components + lib); app/ pages are e2e territory (T02). all:true → honest
+    // floor. Floors in /coverage.floors.json, enforced by scripts/check-coverage.mjs.
+    coverage: {
+      provider: 'v8',
+      all: true,
+      include: ['components/**', 'lib/**'],
+      reporter: ['text-summary', 'json-summary'],
+      reportsDirectory: './coverage',
+    },
   },
   resolve: {
     alias: {

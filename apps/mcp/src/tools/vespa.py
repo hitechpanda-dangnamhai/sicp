@@ -766,7 +766,7 @@ def compare_similar(params: dict[str, Any]) -> dict[str, Any]:
         "yql": yql,
         "query": query_text,
         # Vespa embedder syntax: input.query(query_embedding) = embed(@query, clip_multilingual)
-        "input.query(query_embedding)": f"embed(query)",
+        "input.query(query_embedding)": "embed(query)",
         "ranking.profile": "ai_augmented",
         "hits": limit,
         "timeout": "3s",

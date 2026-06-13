@@ -34,7 +34,6 @@ import logging
 import os
 import signal
 import sys
-from typing import Optional
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -48,7 +47,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 # Module-level singleton to allow shutdown from any context.
-_tracer_provider: Optional[TracerProvider] = None
+_tracer_provider: TracerProvider | None = None
 
 
 def init_otel() -> TracerProvider:

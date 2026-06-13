@@ -130,20 +130,20 @@ import asyncio
 import json
 import os
 import time
-from typing import Any, Optional
+from typing import Any
 
 import redis.asyncio as aioredis
 import structlog
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command, interrupt
+from langgraph.types import interrupt
 from opentelemetry import trace
 
+from ...prompts import load_prompt
 from ...state import IcpState
 from ...tools.llm_client import LLMTimeout, get_llm_client
 from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
-from ...prompts import load_prompt
 
 _tracer = trace.get_tracer(__name__)
 _logger = structlog.get_logger()
@@ -329,7 +329,7 @@ async def _emit_error_and_route_to_final(
     rid: str,
     code: str,
     message_vi: str,
-    details: Optional[dict[str, Any]] = None,
+    details: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Emit error SSE per D-S08-NN-11 LAW + set state.voice_action='__error__'
     so conditional edges short-circuit to final node.
@@ -439,7 +439,7 @@ async def _node_load_voice_context(
     Per D-S08-NN-A LAW cornerstone. Both reads in parallel via asyncio.gather.
     """
     rid = state["request_id"]
-    user_id = state.get("user_id") or "anon"
+    user_id = state.get("user_id") or "anon"  # noqa: F841  ruff-baseline S-P0-03/T01 (W-76): unused identity extraction — vestigial, see residual
 
     with _tracer.start_as_current_span("voice.load_context") as span:
         span.set_attribute("voice.user_id", user_id)
@@ -470,13 +470,13 @@ async def _node_load_voice_context(
 
         span.set_attribute("voice.history_turns", len(voice_history))
         span.set_attribute("voice.cart_items",
-                           len(((cart_data or {}).get("items") or [])))
+                           len((cart_data or {}).get("items") or []))
         _logger.info(
             "voice.context_loaded",
             request_id=rid,
             user_id=user_id,
             history_turns=len(voice_history),
-            cart_items=len(((cart_data or {}).get("items") or [])),
+            cart_items=len((cart_data or {}).get("items") or []),
         )
 
     return {
@@ -858,7 +858,7 @@ async def _node_voice_cart_remove(
     Per D-S08-NN-06 LAW (Redis cart JSON snapshot reuse, no HASH).
     """
     rid = state["request_id"]
-    user_id = state.get("user_id") or "anon"
+    user_id = state.get("user_id") or "anon"  # noqa: F841  ruff-baseline S-P0-03/T01 (W-76): unused identity extraction — vestigial, see residual
     items = state.get("voice_parsed_items") or []  # type: ignore[typeddict-item]
     cart_data = state.get("_cart_data") or {}  # type: ignore[typeddict-item]
     cart_items = (cart_data.get("items") or []) if isinstance(cart_data, dict) else []
@@ -999,9 +999,9 @@ async def _node_voice_no_match_alts(
             )
             reason = (reason_doc or {}).get("reason", "")
         except LLMTimeout:
-            reason = f"Cùng nhóm sản phẩm, có thể thay thế."
+            reason = "Cùng nhóm sản phẩm, có thể thay thế."
         except Exception:  # noqa: BLE001
-            reason = f"Cùng nhóm sản phẩm, có thể thay thế."
+            reason = "Cùng nhóm sản phẩm, có thể thay thế."
 
         alts.append({
             "item_idx": m.get("item_idx"),
@@ -1172,7 +1172,7 @@ async def _node_bulk_cart_commit(
     to maintain consistent intermediate states for each item.
     """
     rid = state["request_id"]
-    user_id = state.get("user_id") or "anon"
+    user_id = state.get("user_id") or "anon"  # noqa: F841  ruff-baseline S-P0-03/T01 (W-76): unused identity extraction — vestigial, see residual
     matched = state.get("voice_matched_products") or []  # type: ignore[typeddict-item]
     voice_action = state.get("voice_action") or "add"
 
@@ -1337,7 +1337,7 @@ async def _node_save_voice_context(
     are SEPARATE Redis keys per cornerstone architectural decision.
     """
     rid = state["request_id"]
-    user_id = state.get("user_id") or "anon"
+    user_id = state.get("user_id") or "anon"  # noqa: F841  ruff-baseline S-P0-03/T01 (W-76): unused identity extraction — vestigial, see residual
 
     # Build this turn record.
     matched = state.get("voice_matched_products") or []  # type: ignore[typeddict-item]

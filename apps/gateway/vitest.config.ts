@@ -33,5 +33,16 @@ export default defineConfig({
         singleFork: true,
       },
     },
+    // S-P0-03/T01 coverage ratchet (W-76). all:true counts untested src too →
+    // honest floor. Floors live in /coverage.floors.json, enforced by
+    // scripts/check-coverage.mjs in CI. Keep this config identical to the floor
+    // measurement so CI reproduces the same number.
+    coverage: {
+      provider: 'v8',
+      all: true,
+      include: ['src/**'],
+      reporter: ['text-summary', 'json-summary'],
+      reportsDirectory: './coverage',
+    },
   },
 });

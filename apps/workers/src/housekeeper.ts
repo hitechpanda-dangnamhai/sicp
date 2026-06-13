@@ -177,6 +177,9 @@ async function main(): Promise<void> {
     message: 'housekeeper.started',
     extras: {
       instance: INSTANCE_ID,
+      // git_sha: S-P0-03/T01 deploy-drift gate. Workers have no HTTP surface, so
+      // the baked GIT_SHA surfaces in the startup log for deploy verification.
+      git_sha: process.env.GIT_SHA ?? 'dev',
       matview_cron: MATVIEW_CRON,
       partition_cron: PARTITION_CRON,
       months_ahead: MONTHS_AHEAD,

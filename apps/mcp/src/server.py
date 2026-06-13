@@ -25,6 +25,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from typing import Any
 
 from flask import Flask, jsonify, request
@@ -60,7 +61,18 @@ def create_app() -> Flask:
         """Liveness probe — used by Docker HEALTHCHECK + compose depends_on."""
         # No external deps checked in /health (returns 200 if process alive).
         # /ready (future) will check Postgres + Vespa connectivity.
-        return jsonify({"status": "ok", "service": "mcp", "version": __version__}), 200
+        # git_sha: S-P0-03/T01 deploy-drift gate (baked via GIT_SHA build-arg).
+        return (
+            jsonify(
+                {
+                    "status": "ok",
+                    "service": "mcp",
+                    "version": __version__,
+                    "git_sha": os.getenv("GIT_SHA", "dev"),
+                }
+            ),
+            200,
+        )
 
     # ---- POST /rpc (AC-4..AC-12 dispatch) ----
     @app.post("/rpc")

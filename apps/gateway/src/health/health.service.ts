@@ -60,8 +60,11 @@ export class HealthService {
    * Liveness — service process is running. Always returns ok.
    * NO dep checks (per 06_OBS §12: "liveness, cực nhanh").
    */
-  liveness(): { status: 'ok' } {
-    return { status: 'ok' };
+  liveness(): { status: 'ok'; git_sha: string } {
+    // S-P0-03/T01 deploy-drift gate: GIT_SHA baked at build time → scripts/
+    // smoke-live.sh compares this against HEAD to catch stale/un-redeployed
+    // containers (lesson S-P0-02/T06 mcp deploy lag). 'dev' when uncompiled.
+    return { status: 'ok', git_sha: process.env.GIT_SHA ?? 'dev' };
   }
 
   /**

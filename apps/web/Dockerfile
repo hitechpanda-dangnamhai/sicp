@@ -68,6 +68,10 @@ RUN pnpm --filter @icp/web build
 # --- Stage 3: runner --------------------------------------------------------
 FROM node:20-alpine AS runner
 WORKDIR /app
+# S-P0-03/T01 deploy-drift gate (W-76): bake build commit → GET /api/health git_sha.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+LABEL org.opencontainers.image.revision=$GIT_SHA
 ENV NODE_ENV=production
 
 # Next.js standalone output produces:

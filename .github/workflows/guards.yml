@@ -59,3 +59,43 @@ jobs:
             echo "$s" | grep -qE '^(S-[A-Z0-9]+(-[A-Z0-9]+)*/(T[0-9]+[a-z]?(-[0-9]+)?|HOTFIX-[0-9]+|REFACTOR-[0-9]+)|META): .+' \
               || { echo "::error::Commit sai format taxonomy: '$s'"; exit 1; }
           done
+
+  openapi-drift:
+    # S-P0-03/T01 (W-46): regenerate the OpenAPI contract from the gateway and
+    # fail on drift — a DTO/decorator change without `pnpm openapi:sync` = FAIL.
+    # The gateway's EXPORT_OPENAPI=true path builds the Swagger doc and writes the
+    # file BEFORE any DB/Redis connection (pg.Pool is lazy), so this runs on a
+    # plain runner with dummy (format-valid) env — no compose needed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build gateway
+        run: pnpm --filter @icp/gateway build
+      - name: Export OpenAPI from gateway (standalone, dummy env)
+        working-directory: apps/gateway
+        env:
+          EXPORT_OPENAPI: 'true'
+          NODE_ENV: test
+          DATABASE_URL: postgres://u:p@localhost:5432/db
+          DATABASE_URL_MIGRATE: postgres://u:p@localhost:5432/db
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: ci_dummy_secret_at_least_32_chars_long_000
+        run: node dist/main.js
+      - name: Regenerate typed client from OpenAPI
+        run: pnpm openapi:generate
+      - name: Fail on contract drift
+        run: |
+          if git diff --exit-code packages/shared-types/openapi.json packages/shared-types/src/api/; then
+            echo "OpenAPI contract in sync."
+          else
+            echo "::error::OpenAPI drift — DTO/decorator changed without 'pnpm openapi:sync'. Run it and commit packages/shared-types/."
+            exit 1
+          fi

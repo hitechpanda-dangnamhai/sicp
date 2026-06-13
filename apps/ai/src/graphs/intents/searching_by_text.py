@@ -79,14 +79,14 @@ from typing import Any
 import structlog
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Command, interrupt
+from langgraph.types import interrupt
 from opentelemetry import trace
 
+from ...prompts import load_prompt
 from ...state import IcpState
 from ...tools.llm_client import LITE_MODEL, LLMTimeout, get_llm_client
 from ...tools.mcp_client import McpClient, McpError, identity_kwargs
 from ...tools.redis_publisher import RedisPublisher
-from ...prompts import load_prompt
 
 _tracer = trace.get_tracer(__name__)
 _logger = structlog.get_logger()

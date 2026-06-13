@@ -64,6 +64,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
 | S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ *(cart deploy-lag regression, phát hiện T05 smoke)* |
+| S-P0-03 | Safety-net (Cluster C2, ADR-052/054) | P0 | 🟡 | T01 ✅ *(CI soft→hard + coverage ratchet + openapi gate W-46 + deploy-drift wired; pulled 2 web fix + Python ruff/pytest; nợ → T01b CI-Postgres + T01c-hotfix _fetch_price_solver)* · T01b ⬜ · T01c-hotfix ⬜ · T02 ⬜ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -133,7 +134,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | Cluster | Tên | IDs (∑) | Slice |
 |---|---|---|---|
 | **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58✅,59✅,60✅,61🟡,62✅,63✅,66✅,67✅,85✅,94✅,104✅ · A16✅,A17✅,A18✅ (**14**) | **S-P0-02** (active) |
-| **C2** | Safety-net (test/CI/eval/golden + obs cost-trace) — TRƯỚC AI-refactor | A13 · W-32,37,40,46,54,55,56,74,75,76,77,78,79,80,81,93 (**17**) | — |
+| **C2** | Safety-net (test/CI/eval/golden + obs cost-trace) — TRƯỚC AI-refactor | A13 · W-32,37,40,**46✅**(openapi gate, S-P0-03/T01),54,55,56,74,75,**76🟡**(soft-fail→hard+ratchet+git_sha gate **partial**: deploy-drift gate wired [smoke-live.sh+GIT_SHA stamp], live-smoke stage conditional→T01b),77,78,79,80,81,93 (**17**) | **S-P0-03** (active) |
 | **C3** | Async backbone & event integrity (Kafka/outbox/relay/DLQ/envelope/retry-CB/events-partition) — XONG TRƯỚC payment | A7,A10,A11,A12,A15,A20,A21 · W-44,68,70,71,72,73 (**13**) | — |
 | **C3-RT** | Runtime-prod hardening & backpressure (flask→gunicorn/MCP-pool/Redis-HA/SSE-cap/deadlock-retry/load-shed) — *split của C3 per Plan KI#3* | A1,A3,A4,A5 · W-86,95,96,97 (**8**) | — |
 | **C4** | Payment & order integrity | (**0** inventory — payment = build mới BACKLOG #2/#3, không phải weakness có sẵn; phụ thuộc cứng C3 outbox/DLQ) | — |
@@ -165,6 +166,26 @@ seed customer password (cross-user idempotency e2e bị skip ở T04 acceptance 
 **Note T06 (C2 scope):** **W-76** (CI safety-net) +**deploy-drift gate**: build SHA stamp
 trong image + live-smoke so SHA container vs HEAD (bài học T06 — cart outage do mcp stale
 pre-T03b ẩn vì CI soft-fail + cart chưa smoke; + BACKLOG #32 docker-cache-stale tiền lệ).
+
+**Residual S-P0-03/T01 (ruff-baseline + suspected bug):** gỡ CI soft-fail (W-76) lộ nợ Python —
+6 `# noqa` baseline trong `apps/ai` (vá khi chạm file): 5×F841 `user_id` extraction vestigial
+(`cart_by_text.py` ×3, `buying_by_voices.py` ×2) + **1×F821 NGHI BUG THẬT** —
+`importing_by_images.py:_fetch_price_solver(mcp_client, context)` gọi `identity_kwargs(state)`
+với `state` UNDEFINED → NameError trên path `avg>0` (KHÔNG bắt bởi `except McpError`); identity
+KHÔNG thread vào `analytics.suggest_price` MCP call. Chưa fix (đổi signature graph dùng chung,
+untestable thiếu langgraph local). Giữ noqa-baseline T01 tới khi hotfix đóng. Ratchet floor
+gateway=29% (DB-integration specs opt-out `RUN_DB_TESTS` khi không có PG; nâng khi T01b thêm
+CI-Postgres job). 5×F841 vestigial: dọn khi chạm file ở C7.
+
+- **T01c-hotfix** *(mới, không W-ID — phát hiện T01, chạy SAU T01b)*: `_fetch_price_solver`
+  identity NameError, `ai/graphs/intents/importing_by_images.py`.
+
+**T01b (tách khỏi T01 — cần compose/DB runner, chạy TRƯỚC T01c-hotfix):** matrix Postgres
+service trong CI + `RUN_DB_TESTS=1` cho gateway (19 spec auth/tenant-isolation un-skip) + mcp
+stock-atomic + ratchet lại gateway floor (29% → số mới đo). Acceptance: spec đang skip chạy thật
++ demo gate-bite postgres-down → đỏ + revert. *(openapi gate W-46 + deploy-drift artifacts ĐÃ
+vào T01 — export standalone không cần compose; chỉ live-smoke stage `deploy-smoke` conditional
+`RUN_DEPLOY_SMOKE=true` → T01b.)*
 
 ## §4 Done gần đây
 

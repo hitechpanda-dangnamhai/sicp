@@ -43,6 +43,20 @@ import {
   HomeInputBar,
 } from '@/components/icp/organisms';
 
+// HeroInsightCard (and TenantSwitcher/LoginSuccessTransition) call useRouter();
+// jsdom has no mounted App Router → "invariant expected app router to be mounted".
+// Stub next/navigation per repo pattern (S-P0-01-T02b-3-login-transition.test.tsx).
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+  }),
+}));
+
 // =============================================================================
 // ConversationThread
 // =============================================================================
@@ -419,8 +433,9 @@ describe('<LoginForm>', () => {
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledTimes(1);
     });
+    // rememberMe: false is part of the RHF payload since T04 D-20 (defaultValues).
     expect(onSubmit).toHaveBeenCalledWith(
-      { email: 'test@example.com', password: 'secret123' },
+      { email: 'test@example.com', password: 'secret123', rememberMe: false },
       expect.anything(),
     );
   });
@@ -446,10 +461,12 @@ describe('DashboardHeader', () => {
 
 describe('HeroInsightCard', () => {
   it('renders tag + title + subtitle + 2 decorative CTAs per D-08 + D-09', () => {
+    // HeroInsightCard is now data-driven (fetch /dashboard/insight). In jsdom the
+    // fetch rejects → insight stays null → neutral fallback headline/subline render.
     render(<HeroInsightCard />);
     expect(screen.getByText('AI VỪA PHÁT HIỆN')).toBeInTheDocument();
-    expect(screen.getByText(/Doanh thu tuần này giảm/)).toBeInTheDocument();
-    expect(screen.getByText(/2 nguyên nhân chính/)).toBeInTheDocument();
+    expect(screen.getByText('Xem phân tích doanh thu tuần này')).toBeInTheDocument();
+    expect(screen.getByText(/Bấm để xem chi tiết doanh thu 7 ngày qua/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Xem phân tích/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Để sau' })).toBeInTheDocument();
   });

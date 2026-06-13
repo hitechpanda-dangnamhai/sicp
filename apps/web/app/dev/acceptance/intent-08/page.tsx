@@ -101,7 +101,7 @@ export default function IntentEightAcceptancePage() {
         <section className="mb-10">
           <h2 className="text-[18px] font-bold mb-3">state-B — Loading (form locked)</h2>
           <p className="text-[12px] text-[#9F1239] mb-4">
-            LoginForm with <code className="font-mono bg-white px-1.5 py-0.5 rounded">loading=true</code> — fields disabled, submit shows spinner "Đăng nhập".
+            LoginForm with <code className="font-mono bg-white px-1.5 py-0.5 rounded">loading=true</code> — fields disabled, submit shows spinner &quot;Đăng nhập&quot;.
           </p>
           <div className="bg-white border-[0.5px] border-[#FBCFE8] rounded-[20px] px-5 py-[22px] max-w-[380px]">
             <LoginForm
@@ -116,7 +116,7 @@ export default function IntentEightAcceptancePage() {
         <section className="mb-10">
           <h2 className="text-[18px] font-bold mb-3">state-C — Wrong password (inline + shake)</h2>
           <p className="text-[12px] text-[#9F1239] mb-4">
-            LoginForm with <code className="font-mono bg-white px-1.5 py-0.5 rounded">error="..."</code> + <code className="font-mono bg-white px-1.5 py-0.5 rounded">animate-shake</code> wrapper class — runs once on mount.
+            LoginForm with <code className="font-mono bg-white px-1.5 py-0.5 rounded">error=&quot;...&quot;</code> + <code className="font-mono bg-white px-1.5 py-0.5 rounded">animate-shake</code> wrapper class — runs once on mount.
           </p>
           <div
             className="bg-white border-[0.5px] border-[#FBCFE8] rounded-[20px] px-5 py-[22px] animate-shake max-w-[380px]"
@@ -185,8 +185,8 @@ export default function IntentEightAcceptancePage() {
         <section className="mb-10">
           <h2 className="text-[18px] font-bold mb-3">state-E — Success transition (BrainXL + check-pop + 2s progress)</h2>
           <p className="text-[12px] text-[#9F1239] mb-4">
-            LoginSuccessTransition organism with <code className="font-mono bg-white px-1.5 py-0.5 rounded">displayName="Anh Nam"</code>.
-            Redirect delay overridden to 999_999ms (~16min) so this dev preview doesn't auto-navigate to /home.
+            LoginSuccessTransition organism with <code className="font-mono bg-white px-1.5 py-0.5 rounded">displayName=&quot;Anh Nam&quot;</code>.
+            Redirect delay overridden to 999_999ms (~16min) so this dev preview doesn&apos;t auto-navigate to /home.
           </p>
           <div className="border border-[#FBCFE8] rounded-2xl overflow-hidden bg-white" style={{ height: 660 }}>
             <LoginSuccessTransition

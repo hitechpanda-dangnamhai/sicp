@@ -59,6 +59,12 @@ WORKDIR /workspace/apps/gateway
 RUN rm -rf dist tsconfig.tsbuildinfo && pnpm build
 # ──────── Stage 2: Runtime ────────
 FROM node:20-alpine AS runtime
+# S-P0-03/T01 deploy-drift gate (W-76): bake the build commit so the running
+# container can report it (GET /api/v1/health → git_sha). scripts/smoke-live.sh
+# compares it against HEAD to catch stale/un-redeployed images.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+LABEL org.opencontainers.image.revision=$GIT_SHA
 WORKDIR /workspace
 # C-04 fix: Copy WHOLE workspace from builder. Docker COPY preserves
 # symlinks by default → pnpm's .pnpm content-addressed store + symlink

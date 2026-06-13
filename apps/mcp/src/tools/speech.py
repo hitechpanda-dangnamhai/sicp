@@ -39,7 +39,6 @@ from __future__ import annotations
 
 import base64
 import os
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import Any
 
 from opentelemetry import trace

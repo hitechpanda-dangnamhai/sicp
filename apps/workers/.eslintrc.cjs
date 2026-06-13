@@ -1,41 +1,42 @@
 /* eslint-disable */
+// S-P0-03/T01 (W-76 / KI#5 T02): workers had NO lint — now covered by hard CI.
+// Mirrors apps/gateway/.eslintrc.cjs. tsconfig.json already includes specs, so
+// typed linting needs no separate lint project here.
 module.exports = {
   parser: '@typescript-eslint/parser',
   parserOptions: {
-    // tsconfig.eslint.json re-includes **/*.spec.ts (build tsconfig excludes them)
-    // so typed linting covers tests too — S-P0-03/T01 W-76 (lint chạy thật).
-    project: 'tsconfig.eslint.json',
+    project: 'tsconfig.json',
     tsconfigRootDir: __dirname,
     sourceType: 'module',
   },
   plugins: ['@typescript-eslint/eslint-plugin'],
-  extends: [
-    'plugin:@typescript-eslint/recommended',
-    'prettier',
-  ],
+  extends: ['plugin:@typescript-eslint/recommended', 'prettier'],
   root: true,
   env: {
     node: true,
-    jest: true,
   },
   ignorePatterns: ['.eslintrc.cjs', 'dist'],
   rules: {
-    '@typescript-eslint/interface-name-prefix': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-    // No raw console.log in source — must use createLogger() per 00_CONTEXT §10.5
-    // Exception: bootstrap-level fatal errors before logger is wired.
+    // No raw console.log — workers use createLogger() (Pino). Bootstrap errors OK.
     'no-console': ['warn', { allow: ['error'] }],
   },
   overrides: [
     {
-      // Tests now lint too (S-P0-03/T01 W-76). `any` in mock/stub setup is
-      // idiomatic and carries no production risk — the rule stays ON for src.
       files: ['**/*.spec.ts', '**/*.test.ts'],
       rules: {
         '@typescript-eslint/no-explicit-any': 'off',
+      },
+    },
+    {
+      // CLI entrypoints (skeleton stub + dev seed runner) — console IS the output
+      // channel, same as scripts/*.ts seeders. Service logic uses createLogger().
+      files: ['src/index.ts', 'src/shopee-mock-seed-worker.ts'],
+      rules: {
+        'no-console': 'off',
       },
     },
   ],

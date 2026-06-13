@@ -119,7 +119,12 @@ function makeConfig(): ConfigService {
   return fakeConfig as ConfigService;
 }
 
-describe('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + TrackingService)', () => {
+// S-P0-03/T01 (W-76): this is a live-infra integration suite (real PG + Redis).
+// The plain CI gate runs with no DB → opt in with RUN_DB_TESTS=1 (locally or in
+// the CI Postgres job T01b adds) so the core pipeline stays green without DB.
+const RUN_DB = process.env.RUN_DB_TESTS === '1';
+
+describe.skipIf(!RUN_DB)('AuthService integration (real PG + Redis + bcryptjs + jsonwebtoken + TrackingService)', () => {
   let pool: Pool;
   let redis: Redis;
   let pgPool: PgPool;

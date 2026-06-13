@@ -56,9 +56,9 @@ export class HealthController {
   @ApiResponse({
     status: 200,
     description: 'Service is alive',
-    schema: { example: { status: 'ok' } },
+    schema: { example: { status: 'ok', git_sha: 'a1b2c3d' } },
   })
-  liveness(): { status: 'ok' } {
+  liveness(): { status: 'ok'; git_sha: string } {
     return this.health.liveness();
   }
 

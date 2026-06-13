@@ -42,7 +42,8 @@ import base64
 import json
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from typing import Any
 
 from opentelemetry import trace
@@ -295,7 +296,7 @@ def analyze(params: dict[str, Any]) -> dict[str, Any]:
             except FuturesTimeout:
                 _logger.warning("vision.analyze.timeout", timeout_s=timeout_s)
                 span.set_attribute("vision.status", "timeout")
-                raise RuntimeError(f"vision.analyze: Gemini call exceeded {timeout_s}s")
+                raise RuntimeError(f"vision.analyze: Gemini call exceeded {timeout_s}s") from None
             except Exception as e:
                 _logger.error("vision.analyze.failed", error=str(e))
                 span.set_attribute("vision.status", "error")
@@ -306,7 +307,7 @@ def analyze(params: dict[str, Any]) -> dict[str, Any]:
         except ValueError as e:
             _logger.warning("vision.analyze.parse_failed", raw_text=raw_text[:200], error=str(e))
             span.set_attribute("vision.status", "parse_error")
-            raise RuntimeError("vision.analyze: Gemini returned malformed response")
+            raise RuntimeError("vision.analyze: Gemini returned malformed response") from e
 
         result = _normalize_result(raw)
 
@@ -417,7 +418,7 @@ def suggest_attributes(params: dict[str, Any]) -> dict[str, Any]:
                 span.set_attribute("vision.status", "timeout")
                 raise RuntimeError(
                     f"vision.suggest_attributes: Gemini call exceeded {timeout_s}s"
-                )
+                ) from None
             except Exception as e:
                 _logger.error("vision.suggest_attributes.failed", error=str(e))
                 span.set_attribute("vision.status", "error")
@@ -434,7 +435,7 @@ def suggest_attributes(params: dict[str, Any]) -> dict[str, Any]:
                 error=str(e),
             )
             span.set_attribute("vision.status", "parse_error")
-            raise RuntimeError("vision.suggest_attributes: Gemini returned malformed response")
+            raise RuntimeError("vision.suggest_attributes: Gemini returned malformed response") from e
 
         result = _normalize_suggest_result(raw)
 

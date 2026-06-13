@@ -197,7 +197,7 @@ class LLMClient:
                     asyncio.to_thread(client.generate_content, prompt),
                     timeout=timeout_s,
                 )
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 raise LLMTimeout(
                     f"Gemini call exceeded {timeout_s}s (model={model})",
                     provider="gemini",
@@ -237,7 +237,7 @@ class LLMClient:
                     ),
                     timeout=timeout_s,
                 )
-            except asyncio.TimeoutError as e:
+            except TimeoutError as e:
                 raise LLMTimeout(
                     f"OpenAI call exceeded {timeout_s}s",
                     provider="openai",

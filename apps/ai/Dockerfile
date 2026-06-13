@@ -32,6 +32,11 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
 # ---- Stage 2: runtime image ----
 FROM python:3.11-slim AS runtime
 
+# S-P0-03/T01 deploy-drift gate (W-76): bake build commit → GET /health git_sha.
+ARG GIT_SHA=dev
+ENV GIT_SHA=$GIT_SHA
+LABEL org.opencontainers.image.revision=$GIT_SHA
+
 WORKDIR /app
 
 # curl for HEALTHCHECK directive (parity với apps/gateway pattern).

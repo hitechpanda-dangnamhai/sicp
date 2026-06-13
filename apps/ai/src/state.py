@@ -128,7 +128,7 @@ Reference:
 
 from __future__ import annotations
 
-from typing import Literal, Optional, TypedDict
+from typing import Literal, TypedDict
 
 Modality = Literal["text", "image", "voice"]
 
@@ -160,8 +160,8 @@ class IcpState(TypedDict, total=False):
     request_id: str
     modality: Modality
     content: str
-    intent: Optional[str]
-    confidence: Optional[float]
+    intent: str | None
+    confidence: float | None
     trace_id: str
 
     # --- Sx05-3-CODE HOTFIX (D-S05-13 LAW Cross-service User Context
@@ -211,7 +211,7 @@ class IcpState(TypedDict, total=False):
     # LangGraph TypedDict total=False schema drops undeclared keys between
     # node transitions, so parse_filters node would see None even when
     # main.py set the value in initial_state. Shape: {brand?, category?} or None.
-    _filters_override: Optional[dict]
+    _filters_override: dict | None
 
     # --- S-05 T02 D-S05-01/03 LAW fields (Phiên Sx05-2 — Pattern A cart entry
     #     intents per C-S05-F Path α resolution). 5 user-facing fields drive
@@ -221,7 +221,7 @@ class IcpState(TypedDict, total=False):
     cart_clear_action: CartClearAction
     cart_stock_action: CartStockAction
     cart_stock_resolve_product_id: str
-    cart_stock_resolve_replacement_id: Optional[str]
+    cart_stock_resolve_replacement_id: str | None
 
     # --- S-05 T02 internal transient fields (Phiên Sx04-7 declare-or-drop
     #     pattern). _cart_data is loaded once at _node_cart_view entry and
@@ -288,7 +288,7 @@ class IcpState(TypedDict, total=False):
     # always surface confidence; FE handles null gracefully).
     voice_audio_b64: str           # input from gateway POST /intent body.content (base64)
     voice_text: str                # STT output from speech.transcribe MCP
-    voice_confidence: Optional[float]  # STT confidence (may be None per R-S08-1)
+    voice_confidence: float | None  # STT confidence (may be None per R-S08-1)
     voice_action: str              # parsed enum: 'add'|'remove'|'update_qty'|'query'
     voice_history: list            # loaded from voice:context:{user_id} (last 5 turns FIFO)
     voice_parsed_items: list       # LLM bulk parse output [{query, qty, unit?, ordinal_ref?}]

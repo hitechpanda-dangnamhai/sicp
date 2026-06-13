@@ -176,6 +176,8 @@ services:
     build:
       context: ..
       dockerfile: apps/gateway/Dockerfile
+      args:
+        GIT_SHA: "${GIT_SHA:-dev}"   # S-P0-03/T01 deploy-drift gate
     image: icp/gateway:dev
     container_name: icp-gateway
     env_file: ../.env
@@ -205,6 +207,8 @@ services:
     build:
       context: ../apps/ai           # T03 stub: single-file COPY context
       dockerfile: Dockerfile
+      args:
+        GIT_SHA: "${GIT_SHA:-dev}"   # S-P0-03/T01 deploy-drift gate
     image: icp/ai:dev
     container_name: icp-ai
     env_file: ../.env
@@ -238,6 +242,8 @@ services:
     build:
       context: ../apps/mcp          # T03 stub: single-file COPY context
       dockerfile: Dockerfile
+      args:
+        GIT_SHA: "${GIT_SHA:-dev}"   # S-P0-03/T01 deploy-drift gate
     image: icp/mcp:dev
     container_name: icp-mcp
     env_file: ../.env
@@ -272,6 +278,8 @@ services:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
+      args:
+        GIT_SHA: "${GIT_SHA:-dev}"   # S-P0-03/T01 deploy-drift gate
     image: icp/web:dev
     container_name: icp-web
     env_file: ../.env
@@ -300,6 +308,8 @@ services:
     build:
       context: ..
       dockerfile: apps/workers/Dockerfile
+      args:
+        GIT_SHA: "${GIT_SHA:-dev}"   # S-P0-03/T01 deploy-drift gate
     image: icp/workers:dev
     container_name: icp-workers
     env_file: ../.env
