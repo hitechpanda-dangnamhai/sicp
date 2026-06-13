@@ -35,8 +35,11 @@ import os
 import signal
 import sys
 
-from opentelemetry import trace
+from opentelemetry import metrics, trace
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import (
     DEPLOYMENT_ENVIRONMENT,
     SERVICE_NAME,
@@ -46,8 +49,9 @@ from opentelemetry.sdk.resources import (
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-# Module-level singleton to allow shutdown from any context.
+# Module-level singletons to allow shutdown from any context.
 _tracer_provider: TracerProvider | None = None
+_meter_provider: MeterProvider | None = None
 
 
 def init_otel() -> TracerProvider:
@@ -94,6 +98,26 @@ def init_otel() -> TracerProvider:
     span_exporter = OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
     _tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
 
+    # --- Metrics pipeline (S-P0-03/T03c, W-55) — net-new MeterProvider. ----
+    # observability/ previously had logger+tracing only. LLM cost/token metrics
+    # (llm.cost.usd, llm.tokens, llm.latency) export via OTLP gRPC → collector
+    # metrics pipeline → prometheusremotewrite → Prometheus (ADR-054 §2).
+    # Attach-or-create (set_meter_provider is set-once): if the
+    # opentelemetry-instrument agent already installed an SDK MeterProvider
+    # (distro default exports OTLP), reuse it; else build ours with the OTLP
+    # PeriodicExportingMetricReader. Export is async/batched → fire-and-forget,
+    # never blocks/fails the request (parity with traces).
+    global _meter_provider
+    existing_mp = metrics.get_meter_provider()
+    if isinstance(existing_mp, MeterProvider):
+        _meter_provider = existing_mp
+    else:
+        metric_reader = PeriodicExportingMetricReader(
+            OTLPMetricExporter(endpoint=otlp_endpoint, insecure=True)
+        )
+        _meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+        metrics.set_meter_provider(_meter_provider)
+
     # Register graceful shutdown.
     atexit.register(shutdown_otel)
     _install_signal_handlers()
@@ -108,8 +132,15 @@ def init_otel() -> TracerProvider:
 
 
 def shutdown_otel() -> None:
-    """Flush + shutdown TracerProvider. Safe to call multiple times."""
-    global _tracer_provider
+    """Flush + shutdown Tracer + Meter providers. Safe to call multiple times."""
+    global _tracer_provider, _meter_provider
+    if _meter_provider is not None:
+        try:
+            _meter_provider.shutdown()
+        except Exception as e:  # noqa: BLE001 — best-effort during shutdown
+            logging.getLogger(__name__).warning("otel.meter_shutdown_failed err=%s", e)
+        finally:
+            _meter_provider = None
     if _tracer_provider is None:
         return
     try:

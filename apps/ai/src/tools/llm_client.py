@@ -56,6 +56,7 @@ from typing import Any
 import structlog
 from opentelemetry import trace
 
+from ..observability.metrics import record_llm_metrics
 from .llm_pricing import cost_usd
 from .mcp_client import McpClient
 
@@ -416,10 +417,24 @@ class LLMClient:
         usage: dict[str, int | None] | None = None,
         error_code: str | None = None,
     ) -> None:
-        """Schedule a fire-and-forget trace write. NEVER raises (isolates the
-        request from all trace logic). No trace_ctx / no tenant / no running loop
-        → skip silently (tenant-scoped trace needs a tenant)."""
-        if trace_ctx is None or not trace_ctx.tenant_id:
+        """Record metrics + schedule a fire-and-forget trace write. NEVER raises
+        (isolates the request from all trace/metric logic). No trace_ctx → skip;
+        no tenant → metrics still recorded (observability, no RLS) but DB write
+        skipped (tenant-scoped trace needs a tenant); no running loop → skip task."""
+        if trace_ctx is None:
+            return
+        # W-55 metrics: cost/tokens/latency (own swallow; tenant label optional).
+        record_llm_metrics(
+            tenant_id=trace_ctx.tenant_id,
+            intent=trace_ctx.intent_type,
+            provider=provider,
+            model=model,
+            status=status,
+            latency_ms=latency_ms,
+            usage=usage,
+        )
+        # W-40 durable trace write — needs a tenant (RLS-scoped INSERT).
+        if not trace_ctx.tenant_id:
             return
         try:
             loop = asyncio.get_running_loop()

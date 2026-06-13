@@ -49,7 +49,14 @@ packages/shared-types/src/behavior/catalog.ts (PROPERTIES_SCHEMA_MAP). -->
 `llm.gemini.client_init` · `llm.gemini.fallback_to_openai` · `llm.gemini.init_failed` · `llm.gemini.json_parse_failed` · `llm.gemini.no_api_key` · `llm.openai.init_failed` · `llm.openai.json_parse_failed` · `llm.openai.no_api_key` · `llm.mock_timeout` · `llm.trace.write_failed` *(S-P0-03/T03b — durable trace-write swallowed, counter↑; fire-and-forget)* · `llm.pricing.env_parse_failed` *(T03b — LLM_PRICES_JSON parse error, fallback defaults)*.
 
 ### Traces / cost spine (mcp) ✅ — NEW (S-P0-03/T03b, W-40)
-`trace.appended` *(traces.append INSERT llm_traces ok — fields: trace_id, provider, model, status, intent)*.
+`trace.appended` *(traces.append INSERT llm_traces ok — fields: row_id, provider, model, status, intent)*.
+
+### LLM cost metrics (ai → OTLP → Prometheus) ✅ — NEW (S-P0-03/T03c, W-55)
+> OTel metric instruments (KHÔNG phải log message) emit ở `apps/ai/src/observability/metrics.py`, export OTLP→collector→prometheusremotewrite. Đăng ký TRƯỚC emit (DoD §5).
+- `llm.cost.usd` — Counter<float> USD/call · label `{tenant_id, intent, model, provider}`.
+- `llm.tokens` — Counter<int> · label `{tenant_id, intent, model, provider, direction=in|out}`.
+- `llm.latency` — Histogram<int> ms/call · label `{tenant_id, intent, model, provider, status}`.
+- Rollup recording rules (W-74, `infra/otel/rules/llm-rollup.yml`): `llm:cost_usd:rate1h` · `llm:tokens:rate1h` · `llm:cost_usd:rate1h:by_tenant`.
 
 ### Vision (mcp) ✅ — RECONCILE
 `vision.analyze.failed` · `vision.analyze.parse_failed` · `vision.analyze.timeout` · `vision.suggest_attributes.failed` · `vision.suggest_attributes.timeout` · `vision.gemini.initialized`.
