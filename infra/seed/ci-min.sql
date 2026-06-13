@@ -69,3 +69,20 @@ VALUES (
   'owner'
 )
 ON CONFLICT (user_id, tenant_id) DO NOTHING;
+
+-- ============================================================================
+-- S-P0-03/T02b-1 (W-75 e2e): 1 product FIXED-id ở demo cho cart 7-route e2e.
+-- ----------------------------------------------------------------------------
+-- WHY fixed-id: products controller KHÔNG có POST/GET-list (chỉ PATCH) + apps/web
+-- KHÔNG có pg → cart e2e cần 1 product_id ổn định (seed product khác = random uuid).
+-- Demo tenant + merchant1 (owner demo). Stock cao để cart add/patch không OUT_OF_STOCK.
+-- KHÔNG đụng product test_t05 (a5705705 ephemeral) / seed-foundation (a2a20000).
+-- ============================================================================
+INSERT INTO products (id, merchant_id, tenant_id, title, category, attributes, price, stock, status)
+VALUES (
+  'e2e00001-0000-4000-8000-000000000001',
+  '19f25ecb-569d-459e-9e5d-a70a7cf15af6',
+  '11111111-1111-1111-1111-111111111111',
+  'E2E Cart Fixture — Nước mắm demo', 'nuoc_mam', '{}'::jsonb, 35000, 999, 'active'
+)
+ON CONFLICT (id) DO NOTHING;

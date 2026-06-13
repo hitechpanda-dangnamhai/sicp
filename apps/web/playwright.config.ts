@@ -55,11 +55,23 @@ export default defineConfig({
     actionTimeout: 5000,
   },
 
-  // Test projects — Chromium only per Q2 + ST-NEW-2 strategy (a)
+  // Test projects — Chromium only per Q2 + ST-NEW-2 strategy (a).
+  // S-P0-03/T02b-1: 'setup' login MỘT LẦN → storageState (auth-shared, tránh
+  // login throttle 5/min W-60). 'chromium' reuse state; auth.setup.ts chạy trước.
   projects: [
     {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        // Default authed state (merchant1). Auth-flow.spec override = unauth
+        // (test login-UI fresh) qua test.use({ storageState: ... }).
+        storageState: 'e2e/.auth/merchant1.json',
+      },
+      dependencies: ['setup'],
     },
   ],
 

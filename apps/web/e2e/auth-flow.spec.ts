@@ -39,7 +39,6 @@ import { execSync } from 'node:child_process';
 // ─── Constants ────────────────────────────────────────────────────────────
 
 const LOGIN_URL = '/auth/login';
-const HOME_URL = '/home';
 const ME_URL = '/me';
 
 const CANONICAL_EMAIL = 'merchant1@demo.icp';
@@ -88,7 +87,11 @@ async function loginViaApi(page: Page): Promise<void> {
 
 // ─── Tests ────────────────────────────────────────────────────────────────
 
+// UI auth tests login FRESH (test login-UI) → override project storageState =
+// unauth. AC-38.1/2/3 = 3 fresh logins (+ setup 1 = 4, dưới throttle 5/min W-60).
 test.describe('Intent 08 — auth flow E2E', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test.beforeEach(async () => {
     wipeSessions();
   });
@@ -100,9 +103,11 @@ test.describe('Intent 08 — auth flow E2E', () => {
     // Verify state-A idle heading visible (mockup line 144)
     await expect(page.getByText('Chào mừng trở lại')).toBeVisible();
 
-    // Fill canonical credentials per BE seed C-28
+    // Fill canonical credentials per BE seed C-28.
+    // S-P0-03/T02b-1: `Mật khẩu` exact — bare label match cả input + nút eye-toggle
+    // aria-label "Hiện mật khẩu" (chứa "mật khẩu") → strict-mode violation.
     await page.getByLabel('Email').fill(CANONICAL_EMAIL);
-    await page.getByLabel('Mật khẩu').fill(CANONICAL_PASSWORD);
+    await page.getByLabel('Mật khẩu', { exact: true }).fill(CANONICAL_PASSWORD);
 
     // Submit (state-A → state-B isPending → 200 → state-E isSuccess)
     await page.getByRole('button', { name: 'Đăng nhập' }).click();
@@ -116,10 +121,18 @@ test.describe('Intent 08 — auth flow E2E', () => {
     await expect(page.getByText(/Xin chào/)).toBeVisible();
     await expect(page.getByText(/Anh Nam/)).toBeVisible();
 
-    // Wait for 2s setTimeout cleanup-aware redirect per D-25 → /home
-    await page.waitForURL(`**${HOME_URL}`, { timeout: STATE_E_REDIRECT_TIMEOUT_MS });
+    // S-P0-03/T02b-1 REWRITE-FLOW: S-P0-01 multi-tenant GỠ /home dashboard.
+    // Post-success LoginSuccessTransition router.push('/home') → middleware
+    // resolveLastActiveSlug NULL (fresh session) → redirect /onboarding picker.
+    await expect(page.getByRole('heading', { name: 'Chọn shop' })).toBeVisible({
+      timeout: STATE_E_REDIRECT_TIMEOUT_MS,
+    });
 
-    // Verify Dashboard loaded: ICP brand visible (golden-reference line 69)
+    // Pick the only shop merchant1 owns → switch-tenant → /s/demo → /s/demo/home.
+    await page.getByRole('button', { name: /Demo Shop/ }).click();
+    await page.waitForURL('**/s/demo/home', { timeout: STATE_E_REDIRECT_TIMEOUT_MS });
+
+    // Dashboard rendered at storefront-scoped path (DashboardHeader brand "ICP").
     await expect(page.getByText('ICP', { exact: true })).toBeVisible();
     await expect(page.getByText('Trợ lý kinh doanh thông minh')).toBeVisible();
   });
@@ -129,9 +142,9 @@ test.describe('Intent 08 — auth flow E2E', () => {
   }) => {
     await page.goto(LOGIN_URL);
 
-    // Fill with wrong password
+    // Fill with wrong password (Mật khẩu exact — xem AC-38.1 note selector).
     await page.getByLabel('Email').fill(CANONICAL_EMAIL);
-    await page.getByLabel('Mật khẩu').fill(WRONG_PASSWORD);
+    await page.getByLabel('Mật khẩu', { exact: true }).fill(WRONG_PASSWORD);
 
     // Submit
     await page.getByRole('button', { name: 'Đăng nhập' }).click();
@@ -180,5 +193,34 @@ test.describe('Intent 08 — auth flow E2E', () => {
     const sessionCookie = cookies.find((c) => c.name === 'icp_session');
     // After clear cookie, either absent or empty value
     expect(sessionCookie === undefined || sessionCookie.value === '').toBe(true);
+  });
+
+});
+
+// Refresh = OWN fresh session (unauth context). Rotating refresh INVALIDATE
+// session cũ → KHÔNG dùng storageState chung (sẽ poison dashboard/cart → 401).
+// +1 login (tổng suite 5 login/run; CI dùng SkipThrottle test-env — note §2c).
+test.describe('Auth refresh E2E', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('T02b-1 rotating refresh → 200 + new icp_session cookie (no LLM)', async ({
+    page,
+    context,
+  }) => {
+    // Own login (sets icp_session + icp_refresh) — session riêng để rotate.
+    await loginViaApi(page);
+
+    const before = (await context.cookies()).find((c) => c.name === 'icp_session');
+    expect(before).toBeTruthy();
+
+    // POST /auth/refresh reads icp_refresh cookie (Path=/api/v1/auth, separate
+    // from icp_session) → rotating refresh → 200, NO tokens in body (cookies only).
+    const res = await page.request.post('/api/v1/auth/refresh');
+    expect(res.status()).toBe(200);
+
+    // New icp_session re-issued (Set-Cookie applied to context).
+    const after = (await context.cookies()).find((c) => c.name === 'icp_session');
+    expect(after).toBeTruthy();
+    expect(after?.value).toBeTruthy();
   });
 });

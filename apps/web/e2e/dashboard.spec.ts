@@ -20,61 +20,44 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { execSync } from 'node:child_process';
 
 // ─── Constants ────────────────────────────────────────────────────────────
 
-const HOME_URL = '/home';
 const ME_URL = '/me';
 
-const CANONICAL_EMAIL = 'merchant1@demo.icp';
-const CANONICAL_PASSWORD = 'demo1234';
+// ─── Helpers ────────────────────────────────────────────────────────────────
+// Auth = storageState (setup project login MỘT LẦN — tránh login throttle W-60).
 
-// ─── Pre-cleanup helper (mirrors auth-flow.spec.ts) ──────────────────────
-
-function wipeSessions(): void {
-  try {
-    execSync('make e2e-cleanup', { stdio: 'pipe' });
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.warn('[e2e-cleanup] failed (continuing):', (err as Error).message);
-  }
-}
-
-// ─── BE login helper ──────────────────────────────────────────────────────
-
-async function loginViaApi(page: Page): Promise<void> {
-  const response = await page.request.post('/api/v1/auth/login', {
-    data: {
-      email: CANONICAL_EMAIL,
-      password: CANONICAL_PASSWORD,
-      remember_me: false,
-    },
-  });
-  expect(response.status()).toBe(200);
+/**
+ * S-P0-03/T02b-1 REWRITE-FLOW: S-P0-01 multi-tenant GỠ /home dashboard → nay
+ * `/s/<slug>/home`. /onboarding luôn render picker (KHÔNG phụ thuộc last_active)
+ * → pick "Demo Shop" → switch-tenant → /s/demo → /s/demo/home.
+ */
+async function enterDemoShop(page: Page): Promise<void> {
+  await page.goto('/onboarding');
+  await expect(page.getByRole('heading', { name: 'Chọn shop' })).toBeVisible();
+  await page.getByRole('button', { name: /Demo Shop/ }).click();
+  await page.waitForURL('**/s/demo/home', { timeout: 5000 });
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────
 
 test.describe('S-03 T03b — Home Dashboard E2E', () => {
-  test.beforeEach(async () => {
-    wipeSessions();
-  });
 
-  test('AC-38.4 /home loaded with header + stats + tiles', async ({ page }) => {
-    // Pre-login
-    await loginViaApi(page);
-    await page.goto(HOME_URL);
+  test('AC-38.4 storefront /s/demo/home loaded with header + stats + tiles', async ({ page }) => {
+    // Auth via storageState; enter shop (multi-tenant flow — storefront-scoped).
+    await enterDemoShop(page);
 
-    // Header: ICP brand + tagline (golden-reference-mockup.html line 69-70)
+    // Header: ICP brand + tagline (DashboardHeader.tsx:75-80)
     await expect(page.getByText('ICP', { exact: true })).toBeVisible();
     await expect(page.getByText('Trợ lý kinh doanh thông minh')).toBeVisible();
 
     // 2 Hero Tiles per D-11 + mockup lines 166-208
     // Tile 1: "Nhập hàng" hero pink-gradient HOT badge
     await expect(page.getByText('Nhập hàng')).toBeVisible();
-    // Tile 2: "Phân tích" hero orange-gradient AI badge
-    await expect(page.getByText('Phân tích')).toBeVisible();
+    // Tile 2: "Phân tích" hero orange-gradient AI badge (exact — "phân tích"
+    // substring xuất hiện ở HeroInsightCard/subtitle → strict-mode nếu loose).
+    await expect(page.getByText('Phân tích', { exact: true })).toBeVisible();
 
     // 4 List Tiles per mockup lines 216-289 (R1 mapping per C-23)
     // List Tile 1: "Tìm sản phẩm" intent-03
@@ -84,18 +67,19 @@ test.describe('S-03 T03b — Home Dashboard E2E', () => {
 
     // StatBar — 3 KPI labels per D-10 + mockup lines 124-152
     // "đơn hôm nay" + "doanh thu" + "tồn kho"
-    await expect(page.getByText('đơn hôm nay')).toBeVisible();
-    await expect(page.getByText('doanh thu')).toBeVisible();
-    await expect(page.getByText('tồn kho')).toBeVisible();
+    // KPI labels exact — "doanh thu"/"tồn kho" là substring trong HeroInsightCard
+    // + subtitle "Trend, doanh thu, tồn kho" → strict-mode nếu loose.
+    await expect(page.getByText('đơn hôm nay', { exact: true })).toBeVisible();
+    await expect(page.getByText('doanh thu', { exact: true })).toBeVisible();
+    await expect(page.getByText('tồn kho', { exact: true })).toBeVisible();
 
     // AI Insight Card section title per mockup line 100
     await expect(page.getByText('AI VỪA PHÁT HIỆN')).toBeVisible();
   });
 
   test('AC-38.5 D-28 avatar tap → /me navigation', async ({ page }) => {
-    // Pre-login
-    await loginViaApi(page);
-    await page.goto(HOME_URL);
+    // Auth via storageState; enter shop (storefront-scoped dashboard).
+    await enterDemoShop(page);
 
     // Verify dashboard loaded first (smoke check)
     await expect(page.getByText('ICP', { exact: true })).toBeVisible();

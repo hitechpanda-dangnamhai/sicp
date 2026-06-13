@@ -1,0 +1,5 @@
+
+# Playwright auth storageState (session secrets — never commit)
+e2e/.auth/
+test-results/
+playwright-report/
