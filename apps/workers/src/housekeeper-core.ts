@@ -9,23 +9,38 @@
 import type Redis from 'ioredis';
 
 export interface PartitionSpec {
-  /** Tên partition: behavior_events_yYYYYmMM */
+  /** Tên partition: <parent>_yYYYYmMM */
   name: string;
+  /** Bảng partitioned cha (PARTITION OF <parent>) */
+  parent: string;
   /** Cận dưới inclusive, 'YYYY-MM-01' */
   from: string;
   /** Cận trên exclusive, 'YYYY-MM-01' của tháng kế */
   to: string;
 }
 
+/**
+ * Bảng partitioned RANGE-by-month housekeeper duy trì rolling. Single Home danh
+ * sách — thêm bảng partitioned mới = thêm 1 dòng ở đây (vd llm_traces, V015).
+ * Cả 2 phân vùng theo cột thời gian (behavior_events.occurred_at /
+ * llm_traces.created_at) cùng grid tháng → cùng spec.
+ */
+export const PARTITIONED_TABLES = ['behavior_events', 'llm_traces'] as const;
+
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 const firstOfMonth = (y: number, m: number): string => `${y}-${pad2(m)}-01`; // m: 1..12
 
 /**
- * Sinh spec partition cho tháng hiện tại + `monthsAhead` tháng tới (inclusive).
- * monthsAhead=3 lúc 2026-06 → m06,m07,m08,m09 (4 partition). Idempotent ở tầng
- * DDL (CREATE IF NOT EXISTS). PURE (nhận `now` để test deterministic).
+ * Sinh spec partition cho tháng hiện tại + `monthsAhead` tháng tới (inclusive)
+ * của 1 bảng partitioned cha. monthsAhead=3 lúc 2026-06 → m06,m07,m08,m09
+ * (4 partition). Idempotent ở tầng DDL (CREATE IF NOT EXISTS). PURE (nhận `now`
+ * để test deterministic). `parent` mặc định behavior_events (back-compat).
  */
-export function computeRollingPartitions(now: Date, monthsAhead: number): PartitionSpec[] {
+export function computeRollingPartitions(
+  now: Date,
+  monthsAhead: number,
+  parent: string = 'behavior_events',
+): PartitionSpec[] {
   const specs: PartitionSpec[] = [];
   const baseYear = now.getUTCFullYear();
   const baseMonth0 = now.getUTCMonth(); // 0..11
@@ -35,7 +50,8 @@ export function computeRollingPartitions(now: Date, monthsAhead: number): Partit
     const m = d.getUTCMonth() + 1; // 1..12
     const next = new Date(Date.UTC(y, m, 1)); // tháng kế
     specs.push({
-      name: `behavior_events_y${y}m${pad2(m)}`,
+      name: `${parent}_y${y}m${pad2(m)}`,
+      parent,
       from: firstOfMonth(y, m),
       to: firstOfMonth(next.getUTCFullYear(), next.getUTCMonth() + 1),
     });
@@ -43,10 +59,10 @@ export function computeRollingPartitions(now: Date, monthsAhead: number): Partit
   return specs;
 }
 
-/** DDL idempotent tạo 1 partition. Identifier sinh từ số (không user input → an toàn). */
+/** DDL idempotent tạo 1 partition. Identifier sinh từ số/whitelist (không user input → an toàn). */
 export function buildPartitionDDL(spec: PartitionSpec): string {
   return (
-    `CREATE TABLE IF NOT EXISTS ${spec.name} PARTITION OF behavior_events ` +
+    `CREATE TABLE IF NOT EXISTS ${spec.name} PARTITION OF ${spec.parent} ` +
     `FOR VALUES FROM ('${spec.from}') TO ('${spec.to}');`
   );
 }

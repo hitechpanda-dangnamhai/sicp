@@ -36,6 +36,7 @@ import {
   buildPartitionDDL,
   acquireLeaderLock,
   releaseLeaderLock,
+  PARTITIONED_TABLES,
 } from './housekeeper-core';
 
 const tracer = trace.getTracer('workers.housekeeper');
@@ -59,19 +60,25 @@ async function ensurePartitions(pool: Pool): Promise<number> {
   return tracer.startActiveSpan('housekeeper.ensure_partitions', async (span) => {
     const t0 = Date.now();
     try {
-      const specs = computeRollingPartitions(new Date(), MONTHS_AHEAD);
-      for (const spec of specs) {
-        await pool.query(buildPartitionDDL(spec));
+      // Mọi bảng partitioned (behavior_events + llm_traces V015) cùng grid tháng.
+      const now = new Date();
+      const names: string[] = [];
+      for (const table of PARTITIONED_TABLES) {
+        const specs = computeRollingPartitions(now, MONTHS_AHEAD, table);
+        for (const spec of specs) {
+          await pool.query(buildPartitionDDL(spec));
+        }
+        names.push(...specs.map((s) => s.name));
       }
-      span.setAttribute('housekeeper.partitions', specs.length);
+      span.setAttribute('housekeeper.partitions', names.length);
       logger.info({
         message: 'housekeeper.partition_ensured',
         ok: true,
         duration_ms: Date.now() - t0,
-        extras: { count: specs.length, names: specs.map((s) => s.name) },
+        extras: { count: names.length, names },
       });
       span.setStatus({ code: SpanStatusCode.OK });
-      return specs.length;
+      return names.length;
     } catch (err) {
       span.setStatus({ code: SpanStatusCode.ERROR });
       logger.error({
