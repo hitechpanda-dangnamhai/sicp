@@ -12,10 +12,12 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.spec.ts'],
     exclude: ['node_modules', 'dist'],
+    // S-P0-03/T01d-hotfix (ADR-057): exclude spec khỏi denominator (coverage SOURCE-only).
     coverage: {
       provider: 'v8',
       all: true,
       include: ['src/**'],
+      exclude: ['**/*.spec.ts', '**/*.test.ts'],
       reporter: ['text-summary', 'json-summary'],
       reportsDirectory: './coverage',
     },

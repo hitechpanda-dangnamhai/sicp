@@ -58,6 +58,10 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # @icp/shared-types exports dist-only (no src fallback, dist gitignored) →
+      # build TRƯỚC khi vitest resolve, nếu không "Failed to resolve entry" (T01d-hotfix).
+      - name: Build @icp/shared-types (consumers resolve ./dist)
+        run: pnpm --filter @icp/shared-types build
       # test:cov writes apps/<app>/coverage/coverage-summary.json for the ratchet.
       # gateway runs here too (DB specs self-skip without RUN_DB_TESTS) but its
       # coverage floor is enforced in the integration-db job (full coverage w/ DB).
@@ -77,6 +81,10 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # @icp/shared-types exports dist-only → build TRƯỚC tsc, nếu không TS2307
+      # "Cannot find module '@icp/shared-types'" ở consumer (T01d-hotfix).
+      - name: Build @icp/shared-types (consumers resolve ./dist)
+        run: pnpm --filter @icp/shared-types build
       - run: pnpm typecheck
 
   python-lint:
@@ -161,6 +169,9 @@ jobs:
           python-version: '3.11'
           cache: pip
       - run: pnpm install --frozen-lockfile
+      # @icp/shared-types exports dist-only → build TRƯỚC gateway vitest resolve (T01d-hotfix).
+      - name: Build @icp/shared-types (consumers resolve ./dist)
+        run: pnpm --filter @icp/shared-types build
       - name: Apply migrations (superuser) → schema + RLS + icp_app role + DEMO tenant
         run: bash infra/migrations/apply.sh
       - name: Minimal seed (merchant1 only — NOT full W-80 seed)

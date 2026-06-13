@@ -37,10 +37,13 @@ export default defineConfig({
     // honest floor. Floors live in /coverage.floors.json, enforced by
     // scripts/check-coverage.mjs in CI. Keep this config identical to the floor
     // measurement so CI reproduces the same number.
+    // S-P0-03/T01d-hotfix (ADR-057): exclude spec files khỏi denominator —
+    // coverage đo SOURCE-only (thêm test KHÔNG còn làm tụt gate). Floor re-measured.
     coverage: {
       provider: 'v8',
       all: true,
       include: ['src/**'],
+      exclude: ['**/*.spec.ts', '**/*.test.ts'],
       reporter: ['text-summary', 'json-summary'],
       reportsDirectory: './coverage',
     },

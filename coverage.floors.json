@@ -1,8 +1,8 @@
 {
-  "$comment": "S-P0-03/T01b (W-76) coverage RATCHET. floor = current measured lines% rounded DOWN to 1%. Raise floors each cluster — never lower without an ADR. Measured 2026-06-13, vitest v8 all:true (gateway/workers include src/**; web include components+lib). gateway floor 43 is measured WITH DB (RUN_DB_TESTS=1, 23/23 specs run = 43.8%) → checked in the CI `integration-db` job (`check-coverage.mjs gateway`). web/workers are DB-free → checked in the no-DB `test` job (`check-coverage.mjs web workers`). metric = lines.",
+  "$comment": "S-P0-03/T01b (W-76) coverage RATCHET. floor = current measured lines% rounded DOWN to 1%. Raise floors each cluster — never lower without an ADR. metric = lines. S-P0-03/T01d-hotfix (ADR-057): coverage basis ĐỔI = SOURCE-only — vitest coverage exclude '**/*.spec.ts' (giữ all:true) → thêm test KHÔNG làm tụt gate (nghịch lý T02a). Re-based số honest trên CI conditions (ci-min seed): gateway floor 43→42 (source-only WITH-DB CI = 42.72%; KHÔNG phải hạ gate — đổi basis từ with-spec 43.8% sang source-only, spec files cover cao hơn src nên % giảm; ADR-057). workers 10 (source-only 10.79%); web 53 UNCHANGED (components+lib include không gồm spec — đã source-only). gateway checked in CI `integration-db`; web/workers in no-DB `test` job.",
   "metric": "lines",
   "floors": {
-    "gateway": 43,
+    "gateway": 42,
     "web": 53,
     "workers": 10
   }

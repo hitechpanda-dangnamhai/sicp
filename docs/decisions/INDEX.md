@@ -57,5 +57,6 @@
 | [ADR-054](ADR-054.md) | LLM cost architecture | Accepted | Giữ provider-abstraction 1 swap; durable trace từ C2 (W-93); route task lite (W-92); distill SAU eval harness; cost per-tenant/intent; quyết bằng số |
 | [ADR-055](ADR-055.md) | Stock concurrency: optimistic atomic decrement | Accepted | Trừ kho = single-statement atomic UPDATE...WHERE stock>=n tenant-scoped; KHÔNG FOR UPDATE; validate=advisory; invariant stock≥0 tại DB; cột thật `stock` |
 | [ADR-056](ADR-056.md) | CI posture LLM-driven e2e: non-blocking live job | Accepted | deterministic e2e=hard-gate; LLM-e2e=job CI non-blocking (live structural, report, không fail pipeline); regression intent dựa T04 eval; tôn §0.5 |
+| [ADR-057](ADR-057.md) | Coverage gate đo SOURCE-only (exclude spec) | Accepted | exclude *.spec.ts khỏi denominator, giữ all:true; re-measure floor honest; sửa nghịch lý thêm-test-tụt-gate (W-76/T02a) |
 
 ⚠️ **Gap:** ADR-026 … ADR-030 không tồn tại trong file gốc — không sinh số bù.
