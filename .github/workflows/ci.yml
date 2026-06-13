@@ -216,3 +216,131 @@ jobs:
         if: always()
         working-directory: infra
         run: docker compose down -v
+
+  # ── S-P0-03/T02c (W-81 + A13 CI): deterministic e2e HARD-GATE (MODE B) ──────
+  # Boot web + gateway từ BUILT source (KHÔNG docker compose, KHÔNG conditional)
+  # → chạy MỌI push, fail = pipeline fail. Service-container pg+redis (như
+  # integration-db). Playwright deterministic specs: auth-flow + cart-flow +
+  # dashboard + bugs-regression. EXCLUDE intent-03 (LLM-path, reach-result
+  # Vespa-blocked #36 → wire cùng T02b-2 non-blocking live job ADR-056).
+  # W-81: cart-flow parse response qua CartSchema (@icp/shared-types) = contract
+  # thật (đổi field → e2e đỏ). Flaky-mitigate = health-gate BOOT (retry lúc boot,
+  # KHÔNG retry assertion); playwright retries=2 chỉ cho web cold-start, throttle
+  # login nới ở CI env để retry KHÔNG cascade 429 (W-60 vẫn test riêng ở unit).
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: icp
+          POSTGRES_PASSWORD: icp_dev_password
+          POSTGRES_DB: icp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U icp"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Gateway runtime (icp_app role, RLS-enforced) + migrate superuser (apply.sh
+      # ưu tiên DATABASE_URL_MIGRATE; cần CẢ HAI set — mirror integration-db).
+      DATABASE_URL: postgresql://icp_app:icp_app_dev_password@localhost:5432/icp
+      DATABASE_URL_MIGRATE: postgresql://icp:icp_dev_password@localhost:5432/icp
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_dummy_secret_at_least_32_chars_long_000
+      NODE_ENV: test
+      PORT: '3001'
+      # Web same-origin proxy → gateway (next.config rewrites GATEWAY_PROXY_TARGET).
+      GATEWAY_PROXY_TARGET: http://localhost:3001
+      # e2e-cleanup direct psql/redis-cli (MODE B) — superuser DB + redis.
+      E2E_CLEANUP_DB_URL: postgresql://icp:icp_dev_password@localhost:5432/icp
+      # Nới throttle login CI: setup(1)+auth-flow(3)=4 logins; playwright retry=2
+      # có thể đẩy >5/min → 429 cascade. Throttle semantics test riêng ở unit.
+      THROTTLE_LOGIN_LIMIT: '50'
+      THROTTLE_LOGIN_HOURLY_LIMIT: '200'
+      # ADR-056 (MODE B mở rộng): cart 7-route → MCP (cart.service.ts thin JSON-RPC
+      # client) → e2e boot-from-source GỒM Python MCP. Gateway trỏ MCP localhost.
+      MCP_URL: http://localhost:5050/rpc
+      # MCP cart fixtures (promo/free-gift) — repo path (mặc định /app/... là container).
+      PROMO_FIXTURE_PATH: ${{ github.workspace }}/infra/seed/promo_codes.json
+      FREE_GIFT_FIXTURE_PATH: ${{ github.workspace }}/infra/seed/free_gift_rules.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pnpm install --frozen-lockfile
+      - name: Install MCP (Python, boot-from-source) — cart 7-route → MCP (ADR-056)
+        working-directory: apps/mcp
+        run: pip install -e .
+      - name: redis-tools (e2e-cleanup Redis wipe — determinism)
+        run: sudo apt-get update && sudo apt-get install -y redis-tools
+      - name: Apply migrations (superuser) → schema + RLS + icp_app + DEMO tenant
+        run: bash infra/migrations/apply.sh
+      - name: Minimal seed (merchant1 + demo2 + customer1 + e2e00001 product)
+        run: psql "$DATABASE_URL_MIGRATE" -v ON_ERROR_STOP=1 -f infra/seed/ci-min.sql
+      - name: Build shared-types + gateway + web (dep-order; KHÔNG kéo workers/ai)
+        run: pnpm --filter @icp/shared-types --filter @icp/gateway --filter @icp/web build
+      - name: Install Playwright Chromium
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Boot MCP + gateway (built) → health-gate → deterministic e2e
+        # ADR-056 (MODE B mở rộng): MCP (Flask) + gateway + playwright CÙNG step →
+        # cả 2 sống suốt test run. cart 7-route → MCP (cart.service.ts thin JSON-RPC).
+        # MCP boot-from-source `python -m src.server` (deps pip -e). health-gate /health
+        # (liveness — no-dep) retry lúc BOOT, KHÔNG retry assertion. playwright tự boot
+        # web. MCP/gateway boot fail = job đỏ THẬT (KHÔNG mask/silent-skip — §0.5).
+        run: |
+          ( cd apps/mcp && PYTHONPATH=. python -m src.server --host 127.0.0.1 --port 5050 ) > /tmp/mcp.log 2>&1 &
+          MCP=$!
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5050/health || true)
+            [ "$code" = "200" ] && { echo "mcp ready (${i}s)"; break; }
+            [ "$i" = "60" ] && { echo "mcp boot FAILED"; cat /tmp/mcp.log; exit 1; }
+            sleep 1
+          done
+          node apps/gateway/dist/main.js > /tmp/gateway.log 2>&1 &
+          GW=$!
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3001/api/v1/health || true)
+            [ "$code" = "200" ] && { echo "gateway ready (${i}s)"; break; }
+            [ "$i" = "60" ] && { echo "gateway boot FAILED"; cat /tmp/gateway.log; exit 1; }
+            sleep 1
+          done
+          make e2e-cleanup
+          set +e
+          ( cd apps/web && pnpm exec playwright test \
+              auth-flow.spec.ts cart-flow.spec.ts dashboard.spec.ts bugs-regression.spec.ts )
+          RC=$?
+          set -e
+          kill "$GW" "$MCP" 2>/dev/null || true
+          exit $RC
+      - name: MCP log on failure
+        if: failure()
+        run: cat /tmp/mcp.log || true
+      - name: Gateway log on failure
+        if: failure()
+        run: cat /tmp/gateway.log || true
+      - name: Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 7
+          if-no-files-found: ignore
