@@ -64,7 +64,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | S-META-02 | Hoà tan docs cũ | META | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ · T07 ✅ · T08 ✅ |
 | S-P0-01 | Multi-tenant SaaS (RLS + tenant_id) | 01 | 🟡 | T01 ✅ · T02 ✅ · T02b-1/2/3 ✅ *(nợ e2e 2-tenant FE → T05)* · T02c ✅ · T03a ✅ · T03c ✅ *(nợ SSE e2e → T03b/T05)* · T03d ✅ *(nợ e2e storefront → T05)* · T03e ✅ *(nợ e2e customer storefront live → T05)* · T03b ✅ *(nợ SSE e2e live → T05)* · T04 ✅ *(nợ cross-tenant 0-row live + matview live + backfill run → T05)* · T05 ⬜ |
 | S-P0-02 | Stop-the-bleed (Cluster C1, ADR-052) | P0 | ✅ | T01 ✅ · T02 ✅ · T03 ✅ · T04 ✅ · T05 ✅ · T06 ✅ *(cart deploy-lag regression, phát hiện T05 smoke)* |
-| S-P0-03 | Safety-net (Cluster C2, ADR-052/054) | P0 | 🟡 | T01 ✅ *(CI soft→hard + coverage ratchet + openapi gate W-46 + deploy-drift wired; pulled 2 web fix + Python ruff/pytest; nợ → T01b CI-Postgres + T01c-hotfix _fetch_price_solver)* · T01b ⬜ · T01c-hotfix ⬜ · T02 ⬜ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
+| S-P0-03 | Safety-net (Cluster C2, ADR-052/054) | P0 | 🟡 | T01 ✅ *(CI soft→hard + coverage ratchet + openapi gate W-46 + deploy-drift wired; pulled 2 web fix + Python ruff/pytest)* · T01b ✅ *(CI integration-db: postgres+redis un-skip 19 spec + mcp stock-atomic; gateway floor 29→43 with-DB; test-vs-RLS fix AC-12)* · T01c-hotfix ⬜ · T02 ⬜ · T03 ⬜ · T04 ⬜ · T05 ⬜ |
 | S-AUDIT | Docs audit định kỳ (vĩnh viễn) | META | ∞ | T01: rewrite `docs/README.md` theo cấu trúc v2 (phát hiện từ T08) — chờ |
 
 
@@ -134,7 +134,7 @@ thứ tự ép bởi ràng buộc cứng — W-66 deadline → perimeter P0 → 
 | Cluster | Tên | IDs (∑) | Slice |
 |---|---|---|---|
 | **C1** | Stop-the-bleed (timebomb + perimeter P0 + latent-P0 design) | W-58✅,59✅,60✅,61🟡,62✅,63✅,66✅,67✅,85✅,94✅,104✅ · A16✅,A17✅,A18✅ (**14**) | **S-P0-02** (active) |
-| **C2** | Safety-net (test/CI/eval/golden + obs cost-trace) — TRƯỚC AI-refactor | A13 · W-32,37,40,**46✅**(openapi gate, S-P0-03/T01),54,55,56,74,75,**76🟡**(soft-fail→hard+ratchet+git_sha gate **partial**: deploy-drift gate wired [smoke-live.sh+GIT_SHA stamp], live-smoke stage conditional→T01b),77,78,79,80,81,93 (**17**) | **S-P0-03** (active) |
+| **C2** | Safety-net (test/CI/eval/golden + obs cost-trace) — TRƯỚC AI-refactor | A13 · W-32,37,40,**46✅**(openapi gate, S-P0-03/T01),54,55,56,74,75,**76✅**(soft-fail→hard + coverage ratchet + integration-db un-skip 19 spec + openapi+git_sha gate; S-P0-03/T01+T01b. *residual:* live-smoke compose stage conditional `RUN_DEPLOY_SMOKE=true` cho prod deploy),77,78,79,80,81,93 (**17**) | **S-P0-03** (active) |
 | **C3** | Async backbone & event integrity (Kafka/outbox/relay/DLQ/envelope/retry-CB/events-partition) — XONG TRƯỚC payment | A7,A10,A11,A12,A15,A20,A21 · W-44,68,70,71,72,73 (**13**) | — |
 | **C3-RT** | Runtime-prod hardening & backpressure (flask→gunicorn/MCP-pool/Redis-HA/SSE-cap/deadlock-retry/load-shed) — *split của C3 per Plan KI#3* | A1,A3,A4,A5 · W-86,95,96,97 (**8**) | — |
 | **C4** | Payment & order integrity | (**0** inventory — payment = build mới BACKLOG #2/#3, không phải weakness có sẵn; phụ thuộc cứng C3 outbox/DLQ) | — |
@@ -180,12 +180,14 @@ CI-Postgres job). 5×F841 vestigial: dọn khi chạm file ở C7.
 - **T01c-hotfix** *(mới, không W-ID — phát hiện T01, chạy SAU T01b)*: `_fetch_price_solver`
   identity NameError, `ai/graphs/intents/importing_by_images.py`.
 
-**T01b (tách khỏi T01 — cần compose/DB runner, chạy TRƯỚC T01c-hotfix):** matrix Postgres
-service trong CI + `RUN_DB_TESTS=1` cho gateway (19 spec auth/tenant-isolation un-skip) + mcp
-stock-atomic + ratchet lại gateway floor (29% → số mới đo). Acceptance: spec đang skip chạy thật
-+ demo gate-bite postgres-down → đỏ + revert. *(openapi gate W-46 + deploy-drift artifacts ĐÃ
-vào T01 — export standalone không cần compose; chỉ live-smoke stage `deploy-smoke` conditional
-`RUN_DEPLOY_SMOKE=true` → T01b.)*
+**T01b ✅ (đã đóng):** job `integration-db` (ci.yml) — postgres:16-alpine + redis:7-alpine +
+`apply.sh` + seed tối thiểu (`infra/seed/ci-min.sql`, CHỈ merchant1) → `RUN_DB_TESTS=1` un-skip
+19 spec (gateway auth 12 + tenant-isolation 7, **23/23 xanh**) + mcp stock-atomic (2) với DB.
+Gateway floor 29→**43** (with-DB, đo thật 43.8%; check riêng job DB qua `check-coverage.mjs gateway`;
+web/workers vẫn check ở job no-DB). Gate-bite postgres-down + RUN_DB_TESTS=1 → 2 suite fail (demo).
+**test-vs-RLS fix:** AC-12.a/b/c read + afterEach DELETE `behavior_events` qua `pgPool.withTenant(DEMO)`
+(KHÔNG sửa code production — event ghi đúng, log `batch_persisted accepted:1`). *(live-smoke
+`deploy-smoke` vẫn conditional `RUN_DEPLOY_SMOKE=true` cho prod stage.)*
 
 ## §4 Done gần đây
 

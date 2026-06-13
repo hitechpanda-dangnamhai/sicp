@@ -59,9 +59,11 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # test:cov writes apps/<app>/coverage/coverage-summary.json for the ratchet.
+      # gateway runs here too (DB specs self-skip without RUN_DB_TESTS) but its
+      # coverage floor is enforced in the integration-db job (full coverage w/ DB).
       - run: pnpm -r run test:cov
-      - name: Coverage ratchet (floors in coverage.floors.json)
-        run: node scripts/check-coverage.mjs
+      - name: Coverage ratchet — web + workers (DB-free)
+        run: node scripts/check-coverage.mjs web workers
 
   typecheck:
     runs-on: ubuntu-latest
@@ -111,6 +113,70 @@ jobs:
         run: |
           pip install -e ".[dev]"
           pytest -q
+
+  # S-P0-03/T01b (W-76): tier-2 gate with real Postgres + Redis. Un-skips the 19
+  # DB-integration specs (RUN_DB_TESTS=1: gateway auth + tenant-isolation) and runs
+  # mcp stock-atomic against a live DB, then ratchets gateway's WITH-DB coverage
+  # floor (43). Runs on every push/PR (services are cheap; no compose needed).
+  integration-db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: icp
+          POSTGRES_PASSWORD: icp_dev_password
+          POSTGRES_DB: icp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U icp"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://icp_app:icp_app_dev_password@localhost:5432/icp
+      DATABASE_URL_MIGRATE: postgresql://icp:icp_dev_password@localhost:5432/icp
+      DATABASE_URL_SUPER: postgresql://icp:icp_dev_password@localhost:5432/icp
+      DATABASE_URL_APP: postgresql://icp_app:icp_app_dev_password@localhost:5432/icp
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci_dummy_secret_at_least_32_chars_long_000
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pnpm install --frozen-lockfile
+      - name: Apply migrations (superuser) → schema + RLS + icp_app role + DEMO tenant
+        run: bash infra/migrations/apply.sh
+      - name: Minimal seed (merchant1 only — NOT full W-80 seed)
+        run: psql "$DATABASE_URL_MIGRATE" -v ON_ERROR_STOP=1 -f infra/seed/ci-min.sql
+      - name: Gateway integration specs (RUN_DB_TESTS=1) + WITH-DB coverage ratchet
+        working-directory: apps/gateway
+        env:
+          RUN_DB_TESTS: '1'
+        run: pnpm test:cov
+      - name: Coverage ratchet — gateway (with DB)
+        run: node scripts/check-coverage.mjs gateway
+      - name: MCP stock-atomic against live DB
+        working-directory: apps/mcp
+        run: |
+          pip install -e ".[dev]"
+          pytest tests/test_t05_stock_atomic.py -q
 
   # S-P0-03/T01 (W-76) deploy-drift gate. CONDITIONAL: brings up the full compose
   # stack, so it only runs where a Docker/compose runner exists. Enable by setting

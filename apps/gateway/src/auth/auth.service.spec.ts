@@ -224,9 +224,13 @@ describe.skipIf(!RUN_DB)('AuthService integration (real PG + Redis + bcryptjs + 
 
     // Pre-clean any orphan test data from prior runs.
     await pool.query(`DELETE FROM sessions WHERE user_id = $1`, [testUserId]);
-    await pool.query(
-      `DELETE FROM behavior_events WHERE user_id = $1 OR session_id = 'system'`,
-      [testUserId],
+    // RLS-aware cleanup (S-P0-03/T01b): behavior_events is RLS-scoped → DELETE via
+    // the plain icp_app pool silently removes 0 rows (RLS filter) → rows accumulate.
+    await pgPool.withTenant(DEMO_TENANT_ID, (c) =>
+      c.query(
+        `DELETE FROM behavior_events WHERE user_id = $1 OR session_id = 'system'`,
+        [testUserId],
+      ),
     );
     await cleanRedisSessions(redis);
   });
@@ -235,9 +239,13 @@ describe.skipIf(!RUN_DB)('AuthService integration (real PG + Redis + bcryptjs + 
     // Clear sessions + behavior_events created during this test only.
     // session_id='system' covers forgot-password rows (no user_id, no jti).
     await pool.query(`DELETE FROM sessions WHERE user_id = $1`, [testUserId]);
-    await pool.query(
-      `DELETE FROM behavior_events WHERE user_id = $1 OR session_id = 'system'`,
-      [testUserId],
+    // RLS-aware cleanup (S-P0-03/T01b): behavior_events is RLS-scoped → DELETE via
+    // the plain icp_app pool silently removes 0 rows (RLS filter) → rows accumulate.
+    await pgPool.withTenant(DEMO_TENANT_ID, (c) =>
+      c.query(
+        `DELETE FROM behavior_events WHERE user_id = $1 OR session_id = 'system'`,
+        [testUserId],
+      ),
     );
     await cleanRedisSessions(redis);
   });
@@ -449,10 +457,15 @@ describe.skipIf(!RUN_DB)('AuthService integration (real PG + Redis + bcryptjs + 
     // Wait for fire-and-forget loopback to complete PG INSERT
     await sleep(LOOPBACK_FLUSH_MS);
 
-    const rows = await pool.query<{ event_type: string; user_id: string; session_id: string; properties: Record<string, unknown> }>(
-      `SELECT event_type, user_id, session_id, properties FROM behavior_events
-       WHERE event_type = 'auth.signed_in' AND user_id = $1`,
-      [login.user.id],
+    // RLS-aware read (S-P0-03/T01b): behavior_events is RLS-scoped since S-P0-01.
+    // The event IS persisted under DEMO; read via withTenant() or a plain icp_app
+    // query returns 0 (RLS filters). Mirror tenant-isolation.spec.
+    const rows = await pgPool.withTenant(DEMO_TENANT_ID, (c) =>
+      c.query<{ event_type: string; user_id: string; session_id: string; properties: Record<string, unknown> }>(
+        `SELECT event_type, user_id, session_id, properties FROM behavior_events
+         WHERE event_type = 'auth.signed_in' AND user_id = $1`,
+        [login.user.id],
+      ),
     );
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0].session_id).toBe(login.jti);
@@ -473,10 +486,13 @@ describe.skipIf(!RUN_DB)('AuthService integration (real PG + Redis + bcryptjs + 
     // Wait for both signed_in (from login) + signed_out (from logout) to flush
     await sleep(LOOPBACK_FLUSH_MS);
 
-    const rows = await pool.query<{ event_type: string; user_id: string; session_id: string; properties: Record<string, unknown> }>(
-      `SELECT event_type, user_id, session_id, properties FROM behavior_events
-       WHERE event_type = 'auth.signed_out' AND user_id = $1`,
-      [login.user.id],
+    // RLS-aware read (S-P0-03/T01b): behavior_events RLS-scoped → read via withTenant.
+    const rows = await pgPool.withTenant(DEMO_TENANT_ID, (c) =>
+      c.query<{ event_type: string; user_id: string; session_id: string; properties: Record<string, unknown> }>(
+        `SELECT event_type, user_id, session_id, properties FROM behavior_events
+         WHERE event_type = 'auth.signed_out' AND user_id = $1`,
+        [login.user.id],
+      ),
     );
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0].session_id).toBe(login.jti);
@@ -502,9 +518,12 @@ describe.skipIf(!RUN_DB)('AuthService integration (real PG + Redis + bcryptjs + 
     // Wait for fire-and-forget loopback
     await sleep(LOOPBACK_FLUSH_MS);
 
-    const rows = await pool.query<{ event_type: string; user_id: string | null; session_id: string; tenant_id: string; properties: Record<string, string> }>(
-      `SELECT event_type, user_id, session_id, tenant_id, properties FROM behavior_events
-       WHERE event_type = 'auth.password_reset_requested' AND session_id = 'system'`,
+    // RLS-aware read (S-P0-03/T01b): behavior_events RLS-scoped → read via withTenant.
+    const rows = await pgPool.withTenant(DEMO_TENANT_ID, (c) =>
+      c.query<{ event_type: string; user_id: string | null; session_id: string; tenant_id: string; properties: Record<string, string> }>(
+        `SELECT event_type, user_id, session_id, tenant_id, properties FROM behavior_events
+         WHERE event_type = 'auth.password_reset_requested' AND session_id = 'system'`,
+      ),
     );
     expect(rows.rows).toHaveLength(1);
     expect(rows.rows[0].user_id).toBeNull(); // No session yet — anonymous endpoint

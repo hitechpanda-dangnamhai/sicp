@@ -37,6 +37,7 @@
 - [ ] **Tenant gate (ADR-052):** mọi thay đổi data-path phải có ≥1 assert cross-tenant (request tenant A KHÔNG đọc/ghi được data tenant B) — không assert = chưa xong
 - [ ] **Re-verify scoped (ADR-052):** finding nhận từ inventory/audit là GIẢ THUYẾT — verify lại tại `path:line` TRƯỚC khi code, ghi CONFIRMED/STALE/CHANGED vào report (lý do: inventory từng có P0 giả do đọc nhầm đơn vị)
 - [ ] **W-ID mồ côi (ADR-052):** đóng slice phải tick các W-IDs nó nhận trong `BACKLOG §3` map; chương trình re-architecture CHƯA kết thúc khi còn W-ID chưa GIỮ / chưa ✅ / chưa thuộc slice nào
+- [ ] **RLS-aware test (S-P0-03/T01b):** integration test ĐỌC/XOÁ bảng có RLS → phải qua `withTenant(tenant_id, cb)` HOẶC super-pool tường minh. Pool tenant-pool (icp_app) không set ctx → RLS lọc 0 dòng = test sai, KHÔNG phải code sai (bài học `auth.service.spec` AC-12).
 
 ## 6. COMMIT
 - Trong task: commit nháp tuỳ ý. ĐÓNG TASK: **squash về đúng 1 commit**.
@@ -161,3 +162,9 @@ Known issues: <tự khai, kể cả nghi ngờ>
 - **Mindset đọc-only** (TỰ bật, KHÔNG cần plan mode): CẤM edit / write / migration / install. Chỉ tool đọc: `view`/`grep`/`find`/`cat`/`ls`/`wc`/`psql \d`.
 - **Format output**: ≤60 dòng (RECON) · ≤30 dòng (PULL). MỖI claim kèm `path:dòng`. Không thấy → "KHÔNG TÌM THẤY", cấm đoán. CẤM tự đề xuất fix — Web lo ở A1 DESIGN.
 - **File dài** (vd "cat ADR-040"): tóm tắt 3-5 bullet + path, KHÔNG paste raw — giữ trần dòng; Web tự fetch nếu cần.
+
+## 13. Slice là Single Home của task (R3 — slice-content)
+- Mọi task PHẢI tồn tại trong file slice (`docs/slices/S-*.md`) TRƯỚC khi paste prompt mở task.
+- Task sinh GIỮA slice (do KI split / regression / hotfix): append vào file slice (`§Yb`, `§Yc`…) trong CÙNG commit với task đó — slice là nhà duy nhất của định nghĩa task (mở rộng §9).
+- Prompt mở task LUÔN dùng form mỏng playbook (`[BỐI CẢNH]`/`[VIỆC]`/`[RÀNG BUỘC]`/`[OUTPUT]`/`[THẤT BẠI]`), TRỎ slice + task ID — KHÔNG nhúng nội dung task vào prompt.
+- Bài học: S-P0-03/T01b (KI#3 split T01) là task đầu tiên áp luật này (slice §1b).
