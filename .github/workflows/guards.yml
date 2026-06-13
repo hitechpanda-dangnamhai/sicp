@@ -48,7 +48,9 @@ jobs:
           else
             RANGE="${{ github.event.before }}..${{ github.sha }}"
           fi
-          git log --format=%s "$RANGE" | while read -r s; do
+          # --no-merges: skip synthetic PR merge-commit (refs/pull/N/merge) — chỉ
+          # lint commit tác giả; PR-flow + push-flow đều đúng (root-3 T01d-hotfix).
+          git log --no-merges --format=%s "$RANGE" | while read -r s; do
             echo "check: $s"
             # taxonomy v3: slice id cho phép prefix chữ + nhiều đoạn (S-P0-01,
             # S-META-02, S-AUDIT) — không chỉ S-<số>. WHY: BACKLOG §2 đặt tên
@@ -56,7 +58,10 @@ jobs:
             # taxonomy v3.1: task id cho phép hậu tố chữ + nhánh con (T02b-1) —
             # không chỉ T<số>. WHY: slice tách task phức tạp thành T0Nx-M
             # (S-P0-01 đặt T02b → T02b-1/2/3). Nguồn: docs/slices/S-P0-01.md.
-            echo "$s" | grep -qE '^(S-[A-Z0-9]+(-[A-Z0-9]+)*/(T[0-9]+[a-z]?(-[0-9]+)?|HOTFIX-[0-9]+|REFACTOR-[0-9]+)|META): .+' \
+            # taxonomy v3.2: task id cho phép hậu tố -hotfix/-refactor (T0N-hotfix)
+            # — convention BACKLOG cho hotfix/refactor gắn-task (T01c/T02b/T01d-hotfix);
+            # cùng tinh thần v3.1 split-suffix. Nguồn: CLAUDE.md §6 + BACKLOG §2.
+            echo "$s" | grep -qE '^(S-[A-Z0-9]+(-[A-Z0-9]+)*/(T[0-9]+[a-z]?(-[0-9]+|-hotfix|-refactor)?|HOTFIX-[0-9]+|REFACTOR-[0-9]+)|META): .+' \
               || { echo "::error::Commit sai format taxonomy: '$s'"; exit 1; }
           done
 
@@ -77,6 +82,11 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # S-P0-03/T01d-hotfix: @icp/shared-types exports dist-only (gitignored) →
+      # build TRƯỚC gateway, nếu không TS2307 "Cannot find module '@icp/shared-types'"
+      # (cùng build-order root CI baseline).
+      - name: Build @icp/shared-types (gateway consumer resolve ./dist)
+        run: pnpm --filter @icp/shared-types build
       - name: Build gateway
         run: pnpm --filter @icp/gateway build
       - name: Export OpenAPI from gateway (standalone, dummy env)
