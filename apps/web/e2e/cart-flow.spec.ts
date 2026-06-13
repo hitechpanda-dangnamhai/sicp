@@ -24,6 +24,7 @@
 
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
+import { CartSchema, type Cart } from '@icp/shared-types/cart';
 
 const DEMO_TENANT = '11111111-1111-1111-1111-111111111111';
 const DEMO2_TENANT = 'a2a2a2a2-0000-4000-8000-000000000002';
@@ -42,10 +43,13 @@ function hdr(tenant: string, mutation = false): Record<string, string> {
   return h;
 }
 
-async function getCart(req: APIRequestContext, tenant: string) {
+// W-81 (T02c): parse cart response qua Zod CartSchema từ @icp/shared-types —
+// contract THẬT (không chỉ shape ad-hoc). BE đổi field cart → parse throw → e2e
+// đỏ thật. Đây là contract-assert route chính (cart) của hard-gate MODE B.
+async function getCart(req: APIRequestContext, tenant: string): Promise<Cart> {
   const res = await req.get('/api/v1/cart', { headers: hdr(tenant) });
   expect(res.status()).toBe(200);
-  return res.json() as Promise<{ items: { product_id: string; qty: number }[] }>;
+  return CartSchema.parse(await res.json());
 }
 
 async function clearCart(req: APIRequestContext, tenant: string): Promise<void> {

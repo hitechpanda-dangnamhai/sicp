@@ -541,18 +541,27 @@ logs-dashboard:
 
 # Reusable cleanup target — wipes prior test sessions for deterministic state.
 # Used by:
-#   - Playwright `beforeEach` hook in auth-flow.spec.ts + dashboard.spec.ts
+#   - Playwright `beforeEach` hook in auth-flow.spec.ts (best-effort, non-fatal)
 #   - Manual repeat-run before `make smoke-e2e`
+#   - CI e2e job (S-P0-03/T02c MODE B) — pre-run determinism step.
+# S-P0-03/T02c MODE B: direct psql/redis-cli (KHÔNG `docker compose exec`) → chạy
+# trên CI GH service-container; local compose map cùng host port nên cũng đúng.
+# Override qua E2E_CLEANUP_DB_URL / REDIS_URL. redis-cli vắng (không bắt buộc local)
+# → bỏ qua Redis wipe có thông báo (KHÔNG silent); PG sessions là cleanup chính.
+E2E_CLEANUP_DB_URL ?= postgresql://icp:icp_dev_password@localhost:5432/icp
+REDIS_URL ?= redis://localhost:6379
 e2e-cleanup:
 	@echo "=== e2e-cleanup: wipe sessions for merchant1@demo.icp ==="
-	@docker compose -f infra/docker-compose.yml exec -T postgres psql -U icp -d icp -tA -c \
+	@psql "$(E2E_CLEANUP_DB_URL)" -tA -c \
 		"DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = 'merchant1@demo.icp');" \
 		> /dev/null
-	@REDIS_KEYS=$$(docker compose -f infra/docker-compose.yml exec -T redis redis-cli KEYS 'session:*' 2>/dev/null | grep -v '^$$' || true); \
-		if [ -n "$$REDIS_KEYS" ]; then \
-			echo "$$REDIS_KEYS" | xargs -r docker compose -f infra/docker-compose.yml exec -T redis redis-cli DEL > /dev/null; \
-		fi
-	@echo "  OK (PG sessions + Redis session:* wiped)"
+	@if command -v redis-cli > /dev/null 2>&1; then \
+		redis-cli -u "$(REDIS_URL)" --scan --pattern 'session:*' | { grep -v '^$$' || true; } \
+			| xargs -r redis-cli -u "$(REDIS_URL)" DEL > /dev/null; \
+		echo "  OK (PG sessions + Redis session:* wiped)"; \
+	else \
+		echo "  OK (PG sessions wiped; redis-cli absent → Redis session:* skipped)"; \
+	fi
 
 # Full E2E smoke target — chains cleanup + Playwright 5 tests.
 # Expected output (per Task Pack §5):
