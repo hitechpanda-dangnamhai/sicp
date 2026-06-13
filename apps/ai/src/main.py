@@ -97,6 +97,7 @@ from . import __version__
 from .graphs.intents import compile_searching_by_text_graph
 from .graphs.router_graph import router_graph
 from .observability import create_logger, init_otel
+from .tools.llm_client import TraceContext, set_request_trace_context
 from .tools.redis_publisher import RedisPublisher
 
 # RedisSaver TTL config per D-S04-13 LAW Strategy β:
@@ -262,6 +263,19 @@ def _drive_graph_async(initial_state: dict[str, Any]) -> bool:
     def _runner() -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        # W-40: ambient TraceContext for this request's thread → every LLM call in
+        # the graph emits a durable trace (ADR-054 §2) without threading a param
+        # through ~10 graph call sites. Per-thread context (thread dies after run
+        # → no cross-request leak). intent_type = best-known at spawn (router may
+        # refine in-graph; trace still carries tenant + tokens + cost).
+        set_request_trace_context(
+            TraceContext(
+                tenant_id=tenant_id,
+                user_id=initial_state.get("user_id"),
+                intent_type=initial_state.get("intent"),
+                rid=request_id,
+            )
+        )
 
         async def _astream_with_saver() -> None:
             # Async context manager: enters Redis connection pool + (after
@@ -513,6 +527,8 @@ def _drive_graph_resume_async(
     def _runner() -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        # W-40: ambient TraceContext (resume path — tenant + rid known).
+        set_request_trace_context(TraceContext(tenant_id=tenant_id, rid=request_id))
 
         async def _astream_resume_with_saver() -> None:
             async with AsyncRedisSaver.from_conn_string(
