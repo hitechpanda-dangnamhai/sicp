@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-13T11:17:19Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-13T14:47:20Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -13,7 +13,8 @@
 - V012__session_last_active_tenant.sql
 - V013__rls_nullif_hardening.sql
 - V014__housekeeper_safety.sql
-- highest: V014
+- V015__llm_traces.sql
+- highest: V015
 
 ## Gateway routes   <!-- grep @Get/@Post/@Patch/@Delete/@Put trong *.controller.ts -->
 - auth: 6 route — @Post('login') @Post('logout') @Get('me') @Post('switch-tenant') @Post('refresh') @Post('forgot-password') 
@@ -83,7 +84,7 @@
 
 ## DB   <!-- docker exec icp-postgres psql; fallback parse migrations -->
 - nguồn: ★ DB LIVE (container icp-postgres, db icp)
-- tables: 24
+- tables: 32
   - action_cards
   - behavior_events
   - behavior_events_y2026m05
@@ -96,6 +97,14 @@
   - behavior_events_y2026m12
   - events
   - insights
+  - llm_traces
+  - llm_traces_y2026m06
+  - llm_traces_y2026m07
+  - llm_traces_y2026m08
+  - llm_traces_y2026m09
+  - llm_traces_y2026m10
+  - llm_traces_y2026m11
+  - llm_traces_y2026m12
   - order_items
   - orders
   - policies
@@ -112,8 +121,8 @@
   - analytics_daily
   - analytics_daily_category
   - analytics_product_performance
-- migrations applied: 11
-- cột tenant_id: 19
+- migrations applied: 13
+- cột tenant_id: 27
 
 ## Frontend (apps/web)   <!-- find app -name page.tsx; ls components -->
 - pages (App Router): 49
