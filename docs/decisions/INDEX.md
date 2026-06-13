@@ -56,5 +56,6 @@
 | [ADR-053](ADR-053.md) | Media: ảnh ra object store + CDN | Accepted | Ảnh → S3-compatible + CDN, DB giữ key+metadata; backfill 2-pha dual-read→cutover; gỡ one-way door base64 (W-90/W-47); thi hành C4 |
 | [ADR-054](ADR-054.md) | LLM cost architecture | Accepted | Giữ provider-abstraction 1 swap; durable trace từ C2 (W-93); route task lite (W-92); distill SAU eval harness; cost per-tenant/intent; quyết bằng số |
 | [ADR-055](ADR-055.md) | Stock concurrency: optimistic atomic decrement | Accepted | Trừ kho = single-statement atomic UPDATE...WHERE stock>=n tenant-scoped; KHÔNG FOR UPDATE; validate=advisory; invariant stock≥0 tại DB; cột thật `stock` |
+| [ADR-056](ADR-056.md) | CI posture LLM-driven e2e: non-blocking live job | Accepted | deterministic e2e=hard-gate; LLM-e2e=job CI non-blocking (live structural, report, không fail pipeline); regression intent dựa T04 eval; tôn §0.5 |
 
 ⚠️ **Gap:** ADR-026 … ADR-030 không tồn tại trong file gốc — không sinh số bù.
