@@ -46,6 +46,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { streamIntent, type IntentStreamHandlers } from '@/lib/sse-client';
+import { tenantHeaders } from '@/lib/api-client';
 import {
   initialState,
   reduceState,
@@ -186,6 +187,9 @@ export function useSearchStream(): UseSearchStreamReturn {
         headers: {
           'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey,
+          // T02b-hotfix: X-Tenant-Id BẮT BUỘC — resolver header-only (ADR-046
+          // amend c); thiếu → 400 TENANT_CONTEXT_MISSING. Pattern tracker.ts:181.
+          ...tenantHeaders(),
         },
         body: JSON.stringify(body),
       });

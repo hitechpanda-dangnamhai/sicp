@@ -38,6 +38,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { streamIntent, type IntentStreamHandlers } from '@/lib/sse-client';
+import { tenantHeaders } from '@/lib/api-client';
 import { CART_QUERY_KEY } from '@/src/features/cart/use-cart';
 import {
   initialState,
@@ -150,6 +151,7 @@ export function useVoiceStream(): UseVoiceStreamReturn {
         headers: {
           'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey,
+          ...tenantHeaders(), // T02b-hotfix: resolver header-only (ADR-046 amend c)
         },
         body: JSON.stringify(body),
       });

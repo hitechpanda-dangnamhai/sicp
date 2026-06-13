@@ -1,4 +1,4 @@
-# FACTS — generated 2026-06-13T09:59:46Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
+# FACTS — generated 2026-06-13T11:17:19Z by scripts/gen-facts.sh — DO NOT EDIT BY HAND
 
 ## Migrations   <!-- ls infra/migrations/*.sql -->
 - V001__init.sql
@@ -171,8 +171,8 @@
 - components/icp/molecules: 44 file
 - components/icp/organisms: 20 file
 - components/icp/layout: 5 file
-- e2e specs: 4
-- unit/__tests__: 16
+- e2e specs: 5
+- unit/__tests__: 17
 
 ## Vespa rank-profiles   <!-- grep rank-profile product.sd -->
 - ai_augmented

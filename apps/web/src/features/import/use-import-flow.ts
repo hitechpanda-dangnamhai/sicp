@@ -51,6 +51,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { streamIntent, type IntentStreamHandlers } from '@/lib/sse-client';
+import { tenantHeaders } from '@/lib/api-client';
 import {
   initialState,
   reduceState,
@@ -215,6 +216,7 @@ export function useImportFlow(): UseImportFlowReturn {
         headers: {
           'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey,
+          ...tenantHeaders(), // T02b-hotfix: resolver header-only (ADR-046 amend c)
         },
         body: JSON.stringify({
           modality: 'image',

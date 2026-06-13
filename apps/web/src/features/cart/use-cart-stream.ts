@@ -44,6 +44,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { streamIntent, type IntentStreamHandlers } from '@/lib/sse-client';
+import { tenantHeaders } from '@/lib/api-client';
 import { postAction, type IntentActionChoice } from '@/src/features/search/action-poster';
 import type { CartAction, StockReplacementData } from './cart-state-machine';
 import { CART_QUERY_KEY } from './use-cart';
@@ -162,6 +163,7 @@ export function useCartStream(config: UseCartStreamConfig): UseCartStreamReturn 
         headers: {
           'Content-Type': 'application/json',
           'Idempotency-Key': idempotencyKey,
+          ...tenantHeaders(), // T02b-hotfix: resolver header-only (ADR-046 amend c)
         },
         body: JSON.stringify({ modality: 'text', content: '', hint }),
       });
