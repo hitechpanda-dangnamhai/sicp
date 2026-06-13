@@ -1,0 +1,35 @@
+# =============================================================================
+# infra/otel/rules/llm-rollup.yml — LLM cost/token rollup (S-P0-03/T03c, W-74)
+# =============================================================================
+# Recording rules pre-aggregate the per-call LLM metrics (W-55: llm.cost.usd /
+# llm.tokens / llm.latency emitted by apps/ai via OTLP → collector
+# prometheusremotewrite). They roll high-cardinality raw series (tenant_id ×
+# intent × model × provider) up to hourly rates so long-range cost dashboards
+# stay cheap + survive raw-sample retention expiry (15d, compose flag).
+#
+# The OTLP→Prometheus exporter sanitizes metric names (dots→underscores) and may
+# append unit/`_total` suffixes; rules match by __name__ regex so they bind
+# regardless of the exact suffix the collector emits.
+# =============================================================================
+groups:
+  - name: llm_cost_rollup
+    interval: 1m
+    rules:
+      # Hourly USD cost rate per tenant/intent/model/provider.
+      - record: llm:cost_usd:rate1h
+        expr: |
+          sum by (tenant_id, intent, model, provider) (
+            rate({__name__=~"llm_cost_usd.*(total|count)?"}[1h])
+          )
+
+      # Hourly token throughput (in+out) per tenant/intent/model/provider.
+      - record: llm:tokens:rate1h
+        expr: |
+          sum by (tenant_id, intent, model, provider, direction) (
+            rate({__name__=~"llm_tokens.*(total|count)?"}[1h])
+          )
+
+      # Total USD cost per tenant (coarsest rollup for billing/quota dashboards).
+      - record: llm:cost_usd:rate1h:by_tenant
+        expr: |
+          sum by (tenant_id) (llm:cost_usd:rate1h)

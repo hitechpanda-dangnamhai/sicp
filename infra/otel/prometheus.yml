@@ -2,6 +2,16 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# ── W-74 (S-P0-03/T03c): retention + rollup ─────────────────────────────────
+# Retention (bound full-granularity storage) = CLI flag in compose:
+#   --storage.tsdb.retention.time=15d  (see docker-compose.observability.yml).
+#   15d raw; long-term cost trend served by the rollup recording rules below.
+# Rollup = recording rules that pre-aggregate the high-cardinality LLM cost/token
+# series (tenant_id label) into hourly rates → cheaper long-range dashboard
+# queries + survive raw-sample expiry (ADR-054 §2 per-intent cost spine).
+rule_files:
+  - /etc/prometheus/rules/llm-rollup.yml
+
 scrape_configs:
   # Self-monitor
   - job_name: 'prometheus'

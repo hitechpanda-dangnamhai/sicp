@@ -91,8 +91,12 @@ services:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--web.enable-remote-write-receiver"
+      # W-74 (S-P0-03/T03c): bound full-granularity storage; long-term cost trend
+      # served by rollup recording rules (otel/rules/llm-rollup.yml).
+      - "--storage.tsdb.retention.time=15d"
     volumes:
       - ./otel/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./otel/rules:/etc/prometheus/rules:ro
       - prometheus_data:/prometheus
     ports: ["9090:9090"]
     networks: [icp]
