@@ -63,6 +63,33 @@ if (!DATABASE_URL) {
 const BCRYPT_COST = 10; // D-01
 
 // ─────────────────────────────────────────────────────────────────────────────
+// S-P0-03/T02a (W-80): multi-tenant seed. Post-V011 mọi bảng data tenant-scoped
+// (tenant_id NOT NULL, no default) → seed PHẢI gán tenant_id tường minh, nếu
+// không INSERT vỡ NOT NULL (bug latent từ V011 — seed.ts cũ chỉ chạy được
+// pre-V011). Seed ≥2 tenant đầy đủ; merchant→tenant deterministic (KHÔNG suy từ
+// membership vì V011 backfill mọi merchant→demo → ambiguous). Customer GLOBAL
+// (ADR-046) không có row tenant. Ids khớp ci-min.sql (a2a2a2a2 persistent).
+// Seed chạy bằng superuser 'icp' (DATABASE_URL) BYPASSRLS → INSERT đa-tenant OK.
+const DEMO_TENANT = '11111111-1111-1111-1111-111111111111';
+const DEMO2_TENANT = 'a2a2a2a2-0000-4000-8000-000000000002';
+
+interface TenantSeed {
+  id: string;
+  slug: string;
+  name: string;
+}
+const TENANTS: TenantSeed[] = [
+  { id: DEMO_TENANT, slug: 'demo', name: 'Demo Shop' },
+  { id: DEMO2_TENANT, slug: 'demo2', name: 'Demo Shop 2' },
+];
+
+// merchant_email → tenant sở hữu (deterministic product/membership scope).
+const MERCHANT_TENANT: Record<string, string> = {
+  'merchant1@demo.icp': DEMO_TENANT,
+  'merchant2@demo.icp': DEMO2_TENANT,
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Type definitions cho seed JSON files (local — không import @icp/shared-types
 // vì seed package standalone, scope T05 minimal).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +143,23 @@ async function main(): Promise<void> {
   await client.connect();
 
   try {
+    // === 0. TENANTS (W-80) ==================================================
+    // DEMO đã có từ V011; demo2 thêm ở đây. FK anchor cho memberships/products.
+    let tenantsInserted = 0;
+    for (const t of TENANTS) {
+      const res = await client.query(
+        `INSERT INTO tenants (id, slug, name)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (id) DO NOTHING
+         RETURNING id`,
+        [t.id, t.slug, t.name],
+      );
+      if (res.rowCount === 1) tenantsInserted++;
+    }
+    console.log(
+      `Tenants:  inserted ${tenantsInserted}, skipped ${TENANTS.length - tenantsInserted}`,
+    );
+
     // === 1. USERS ===========================================================
     const users: UserSeed[] = JSON.parse(
       readFileSync(join(__dirname, 'users.json'), 'utf-8'),
@@ -134,6 +178,24 @@ async function main(): Promise<void> {
     }
     console.log(
       `Users:    inserted ${usersInserted}, skipped ${users.length - usersInserted}`,
+    );
+
+    // === 1b. MEMBERSHIPS (W-80) =============================================
+    // merchant → tenant owner (deterministic map). Customer GLOBAL: KHÔNG row
+    // (ADR-046). Additive với V011 backfill (merchant→demo) — ON CONFLICT NOOP.
+    let membershipsInserted = 0;
+    for (const [email, tenantId] of Object.entries(MERCHANT_TENANT)) {
+      const res = await client.query(
+        `INSERT INTO tenant_memberships (user_id, tenant_id, role)
+         SELECT id, $2, 'owner' FROM users WHERE email = $1
+         ON CONFLICT (user_id, tenant_id) DO NOTHING
+         RETURNING user_id`,
+        [email, tenantId],
+      );
+      if (res.rowCount === 1) membershipsInserted++;
+    }
+    console.log(
+      `Members:  inserted ${membershipsInserted}, skipped ${Object.keys(MERCHANT_TENANT).length - membershipsInserted}`,
     );
 
     // === 2. PRODUCTS ========================================================
@@ -161,10 +223,21 @@ async function main(): Promise<void> {
       }
       const merchantId = merchantRes.rows[0].id;
 
-      // Q-4 Path B idempotency guard.
+      // T02a: tenant_id BẮT BUỘC (V011 NOT NULL). Resolve deterministic từ
+      // merchant_email → tenant owner. Không map → skip (tránh INSERT vỡ).
+      const tenantId = MERCHANT_TENANT[p.merchant_email];
+      if (!tenantId) {
+        console.warn(
+          `Skip product "${p.title}" — merchant ${p.merchant_email} không map tenant.`,
+        );
+        productsSkipped++;
+        continue;
+      }
+
+      // Q-4 Path B idempotency guard (scope tenant — natural key per tenant).
       const existsRes = await client.query(
-        'SELECT 1 FROM products WHERE merchant_id = $1 AND title = $2 LIMIT 1',
-        [merchantId, p.title],
+        'SELECT 1 FROM products WHERE tenant_id = $1 AND merchant_id = $2 AND title = $3 LIMIT 1',
+        [tenantId, merchantId, p.title],
       );
       if (existsRes.rowCount && existsRes.rowCount > 0) {
         productsSkipped++;
@@ -173,14 +246,15 @@ async function main(): Promise<void> {
 
       const insRes = await client.query(
         `INSERT INTO products
-           (merchant_id, title, description, category, attributes,
+           (tenant_id, merchant_id, title, description, category, attributes,
             price, stock, image_url, trend_score,
             brand, original_price, rating_avg, rating_count, sold_count,
             image_gradient, icon_hint, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
-                 $10, $11, $12, $13, $14, $15, $16, $17)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                 $11, $12, $13, $14, $15, $16, $17, $18)
          RETURNING id`,
         [
+          tenantId,
           merchantId,
           p.title,
           p.description,
@@ -210,28 +284,35 @@ async function main(): Promise<void> {
     );
 
     // === 3. POLICIES ========================================================
+    // T02a: tenant-scoped sau V011 — composite UNIQUE (tenant_id, code), UNIQUE
+    // (code) đơn đã DROP. Seed policy set cho MỖI tenant (cả 2 đầy đủ).
+    // ON CONFLICT (tenant_id, code) — khớp uq_policies_tenant_code (V011:206-208).
     const policies: PolicySeed[] = JSON.parse(
       readFileSync(join(__dirname, 'policies.json'), 'utf-8'),
     );
     let policiesInserted = 0;
-    for (const pol of policies) {
-      const res = await client.query(
-        `INSERT INTO policies (code, description, rule_dsl, priority, enabled)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT (code) DO NOTHING
-         RETURNING id`,
-        [
-          pol.code,
-          pol.description,
-          JSON.stringify(pol.rule_dsl),
-          pol.priority,
-          pol.enabled,
-        ],
-      );
-      if (res.rowCount === 1) policiesInserted++;
+    const policyTotal = policies.length * TENANTS.length;
+    for (const t of TENANTS) {
+      for (const pol of policies) {
+        const res = await client.query(
+          `INSERT INTO policies (tenant_id, code, description, rule_dsl, priority, enabled)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (tenant_id, code) DO NOTHING
+           RETURNING id`,
+          [
+            t.id,
+            pol.code,
+            pol.description,
+            JSON.stringify(pol.rule_dsl),
+            pol.priority,
+            pol.enabled,
+          ],
+        );
+        if (res.rowCount === 1) policiesInserted++;
+      }
     }
     console.log(
-      `Policies: inserted ${policiesInserted}, skipped ${policies.length - policiesInserted}`,
+      `Policies: inserted ${policiesInserted}, skipped ${policyTotal - policiesInserted}`,
     );
 
     console.log('Seed complete.');
